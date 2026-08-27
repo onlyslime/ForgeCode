@@ -3,7 +3,7 @@ import json
 
 import pytest
 
-from forgecode.models import Message, OpenAICompatibleProvider, ProviderError, ToolCall, parse_chat_completion
+from forgecode.models import Message, ModelResponse, OpenAICompatibleProvider, ProviderError, ToolCall, is_valid_response, parse_chat_completion
 
 
 class RecordingTransport:
@@ -81,3 +81,9 @@ def test_provider_requires_configuration():
 def test_provider_rejects_non_string_finish_reason():
     with pytest.raises(ProviderError, match="finish_reason"):
         parse_chat_completion({"choices": [{"finish_reason": 1, "message": {"content": "ok"}}]})
+
+
+def test_provider_neutral_response_validation_rejects_nonfinite_usage_and_bad_finish_reason():
+    assert not is_valid_response(ModelResponse(Message("assistant", "ok"), finish_reason="made_up"))
+    assert not is_valid_response(ModelResponse(Message("assistant", "ok"), usage={"total_tokens": float("nan")}))
+    assert not is_valid_response(ModelResponse(Message("assistant", "ok", tool_calls=(ToolCall("x", "read_file", {}),)), finish_reason="stop"))

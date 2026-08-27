@@ -420,6 +420,9 @@ class ApplyPatchTool:
         approval_arguments = {"patch": safe_preview, "allow_delete": allow_delete, "transaction_id": transaction_id, "operations": [operation.path for operation in change_operations], "change_plan": asdict(change_plan)}
         if not context.request_approval(self.definition.name, approval_arguments):
             return ToolResult(False, "apply_patch denied by approval policy", {"error": "approval_denied", "approval": "denied", "diff": safe_preview, "transaction_id": transaction_id, "operations": [asdict(op) for op in change_operations], "change_plan": asdict(change_plan)})
+        stale = context.deny_if_stale(self.definition.name)
+        if stale:
+            return stale
         # Optimistic concurrency: an approval callback may take time or even
         # modify a target. Never silently overwrite that newer content.
         for operation, target, _original, _updated, before_hash, before_size, before_mtime, _after_bytes in planned:
@@ -433,6 +436,21 @@ class ApplyPatchTool:
                     current_hash = hashlib.sha256(target.read_bytes()).hexdigest()
             if (current_hash, current_size, current_mtime) != (before_hash, before_size, before_mtime):
                 return ToolResult(False, f"patch conflict: {operation.path} changed after preview", {"error": "concurrency_conflict", "transaction_id": transaction_id, "path": operation.path, "diff": safe_preview})
+        transaction_manifest = None
+        if context.transaction_store is not None:
+            try:
+                transaction_manifest = context.transaction_store.prepare(
+                    transaction_id=transaction_id,
+                    run_id=context.run_id,
+                    tool=self.definition.name,
+                    operations=[{key: value for key, value in asdict(operation).items() if key in {"path", "operation", "before_sha256", "after_sha256", "before_bytes", "after_bytes", "encoding", "newline"}} for operation in change_operations],
+                    before_bytes={operation.path: (original.encode("utf-8") if original is not None else None) for operation, _target, original, _updated, _before_hash, _before_size, _before_mtime, _after_bytes in planned},
+                    preview=safe_preview,
+                    plan_id=context.plan_id,
+                    plan_item_id=context.plan_item_id,
+                )
+            except Exception as exc:
+                return ToolResult(False, f"transaction could not be prepared: {type(exc).__name__}", {"error": "transaction_prepare_failed", "transaction_id": transaction_id, "diff": safe_preview})
         written: list[tuple[Any, str | None]] = []
         try:
             for operation, target, _original, updated, _before_hash, _before_size, _before_mtime, _after_bytes in planned:
@@ -451,7 +469,30 @@ class ApplyPatchTool:
                         _atomic_write(target, original)
                 except OSError:
                     pass
+            if transaction_manifest is not None:
+                try:
+                    context.transaction_store.fail(transaction_id, str(exc), recovery_required=False)
+                except Exception:
+                    pass
             return ToolResult(False, f"patch write failed: {exc}", {"error": "write_failed", "diff": safe_preview, "transaction_id": transaction_id, "rolled_back": True, "operations": [asdict(op) for op in change_operations]})
+        if transaction_manifest is not None:
+            try:
+                context.transaction_store.commit(transaction_id)
+            except Exception as exc:
+                rolled_back = True
+                for target, original in reversed(written):
+                    try:
+                        if original is None:
+                            if target.exists(): target.unlink()
+                        else:
+                            _atomic_write(target, original)
+                    except OSError:
+                        rolled_back = False
+                try:
+                    context.transaction_store.fail(transaction_id, f"{type(exc).__name__}: {exc}", recovery_required=not rolled_back)
+                except Exception:
+                    pass
+                return ToolResult(False, f"transaction commit failed: {type(exc).__name__}", {"error": "transaction_commit_failed", "transaction_id": transaction_id, "diff": safe_preview, "operations": [asdict(op) for op in change_operations], "rolled_back": rolled_back})
         changed = [operation.path for operation, _target, _original, _updated, _before_hash, _before_size, _before_mtime, _after_bytes in planned]
         metadata = {
             "paths": changed,

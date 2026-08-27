@@ -8,7 +8,10 @@ ready-made agent framework or a hosted file/code-execution product.
 ## Components and data flow
 
 ```text
-CLI (workspace, mode, approval, session)
+CLI parser/renderer
+  -> application services (run/session/transaction/interactive)
+  -> typed config (CLI > ignored TOML > environment > defaults)
+  -> scoped Rules + explicit References + structured TaskPlan
   -> AgentLoop
        -> ContextBuilder (system policy + bounded history)
        -> ModelProvider
@@ -21,6 +24,7 @@ CLI (workspace, mode, approval, session)
             -> run_command (risk + approval + timeout)
        -> RepositoryMap/ContextPlan (bounded deterministic snapshot)
        -> SessionStore + CheckpointStore (bounded redacted JSONL + fingerprints)
+       -> TransactionStore (bounded manifests + ignored content-addressed blobs)
 ```
 
 For each model turn, `AgentLoop` sends the system/user intent and the most
@@ -31,6 +35,31 @@ dispatches every call, then the loop appends a tool result with the matching
 ordinary model-visible results. The loop stops on a final response, provider
 or protocol error, interruption, repeated-call limit, verification failure or
 the configured step limit.
+
+`cli.py` is a stable compatibility entry point. Parser and command dispatch
+live in `application/commands.py`; reusable `RunService`, `SessionService`,
+`TransactionService` and `InteractiveSession` return typed values rather than
+owning a second execution engine.
+
+## Rules, references and structured plans
+
+`RuleEngine` loads root and target-parent-chain `AGENTS.md` files in stable
+order. Each source carries workspace-relative path, scope, priority, digest,
+size and omission metadata. Rules are untrusted context: they cannot enable a
+tool, approve an operation, cross the workspace, or alter command hard blocks.
+A fresh fingerprint check immediately before side effects catches rule changes
+after planning.
+
+`ReferenceResolver` parses explicit `@file`, quoted paths, bounded directories
+and read-only `@git:status|diff|log`. It rejects private runtime, goals,
+credentials, binary/non-UTF8 and escaped paths. Each item has a digest, size,
+language, priority and truncation state. Git runs only fixed argument arrays
+with timeout/output caps and never changes repository state.
+
+`TaskPlan` is a versioned DAG of stable `PlanItem` ids with dependencies,
+risk, expected files/commands, acceptance criteria, status and evidence.
+Invalid cycles/transitions are rejected. Rules/reference/checkpoint
+fingerprints can mark a plan stale; Plan -> Act requires a fresh approval.
 
 ## Plan/Act safety boundary
 
@@ -105,6 +134,29 @@ Resume validates those identities and requires a fresh preview/approval; it
 never treats session text as trusted executable input or silently replays a
 side effect. `inspect`/`map` exposes the same deterministic repository map and
 budgeted relevance planner as a read-only context layer.
+
+`ContextCompactor` derives factual sections in fixed priority order (safety,
+rules, current intent, plan, checkpoint, transactions, failures/verification,
+references, recent history). It appends `context_compacted`; it never deletes
+or rewrites original JSONL. `SessionContextRebuilder` reconstructs bounded
+provider-neutral messages and evidence. Recorded tool calls are descriptions,
+not instructions, so resume never replays them. Completed sessions are
+inspect-only unless explicitly forked to a new run id with a parent link.
+
+## Durable transactions and streaming
+
+Writes and patches prepare a versioned manifest before mutation. Before bytes
+are stored as SHA-256-addressed blobs under ignored `.forgecode/transactions`;
+only hashes and bounded previews reach sessions/review. Commit validates after
+hashes. Undo rechecks every current after hash, obtains approval, restores all
+targets using temporary atomic replacements, and creates a second transaction.
+An external edit, missing/corrupt blob or repeated undo is a conflict and is
+never overwritten with `git reset` or checkout.
+
+The optional SSE parser bounds bytes/events and assembles content and tool-call
+fragments in memory. A tool call becomes a provider-neutral `ToolCall` only
+after `[DONE]`, a valid finish reason, unique id/name and complete JSON object
+arguments. Broken streams return errors before AgentLoop receives any call.
 
 ## Lifecycle, transactions and verification
 

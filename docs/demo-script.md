@@ -15,6 +15,7 @@ uv run forgecode --workspace $demo run --demo --auto-approve
 uv run forgecode --workspace $demo sessions
 uv run forgecode --workspace $demo status
 uv run forgecode --workspace $demo diff
+uv run forgecode --workspace $demo transaction
 ```
 
 ## What to point out
@@ -32,6 +33,31 @@ uv run forgecode --workspace $demo diff
 5. The second pytest and the final verification pass. The terminal shows mode,
    approvals, risk metadata, changed files, diff, final message and session
    JSONL path. `sessions`, `status` and `diff` inspect that same bounded audit.
+6. `transaction` reads the durable ledger after the process exits and reports
+   the exact before/after hashes, verification evidence and rollback availability.
+
+If time permits, demonstrate the hash-checked undo (it intentionally makes the
+original failing test fail again):
+
+```powershell
+uv run forgecode --workspace $demo transaction latest --execute --auto-approve
+uv run forgecode --workspace $demo transaction
+```
+
+The original transaction now shows `undone`; a second undo is rejected. An
+external edit before undo returns conflict exit code 3 and is preserved.
+
+## Interactive script (optional full demo)
+
+```powershell
+$chat = Join-Path ([System.IO.Path]::GetTempPath()) ('forgecode-chat-' + [guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Path $chat | Out-Null
+@('/help','inspect calculator','/mode act','fix calculator','/review','/compact','/quit') |
+  uv run forgecode --workspace $chat chat --demo --auto-approve
+```
+
+This script shows a side-effect-free structured plan, explicit Plan -> Act
+approval, real test/patch evidence, ledger review and append-only compaction.
 
 To demonstrate a second real offline task, use a different fresh directory:
 

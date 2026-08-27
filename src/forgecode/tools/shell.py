@@ -140,6 +140,9 @@ class ShellTool:
             approved = approval.approve(self.definition.name, approval_arguments)
         if not approved:
             return ToolResult(False, "run_command denied by approval policy", {"error": "approval_denied", "approval": "denied", **risk_metadata})
+        stale = context.deny_if_stale(self.definition.name)
+        if stale:
+            return stale
         timeout_value = arguments.get("timeout_seconds", 30)
         if isinstance(timeout_value, bool) or not isinstance(timeout_value, (int, float)):
             raise ValueError("timeout_seconds must be a number")
@@ -213,18 +216,28 @@ class ShellTool:
 class InteractiveApproval:
     """Ask before side effects, with an explicit opt-in automatic mode."""
 
-    def __init__(self, *, auto_approve: bool = False, input_fn=input, output_fn=print, secrets=()):
+    def __init__(self, *, auto_approve: bool = False, input_fn=None, output_fn=None, secrets=(), prompt_to_output: bool = False):
         self.auto_approve = auto_approve
-        self.input_fn = input_fn
-        self.output_fn = output_fn
+        # Resolve defaults at construction time so CLI/tests can safely
+        # inject stdin/stdout (and JSON mode can route prompts to stderr).
+        self.input_fn = input if input_fn is None else input_fn
+        self.output_fn = print if output_fn is None else output_fn
+        self.prompt_to_output = bool(prompt_to_output)
         self.secrets = tuple(secret for secret in secrets if secret)
 
     def approve(self, tool_name: str, arguments: dict[str, Any]) -> bool:
         if self.auto_approve:
             return True
         summary = _safe_summary(arguments, self.secrets)
+        prompt = f"Approve {tool_name} {summary}? [y/N] "
         try:
-            answer = self.input_fn(f"Approve {tool_name} {summary}? [y/N] ")
+            if self.prompt_to_output:
+                # ``input(prompt)`` writes the prompt to stdout itself.  JSON
+                # callers must render it through their diagnostic channel.
+                self.output_fn(prompt)
+                answer = self.input_fn("")
+            else:
+                answer = self.input_fn(prompt)
         except (EOFError, KeyboardInterrupt):
             self.output_fn("approval denied")
             return False

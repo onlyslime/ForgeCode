@@ -1,7 +1,7 @@
-# ForgeCode durability design (v0.0.5)
+# ForgeCode durability design (v0.0.6)
 
-This document records implementation decisions for the v0.0.5 reliability
-milestone. It is a design contract for the code and tests, not a claim that a
+This document records the v0.0.5 reliability baseline and its v0.0.6 durable
+extensions. It is a design contract for the code and tests, not a claim that a
 feature exists before its acceptance test passes.
 
 ## Run lifecycle
@@ -71,6 +71,14 @@ Process-visible failures trigger reverse-order restoration and a rollback
 event. Standard file APIs cannot guarantee atomicity across a machine crash,
 disk failure or a hostile concurrent writer; these limits remain explicit.
 
+In v0.0.6, exact before bytes are written before mutation to content-addressed
+blobs under ignored `.forgecode/transactions`. A bounded manifest links
+before/after hashes, operation, run/plan ids, approval and verification.
+Review and undo reopen this ledger in a new process. Undo requires the current
+after hash, fresh approval and all-target prevalidation; it creates a new
+transaction and marks the parent undone. Corrupt/missing blobs, external
+edits and repeated undo fail closed.
+
 ## Context and repository map
 
 A deterministic repository snapshot follows built-in sensitive exclusions and
@@ -78,6 +86,11 @@ basic `.gitignore`, limits file count and bytes, reports omissions/errors, and
 sorts all outputs. Context selection ranks current intent, checkpoints,
 failures, pending calls, verification and relevant repository entries before
 old conversation. Omissions are visible metadata, never silent.
+
+Compaction appends a deterministic factual summary and never rewrites the
+original JSONL prefix. Context rebuild uses validated events/checkpoints and
+treats previous tool calls only as evidence. Completed sessions are
+inspect-only; explicit forks receive a new run id and parent sequence.
 
 ## Commands and verification
 

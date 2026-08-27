@@ -1,13 +1,15 @@
 """Workspace-scoped filesystem and search tools."""
 
 import os
-import fnmatch
 import re
 import tempfile
 import hashlib
 import uuid
+import fnmatch
+from pathlib import Path
 from typing import Any
 
+from ..context_policy import is_ignored_context_path
 from .base import ToolContext, ToolDefinition, ToolResult
 
 
@@ -22,28 +24,7 @@ _MAX_WRITE_CHARS = 1_000_000
 
 
 def _is_ignored(path, guard) -> bool:
-    try:
-        relative = guard.relative(path)
-    except (OSError, ValueError):
-        return True
-    relative_parts = relative.split("/")
-    if any(part in _SKIP_DIRS for part in relative_parts):
-        return True
-    name = path.name.lower()
-    if name in _SKIP_FILES or name.startswith(".env.") or name.endswith((".pem", ".key", ".secret")):
-        return True
-    gitignore = guard.root / ".gitignore"
-    try:
-        patterns = [line.strip() for line in gitignore.read_text(encoding="utf-8").splitlines() if line.strip() and not line.lstrip().startswith("#")]
-    except (OSError, UnicodeDecodeError):
-        patterns = []
-    for pattern in patterns:
-        if pattern.startswith("!"):
-            continue
-        normalized = pattern.rstrip("/")
-        if fnmatch.fnmatch(relative, normalized) or fnmatch.fnmatch(name, normalized) or any(fnmatch.fnmatch(part, normalized) for part in relative_parts):
-            return True
-    return False
+    return is_ignored_context_path(guard, path)
 
 
 def _is_skipped(path, guard) -> bool:
@@ -78,17 +59,37 @@ class ListFilesTool:
 
     def execute(self, arguments, context):
         pattern = _required(arguments, "pattern")
+        normalized_pattern = pattern.replace("\\", "/")
+        if pattern.startswith(("/", "\\")) or (len(pattern) >= 2 and pattern[1] == ":") or any(part == ".." for part in normalized_pattern.split("/")):
+            raise ValueError("pattern must stay inside the workspace")
         limit = _positive_int(arguments, "max_files", _MAX_LIST_FILES, _MAX_LIST_FILES)
         candidates = []
-        for path in context.guard.root.glob(pattern):
-            if _is_skipped(path, context.guard):
-                continue
-            try:
-                safe_path = context.guard.resolve(path)
-                if safe_path.is_file() and safe_path == path.resolve():
-                    candidates.append(context.guard.relative(safe_path))
-            except (OSError, ValueError):
-                continue
+        # Walk incrementally instead of letting Path.glob materialise an
+        # unbounded recursive result supplied by an untrusted model.
+        visited = 0
+        for directory, names, filenames in os.walk(context.guard.root, topdown=True, followlinks=False):
+            directory_path = Path(directory)
+            names[:] = [name for name in sorted(names, key=str.lower) if not _is_skipped(directory_path / name, context.guard)]
+            for name in sorted(filenames, key=str.lower):
+                path = directory_path / name
+                visited += 1
+                if visited > _MAX_LIST_FILES * 20:
+                    break
+                try:
+                    if not fnmatch.fnmatch(path.relative_to(context.guard.root).as_posix(), normalized_pattern):
+                        continue
+                except (ValueError, OSError):
+                    continue
+                if _is_skipped(path, context.guard):
+                    continue
+                try:
+                    safe_path = context.guard.resolve(path, must_exist=True)
+                    if safe_path.is_file() and safe_path == path.absolute():
+                        candidates.append(context.guard.relative(safe_path))
+                except (OSError, ValueError):
+                    continue
+            if visited > _MAX_LIST_FILES * 20:
+                break
         matches = sorted(set(candidates))
         total_count = len(matches)
         truncated = len(matches) > limit
@@ -111,16 +112,27 @@ class ReadFileTool:
         self.guard = guard
 
     def execute(self, arguments, context):
-        path = context.guard.resolve(_required(arguments, "path"), must_exist=True)
+        path_value = _required(arguments, "path")
+        path = context.guard.resolve(path_value, must_exist=True)
+        lexical = Path(path_value)
+        if not lexical.is_absolute():
+            lexical = context.guard.root / lexical
+        if path != lexical.absolute():
+            raise ValueError("reading symlink or junction aliases is not allowed")
         if _is_ignored(path, context.guard):
             raise ValueError("reading ignored or sensitive files is not allowed")
         if not path.is_file():
             raise ValueError(f"not a file: {arguments['path']}")
         max_chars = _positive_int(arguments, "max_chars", 20_000, _MAX_READ_CHARS)
         try:
-            if path.stat().st_size > _MAX_FILE_BYTES:
+            before_stat = path.stat()
+            if before_stat.st_size > _MAX_FILE_BYTES:
                 raise ValueError(f"file exceeds the {_MAX_FILE_BYTES}-byte safety limit")
-            content = path.read_text(encoding="utf-8")
+            raw = path.read_bytes()
+            after_stat = path.stat()
+            if (before_stat.st_size, before_stat.st_mtime_ns, getattr(before_stat, "st_ino", 0)) != (after_stat.st_size, after_stat.st_mtime_ns, getattr(after_stat, "st_ino", 0)):
+                raise ValueError("file changed while it was read")
+            content = raw.decode("utf-8")
         except UnicodeDecodeError as exc:
             raise ValueError(f"file is not valid UTF-8 text: {arguments['path']}") from exc
         except OSError as exc:
@@ -140,7 +152,13 @@ class SearchTool:
 
     def execute(self, arguments, context):
         query = _required(arguments, "query")
-        root = context.guard.resolve(arguments.get("path", "."), must_exist=True)
+        path_value = arguments.get("path", ".")
+        root = context.guard.resolve(path_value, must_exist=True)
+        lexical_root = Path(path_value)
+        if not lexical_root.is_absolute():
+            lexical_root = context.guard.root / lexical_root
+        if root != lexical_root.absolute():
+            raise ValueError("searching symlink or junction aliases is not allowed")
         use_regex = arguments.get("regex", False)
         if not isinstance(use_regex, bool):
             raise ValueError("regex must be a boolean")
@@ -157,11 +175,15 @@ class SearchTool:
                 continue
             try:
                 safe_path = context.guard.resolve(path)
-                if not safe_path.is_file() or safe_path != path.resolve():
+                if not safe_path.is_file() or safe_path != path.absolute():
                     continue
-                if safe_path.stat().st_size > _MAX_FILE_BYTES:
+                before_stat = safe_path.stat()
+                if before_stat.st_size > _MAX_FILE_BYTES:
                     continue
-                lines = safe_path.read_text(encoding="utf-8").splitlines()
+                lines = safe_path.read_bytes().decode("utf-8").splitlines()
+                after_stat = safe_path.stat()
+                if (before_stat.st_size, before_stat.st_mtime_ns, getattr(before_stat, "st_ino", 0)) != (after_stat.st_size, after_stat.st_mtime_ns, getattr(after_stat, "st_ino", 0)):
+                    continue
             except (UnicodeDecodeError, OSError, ValueError):
                 continue
             for number, line in enumerate(lines, 1):
@@ -223,11 +245,31 @@ class WriteFileTool:
         approval_arguments = {"path": path_value, "content": preview, "transaction_id": transaction_id, "operation": "update" if before_exists else "create"}
         if not context.request_approval(self.definition.name, approval_arguments):
             return ToolResult(False, "write_file denied by approval policy", {"error": "approval_denied", "approval": "denied", "transaction_id": transaction_id})
+        stale = context.deny_if_stale(self.definition.name)
+        if stale:
+            return stale
         current_exists = path.exists()
         current_hash = hashlib.sha256(path.read_bytes()).hexdigest() if current_exists and path.is_file() else None
         current_stat = path.stat() if current_exists else None
         if (current_hash, current_stat.st_size if current_stat else 0, current_stat.st_mtime_ns if current_stat else 0) != (before_hash, before_size, before_mtime):
             return ToolResult(False, f"write conflict: {path_value} changed after preview", {"error": "concurrency_conflict", "transaction_id": transaction_id, "path": path_value})
+        transaction_manifest = None
+        if context.transaction_store is not None:
+            try:
+                relative_path = context.guard.relative(path)
+                after_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
+                transaction_manifest = context.transaction_store.prepare(
+                    transaction_id=transaction_id,
+                    run_id=context.run_id,
+                    tool=self.definition.name,
+                    operations=[{"path": relative_path, "operation": "update" if before_exists else "create", "before_sha256": before_hash, "after_sha256": after_hash, "before_bytes": before_size, "after_bytes": len(content.encode("utf-8")), "mode": before_mode}],
+                    before_bytes={relative_path: before_content},
+                    preview=preview,
+                    plan_id=context.plan_id,
+                    plan_item_id=context.plan_item_id,
+                )
+            except Exception as exc:
+                return ToolResult(False, f"transaction could not be prepared: {type(exc).__name__}", {"error": "transaction_prepare_failed", "transaction_id": transaction_id})
         try:
             path.parent.mkdir(parents=True, exist_ok=True)
             descriptor, temporary_name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".forgecode.tmp", dir=path.parent)
@@ -258,7 +300,31 @@ class WriteFileTool:
                 rolled_back = True
             except OSError:
                 pass
+            if transaction_manifest is not None:
+                try:
+                    context.transaction_store.fail(transaction_id, str(exc), recovery_required=not rolled_back)
+                except Exception:
+                    pass
             return ToolResult(False, f"write failed: {exc}", {"error": "write_failed", "transaction_id": transaction_id, "rolled_back": rolled_back, "path": path_value})
         after_bytes = content.encode("utf-8")
         operation = "update" if before_exists else "create"
+        if transaction_manifest is not None:
+            try:
+                context.transaction_store.commit(transaction_id)
+            except Exception as exc:
+                rolled_back = False
+                try:
+                    if before_content is None:
+                        if path.exists():
+                            path.unlink()
+                    else:
+                        path.write_bytes(before_content)
+                    rolled_back = True
+                except OSError:
+                    pass
+                try:
+                    context.transaction_store.fail(transaction_id, f"{type(exc).__name__}: {exc}", recovery_required=not rolled_back)
+                except Exception:
+                    pass
+                return ToolResult(False, f"transaction commit failed: {type(exc).__name__}", {"error": "transaction_commit_failed", "transaction_id": transaction_id, "path": path_value, "rolled_back": rolled_back})
         return ToolResult(True, f"wrote {context.guard.relative(path)}", {"path": context.guard.relative(path), "bytes": len(after_bytes), "approval": "approved", "mutated": True, "transaction_id": transaction_id, "transaction": "committed", "operation": operation, "before_sha256": before_hash, "after_sha256": hashlib.sha256(after_bytes).hexdigest(), "before_bytes": before_size, "after_bytes": len(after_bytes), "newline": "\r\n" if "\r\n" in content else "\n"})

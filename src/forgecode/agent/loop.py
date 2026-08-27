@@ -103,7 +103,7 @@ class AgentLoop:
             self._record("approval", {"tool": tool_name, "arguments": safe_arguments, "approved": approved})
             self._approvals.append({"tool": tool_name, "approved": approved})
 
-        self.context = ToolContext(context.guard, context.approval, approval_observer=record_approval, mode=context.mode, secrets=context.secrets, deadline_monotonic=time.monotonic() + self.config.total_timeout_seconds, cancellation_requested=context.cancellation_requested)
+        self.context = ToolContext(context.guard, context.approval, approval_observer=record_approval, mode=context.mode, secrets=context.secrets, deadline_monotonic=time.monotonic() + self.config.total_timeout_seconds, cancellation_requested=context.cancellation_requested, transaction_store=context.transaction_store, run_id=context.run_id or (session.run_id if session else ""), plan_id=context.plan_id, plan_item_id=context.plan_item_id, pre_side_effect_check=context.pre_side_effect_check, rules_fingerprint=context.rules_fingerprint, plan_fingerprint=context.plan_fingerprint, config_fingerprint=context.config_fingerprint)
 
     def _record(self, kind: str, payload: dict[str, Any]) -> None:
         safe_payload = self._sanitize_session_payload(payload)
@@ -159,6 +159,9 @@ class AgentLoop:
                 approvals=tuple(self._approvals),
                 verification=self._verification_snapshot,
                 context_summary=self._last_context_summary,
+                rules_fingerprint=self.context.rules_fingerprint,
+                plan_fingerprint=self.context.plan_fingerprint,
+                config_fingerprint=self.context.config_fingerprint,
                 secrets=self.context.secrets,
             )
             self.checkpoint_store.save(checkpoint)
@@ -264,6 +267,7 @@ class AgentLoop:
             request_messages = self.context_builder.fit(messages)
             self._last_context_summary = "\n".join(message.content for message in request_messages[-8:])[:8_000]
             self._record("model_request", {"step": step, "message_count": len(request_messages), "context_chars": sum(len(message.content) for message in request_messages), "tool_count": len(self.registry.schemas(self.context.mode))})
+            provider_started = time.monotonic()
             try:
                 remaining = self.context.remaining_seconds(self.config.provider_timeout_seconds)
                 if remaining <= 0:
@@ -330,7 +334,7 @@ class AgentLoop:
                 result = LoopResult(tuple(messages), "tool_call_limit", error_text, verification_ok, self.context.mode.value, explored=tuple(explored), state=self.lifecycle.state.value, run_id=self.run_id, audit_complete=self.audit_complete)
                 self._record("final", {"stopped_reason": result.stopped_reason, "error": error_text})
                 return result
-            self._record("model_message", {"step": step, "content": response.message.content[:16_000], "tool_calls": [call.name for call in response.message.tool_calls], "finish_reason": response.finish_reason, "usage": response.usage})
+            self._record("model_message", {"step": step, "content": response.message.content[:16_000], "tool_calls": [call.name for call in response.message.tool_calls], "finish_reason": response.finish_reason, "usage": response.usage, "duration_seconds": round(time.monotonic() - provider_started, 3)})
             if not response.message.tool_calls:
                 if self.context.mode is AgentMode.PLAN:
                     if self.lifecycle.state is RunState.DISCOVERING:
@@ -386,6 +390,15 @@ class AgentLoop:
                     )
                     self._verification_results.append(verification_result)
                     self._verification_snapshot = verification_result.to_dict()
+                    if self.context.transaction_store is not None:
+                        try:
+                            latest_transaction = next((manifest for manifest in self.context.transaction_store.list(limit=20) if manifest.run_id == self.context.run_id and manifest.state == "committed"), None)
+                            if latest_transaction is not None:
+                                self.context.transaction_store.attach_verification(latest_transaction.transaction_id, verification_result.to_dict())
+                                self._record("transaction_verification", {"transaction_id": latest_transaction.transaction_id, "verification": verification_result.to_dict()})
+                        except Exception as exc:
+                            self.audit_complete = False
+                            self._record("transaction_error", {"error": type(exc).__name__, "operation": "attach_verification"})
                     self._record("verification_result", {"attempt": verification_runs, "ok": verification_ok, "result": verification_result.to_dict(), "output": verification.output[:20_000], "metadata": self._bounded_arguments(verification.metadata)})
                     messages.append(Message(role="user", content=f"Verification result for `{self.config.verification_command}`:\n{verification.output}"))
                     if not verification.ok and verification_runs >= self.config.max_verification_attempts:
@@ -441,7 +454,9 @@ class AgentLoop:
                         self._transition(RunState.ACTING, reason="side effect execution")
                 if side_effecting:
                     self._pending_actions.append({"id": call.id, "tool": call.name, "arguments": self._bounded_arguments(call.arguments)})
+                tool_started = time.monotonic()
                 tool_result = self.registry.execute(call.name, call.arguments, self.context)
+                tool_duration = round(time.monotonic() - tool_started, 3)
                 if side_effecting:
                     self._pending_actions = [item for item in self._pending_actions if item.get("id") != call.id]
                 if call.name in {"list_files", "read_file", "search", "workspace_summary"}:
@@ -458,7 +473,7 @@ class AgentLoop:
                             "reason": tool_result.output[:1_000],
                         },
                     )
-                self._record("tool_result", {"step": step, "id": call.id, "tool": call.name, "ok": tool_result.ok, "output": tool_result.output[:20_000], "metadata": self._bounded_arguments(tool_result.metadata)})
+                self._record("tool_result", {"step": step, "id": call.id, "tool": call.name, "ok": tool_result.ok, "output": tool_result.output[:20_000], "metadata": self._bounded_arguments(tool_result.metadata), "duration_seconds": tool_duration, "output_chars": len(tool_result.output)})
                 for changed_path in tool_result.metadata.get("paths", []) if isinstance(tool_result.metadata, dict) else ():
                     if isinstance(changed_path, str):
                         self._touched_paths.add(changed_path)
@@ -469,14 +484,29 @@ class AgentLoop:
                 if call.name == "apply_patch" and tool_result.metadata.get("transaction_id"):
                     patch_event = "patch_commit" if tool_result.ok else ("patch_rollback" if tool_result.metadata.get("rolled_back") else "patch_refused")
                     self._record(patch_event, {"transaction_id": tool_result.metadata.get("transaction_id"), "ok": tool_result.ok, "error": tool_result.metadata.get("error"), "operations": tool_result.metadata.get("operations", [])})
+                    if tool_result.ok:
+                        self._record("transaction_committed", {"transaction_id": tool_result.metadata.get("transaction_id"), "tool": call.name, "operations": tool_result.metadata.get("operations", [])})
                 if call.name == "write_file" and tool_result.metadata.get("transaction_id"):
                     write_event = "patch_commit" if tool_result.ok else "patch_refused"
                     self._record(write_event, {"transaction_id": tool_result.metadata.get("transaction_id"), "ok": tool_result.ok, "error": tool_result.metadata.get("error"), "path": tool_result.metadata.get("path"), "operation": tool_result.metadata.get("operation")})
+                    if tool_result.ok:
+                        self._record("transaction_committed", {"transaction_id": tool_result.metadata.get("transaction_id"), "tool": call.name, "path": tool_result.metadata.get("path"), "operation": tool_result.metadata.get("operation")})
                 if call.name == "run_command":
                     command_event = "command_timeout" if tool_result.metadata.get("timed_out") else ("command_result" if tool_result.metadata.get("error") != "risk_blocked" else "command_refusal")
                     self._record(command_event, {"id": call.id, "ok": tool_result.ok, "error": tool_result.metadata.get("error"), "risk": tool_result.metadata.get("risk"), "exit_code": tool_result.metadata.get("exit_code"), "timed_out": tool_result.metadata.get("timed_out", False), "duration_seconds": tool_result.metadata.get("duration_seconds")})
                 self._checkpoint(reason=f"tool:{call.name}")
                 messages.append(Message(role="tool", content=self._tool_message_content(tool_result), tool_call_id=call.id))
+                conflict_error = tool_result.metadata.get("error") if isinstance(tool_result.metadata, dict) else None
+                if conflict_error in {"stale_context", "context_revalidation_failed", "concurrency_conflict", "transaction_prepare_failed", "transaction_commit_failed"}:
+                    if not self.lifecycle.terminal:
+                        try:
+                            self._transition(RunState.RECOVERY_REQUIRED, reason=str(conflict_error))
+                        except LifecycleError:
+                            self.lifecycle.state = RunState.RECOVERY_REQUIRED
+                    self._record("recovery_conflict", {"step": step, "id": call.id, "tool": call.name, "error": conflict_error, "reason": tool_result.output[:1_000]})
+                    result = LoopResult(tuple(messages), "recovery_conflict", tool_result.output[:2_000], verification_ok, self.context.mode.value, explored=tuple(explored), state=self.lifecycle.state.value, run_id=self.run_id, audit_complete=self.audit_complete, verifications=tuple(self._verification_results))
+                    self._record("final", {"stopped_reason": result.stopped_reason, "error": result.error, "state": result.state})
+                    return result
                 if side_effecting and self.lifecycle.state is RunState.ACTING:
                     self._transition(RunState.DISCOVERING, reason="tool result recorded")
 

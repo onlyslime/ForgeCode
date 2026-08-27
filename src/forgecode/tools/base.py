@@ -39,6 +39,14 @@ class ToolContext:
     secrets: tuple[str, ...] = ()
     deadline_monotonic: float | None = None
     cancellation_requested: Callable[[], bool] | None = None
+    transaction_store: Any | None = None
+    run_id: str = ""
+    plan_id: str | None = None
+    plan_item_id: str | None = None
+    pre_side_effect_check: Callable[[], bool | str] | None = None
+    rules_fingerprint: str = ""
+    plan_fingerprint: str = ""
+    config_fingerprint: str = ""
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "mode", AgentMode(self.mode))
@@ -71,6 +79,19 @@ class ToolContext:
             )
         return None
 
+    def deny_if_stale(self, tool_name: str) -> ToolResult | None:
+        """Recheck rules/config/context immediately before a side effect."""
+        if self.pre_side_effect_check is None:
+            return None
+        try:
+            result = self.pre_side_effect_check()
+        except Exception as exc:
+            return ToolResult(False, f"{tool_name} blocked because policy context could not be revalidated", {"error": "context_revalidation_failed", "detail": type(exc).__name__})
+        if result is True:
+            return None
+        reason = result if isinstance(result, str) and result else "rules/config/context changed after planning"
+        return ToolResult(False, f"{tool_name} blocked: {reason}", {"error": "stale_context", "reason": reason})
+
 
 class ApprovalPolicy(Protocol):
     def approve(self, tool_name: str, arguments: dict[str, Any]) -> bool:
@@ -95,6 +116,18 @@ class ToolRegistry:
         if tool.definition.name in self._tools:
             raise ValueError(f"duplicate tool: {tool.definition.name}")
         self._tools[tool.definition.name] = tool
+
+    def filter(self, policy: Any | None = None) -> "ToolRegistry":
+        """Return a registry narrowed by policy; policy cannot add tools."""
+        if policy is None:
+            return self
+        result = ToolRegistry(max_output_chars=self.max_output_chars)
+        available = set(self._tools)
+        for name, tool in self._tools.items():
+            permits = getattr(policy, "permits", None)
+            if permits is None or permits(name, available=available):
+                result.register(tool)
+        return result
 
     def names(self) -> tuple[str, ...]:
         return tuple(self._tools)

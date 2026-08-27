@@ -40,6 +40,17 @@ def test_session_safe_partial_read_reports_corrupt_line(tmp_path: Path):
     assert result.issues and result.issues[0].line == 2
     with pytest.raises(SessionFormatError, match="line 2"):
         store.read_with_issues(strict=True)
+    with pytest.raises(SessionFormatError, match="cannot append"):
+        store.append("would_be_unsafe", {})
+
+
+def test_session_append_rejects_mixed_run_identity(tmp_path: Path):
+    path = tmp_path / "mixed.jsonl"
+    first = SessionStore(path, run_id="run-1")
+    first.append("one", {})
+    second = SessionStore(path, run_id="run-2")
+    with pytest.raises(SessionFormatError, match="different or mixed run id"):
+        second.append("two", {})
 
 
 def test_session_normalizes_odd_values_and_redacts_nested_secrets(tmp_path: Path):
@@ -78,3 +89,59 @@ def test_session_reports_sequence_gap(tmp_path: Path):
     path.write_text(raw_lines[0] + "\n" + json.dumps(raw) + "\n", encoding="utf-8")
     result = SessionStore(path).read_with_issues()
     assert any("gap" in issue.message for issue in result.issues)
+
+
+def test_session_inspection_reports_mixed_run_ids_without_append(tmp_path: Path):
+    path = tmp_path / "mixed-runs.jsonl"
+    first = SessionStore(path, run_id="run-one")
+    first.append("one", {})
+    first.append("two", {})
+    raw_lines = path.read_text(encoding="utf-8").splitlines()
+    raw = json.loads(raw_lines[1])
+    raw["run_id"] = "run-two"
+    path.write_text(raw_lines[0] + "\n" + json.dumps(raw) + "\n", encoding="utf-8")
+
+    result = SessionStore(path).read_with_issues()
+
+    assert any("mixed run_id" in issue.message for issue in result.issues)
+    assert any("inspect-only" in issue.message for issue in result.issues)
+
+
+def test_session_inspection_reports_legacy_v1_mixed_stream_and_strict_rejects(tmp_path: Path):
+    path = tmp_path / "mixed-schema.jsonl"
+    legacy = {"kind": "user_message", "payload": {"content": "old"}, "timestamp": "2026-01-01T00:00:00+00:00"}
+    modern = {"kind": "run_created", "payload": {}, "timestamp": "2026-01-01T00:00:01+00:00", "schema_version": 1, "run_id": "run-one", "sequence": 1}
+    path.write_text(json.dumps(legacy) + "\n" + json.dumps(modern) + "\n", encoding="utf-8")
+
+    store = SessionStore(path)
+    result = store.read_with_issues()
+    assert any("legacy and v1" in issue.message for issue in result.issues)
+    with pytest.raises(SessionFormatError, match="legacy and v1"):
+        store.read_with_issues(strict=True)
+
+
+def test_session_inspection_reports_requested_run_identity_mismatch(tmp_path: Path):
+    path = tmp_path / "identity.jsonl"
+    SessionStore(path, run_id="run-one").append("one", {})
+
+    result = SessionStore(path, run_id="run-two").read_with_issues()
+
+    assert any("requested store run_id" in issue.message for issue in result.issues)
+
+
+def test_session_inspection_reports_invalid_terminal_transition(tmp_path: Path):
+    path = tmp_path / "terminal.jsonl"
+    store = SessionStore(path, run_id="run-one")
+    store.append("state_transition", {"from": "created", "to": "discovering"})
+    store.append("state_transition", {"from": "discovering", "to": "planning"})
+    store.append("state_transition", {"from": "planning", "to": "completed"})
+    # Bypass append's safety guard to model a forged on-disk terminal event.
+    raw_lines = path.read_text(encoding="utf-8").splitlines()
+    forged = json.loads(raw_lines[-1])
+    forged["sequence"] = 4
+    forged["payload"] = {"from": "completed", "to": "acting"}
+    path.write_text("\n".join(raw_lines + [json.dumps(forged)]) + "\n", encoding="utf-8")
+
+    result = SessionStore(path).read_with_issues()
+
+    assert any("invalid terminal" in issue.message for issue in result.issues)

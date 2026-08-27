@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import re
+from dataclasses import fields, is_dataclass
+from pathlib import Path
 from typing import Any, Iterable
 
 
@@ -26,21 +28,57 @@ def redact_text(value: object, secrets: Iterable[str] = ()) -> str:
 
 
 def redact_value(value: Any, secrets: Iterable[str] = ()) -> Any:
-    """Recursively redact structured values before model/session exposure."""
-    secret_values = tuple(secret for secret in secrets if secret)
-    if isinstance(value, dict):
-        result: dict[str, Any] = {}
-        for key, item in value.items():
-            key_text = str(key)
-            if any(part in key_text.lower() for part in _SENSITIVE_KEY_PARTS):
-                result[key_text] = "[REDACTED]"
-            else:
-                result[key_text] = redact_value(item, secret_values)
-        return result
-    if isinstance(value, (list, tuple, set, frozenset)):
-        return [redact_value(item, secret_values) for item in value]
-    if isinstance(value, str):
-        return redact_text(value, secret_values)
-    if value is None or isinstance(value, (bool, int, float)):
-        return value
-    return redact_text(value, secret_values)
+    """Recursively redact structured values before model/session exposure.
+
+    This walker is intentionally defensive because metadata may contain
+    dataclasses, paths, bytes, exceptions or cyclic containers supplied by a
+    provider/tool implementation.  It always returns JSON-compatible values
+    and never follows an object graph indefinitely.
+    """
+    secret_values = tuple(secret for secret in secrets if isinstance(secret, str) and secret)
+    active: set[int] = set()
+
+    def walk(item: Any, depth: int = 0) -> Any:
+        if depth > 20:
+            return "[maximum nesting depth exceeded]"
+        if item is None or isinstance(item, (bool, int, float)):
+            return item
+        if isinstance(item, str):
+            return redact_text(item, secret_values)
+        if isinstance(item, (bytes, bytearray, memoryview)):
+            return f"[bytes omitted: {len(item)} bytes]"
+        if isinstance(item, Path):
+            return redact_text(item.as_posix(), secret_values)
+        object_id = id(item)
+        if object_id in active:
+            return "[circular reference omitted]"
+        active.add(object_id)
+        try:
+            if isinstance(item, dict):
+                result: dict[str, Any] = {}
+                for key, child in list(item.items())[:200]:
+                    key_text = str(key)
+                    if any(part in key_text.lower() for part in _SENSITIVE_KEY_PARTS):
+                        result[key_text] = "[REDACTED]"
+                    else:
+                        result[key_text] = walk(child, depth + 1)
+                if len(item) > 200:
+                    result["_truncated_items"] = len(item) - 200
+                return result
+            if isinstance(item, (list, tuple, set, frozenset)):
+                values = list(item)
+                if isinstance(item, (set, frozenset)):
+                    values.sort(key=repr)
+                result = [walk(child, depth + 1) for child in values[:200]]
+                if len(values) > 200:
+                    result.append({"_truncated_items": len(values) - 200})
+                return result
+            if is_dataclass(item) and not isinstance(item, type):
+                return {field.name: walk(getattr(item, field.name), depth + 1) for field in fields(item)[:200]}
+            if isinstance(item, BaseException):
+                return {"type": type(item).__name__, "message": redact_text(str(item), secret_values)}
+            return redact_text(item, secret_values)
+        finally:
+            active.discard(object_id)
+
+    return walk(value)

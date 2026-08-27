@@ -17,27 +17,14 @@ from typing import Iterable
 
 from ..security.redaction import redact_text
 from ..security.workspace import WorkspaceGuard
+from ..context_policy import is_ignored_context_path
 
 _SKIP_DIRS = {".git", ".venv", "node_modules", "__pycache__", ".pytest_cache", ".forgecode", "dist", "build", "tmp", "temp"}
 _SKIP_NAMES = {".env", ".env.local", "credentials.json", "id_rsa"}
 
 
 def _is_ignored(path: Path, guard: WorkspaceGuard) -> bool:
-    try:
-        relative = guard.relative(path)
-    except (OSError, ValueError):
-        return True
-    parts = relative.split("/")
-    name = path.name.lower()
-    if any(part in _SKIP_DIRS for part in parts) or name in _SKIP_NAMES or name.startswith(".env.") or name.endswith((".pem", ".key", ".secret")):
-        return True
-    gitignore = guard.root / ".gitignore"
-    try:
-        patterns = [line.strip() for line in gitignore.read_text(encoding="utf-8").splitlines() if line.strip() and not line.lstrip().startswith("#")]
-    except (OSError, UnicodeDecodeError):
-        patterns = []
-    import fnmatch
-    return any(fnmatch.fnmatch(relative, pattern.rstrip("/")) or fnmatch.fnmatch(name, pattern.rstrip("/")) or any(fnmatch.fnmatch(part, pattern.rstrip("/")) for part in parts) for pattern in patterns if not pattern.startswith("!"))
+    return is_ignored_context_path(guard, path)
 
 
 _BINARY_SUFFIXES = {".png", ".jpg", ".jpeg", ".gif", ".ico", ".pdf", ".zip", ".gz", ".db", ".sqlite", ".pyc", ".dll", ".exe", ".so", ".class", ".woff", ".woff2"}
@@ -177,7 +164,7 @@ class RepositoryMapBuilder:
                         break
                     try:
                         safe_path = self.guard.resolve(path)
-                        if safe_path.is_file() and safe_path == path.resolve():
+                        if safe_path.is_file() and safe_path == path.absolute():
                             candidates.append(safe_path)
                     except (OSError, ValueError) as exc:
                         errors.append(f"{path.name}: {type(exc).__name__}")
@@ -192,6 +179,9 @@ class RepositoryMapBuilder:
         for path in candidates:
             try:
                 stat = path.stat()
+                resolved_before = self.guard.resolve(path, must_exist=True)
+                if resolved_before != path.absolute():
+                    raise OSError("repository file changed into an unsafe path")
                 relative = self.guard.relative(path)
                 language = _LANGUAGES.get(path.suffix.lower())
                 if language:
@@ -200,6 +190,12 @@ class RepositoryMapBuilder:
                     omitted += 1
                     continue
                 raw = path.read_bytes()
+                after_stat = path.stat()
+                resolved_after = self.guard.resolve(path, must_exist=True)
+                before_identity = (stat.st_size, stat.st_mtime_ns, getattr(stat, "st_ino", 0))
+                after_identity = (after_stat.st_size, after_stat.st_mtime_ns, getattr(after_stat, "st_ino", 0))
+                if resolved_after != path.absolute() or before_identity != after_identity:
+                    raise OSError("repository file changed while it was read")
                 if b"\x00" in raw:
                     omitted += 1
                     continue

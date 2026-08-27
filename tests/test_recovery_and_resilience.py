@@ -61,6 +61,30 @@ def test_checkpoint_redacts_pending_side_effect_arguments(tmp_path: Path):
     assert "do-not-leak" not in (tmp_path / "c.json").read_text(encoding="utf-8")
 
 
+def test_checkpoint_rejects_unknown_fields_and_invalid_identity(tmp_path: Path):
+    guard = WorkspaceGuard(tmp_path)
+    checkpoint = Checkpoint.create(guard, run_id="r", state="paused", mode="act", sequence=1)
+    store = CheckpointStore(tmp_path / "c.json")
+    store.save(checkpoint)
+    raw = __import__("json").loads((tmp_path / "c.json").read_text(encoding="utf-8"))
+    raw["unexpected"] = "no"
+    (tmp_path / "c.json").write_text(__import__("json").dumps(raw), encoding="utf-8")
+    with pytest.raises(ValueError, match="unknown fields"):
+        store.load()
+
+
+def test_checkpoint_store_rejects_symlink_alias(tmp_path: Path):
+    target = tmp_path / "real.json"
+    target.write_text("{}", encoding="utf-8")
+    alias = tmp_path / "alias.json"
+    try:
+        alias.symlink_to(target)
+    except (OSError, NotImplementedError):
+        pytest.skip("symlinks unavailable")
+    with pytest.raises(ValueError, match="symlink or junction"):
+        CheckpointStore(alias)
+
+
 def test_loop_result_contains_structured_verification(tmp_path: Path):
     class Provider:
         calls = 0

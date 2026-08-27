@@ -11,16 +11,50 @@ import json
 import os
 import random
 import math
-from typing import Any, Protocol, Sequence
+from typing import Any, Iterable, Protocol, Sequence
 from urllib import error, request
 
 from ..security.redaction import redact_text
 from .protocol import Message, ModelResponse, ProviderError, ToolCall
 
 
+def _reject_nonfinite(value: str) -> None:
+    raise ValueError(f"non-finite JSON constant is not allowed: {value}")
+
+
+def _validate_json_value(value: Any, *, depth: int = 0, budget: list[int] | None = None) -> None:
+    """Reject non-standard/non-bounded values before tool dispatch."""
+    if budget is None:
+        budget = [100_000]
+    if depth > 24:
+        raise ProviderError("tool arguments exceeded nesting limit", category="response_limit")
+    budget[0] -= 1
+    if budget[0] < 0:
+        raise ProviderError("tool arguments contain too many values", category="response_limit")
+    if isinstance(value, float) and not math.isfinite(value):
+        raise ProviderError("tool arguments contain a non-finite number", category="protocol_error")
+    if isinstance(value, str) and len(value) > 200_000:
+        raise ProviderError("tool arguments contain an oversized string", category="response_limit")
+    if isinstance(value, dict):
+        if len(value) > 10_000:
+            raise ProviderError("tool arguments contain too many object fields", category="response_limit")
+        for key, item in value.items():
+            if not isinstance(key, str):
+                raise ProviderError("tool argument object keys must be strings", category="protocol_error")
+            _validate_json_value(item, depth=depth + 1, budget=budget)
+    elif isinstance(value, list):
+        if len(value) > 10_000:
+            raise ProviderError("tool arguments contain too many array values", category="response_limit")
+        for item in value:
+            _validate_json_value(item, depth=depth + 1, budget=budget)
+
+
 class JsonTransport(Protocol):
     def post_json(self, url: str, headers: dict[str, str], body: bytes, timeout: float) -> tuple[int, bytes]:
         """Send a JSON POST and return status code plus response bytes."""
+
+    def post_stream(self, url: str, headers: dict[str, str], body: bytes, timeout: float) -> tuple[int, Iterable[bytes]]:
+        """Optional SSE transport. Implementations may omit this method."""
 
 
 class UrllibTransport:
@@ -61,7 +95,7 @@ def _message_to_payload(message: Message) -> dict[str, Any]:
             {
                 "id": call.id,
                 "type": "function",
-                "function": {"name": call.name, "arguments": json.dumps(call.arguments, ensure_ascii=False)},
+                "function": {"name": call.name, "arguments": json.dumps(call.arguments, ensure_ascii=False, allow_nan=False)},
             }
             for call in message.tool_calls
         ]
@@ -107,19 +141,22 @@ def _parse_tool_calls(raw_calls: Any, *, max_calls: int = 64) -> tuple[ToolCall,
             raise ProviderError(f"model response tool call {index} has no function name", category="protocol_error")
         arguments = function.get("arguments", "{}")
         if isinstance(arguments, str):
+            if len(arguments) > 200_000:
+                raise ProviderError(f"tool call {call_id} arguments exceeded the configured size limit", category="response_limit")
             try:
-                arguments = json.loads(arguments or "{}")
-            except json.JSONDecodeError as exc:
+                arguments = json.loads(arguments or "{}", parse_constant=_reject_nonfinite)
+            except (json.JSONDecodeError, ValueError) as exc:
                 raise ProviderError(f"tool call {call_id} has invalid JSON arguments", category="protocol_error") from exc
         if not isinstance(arguments, dict):
             raise ProviderError(f"tool call {call_id} arguments must be an object", category="protocol_error")
+        _validate_json_value(arguments)
         calls.append(ToolCall(call_id, function["name"], arguments))
     return tuple(calls)
 
 
 def parse_chat_completion(payload: dict[str, Any]) -> ModelResponse:
     choices = payload.get("choices")
-    if not isinstance(choices, list) or not choices or not isinstance(choices[0], dict):
+    if not isinstance(choices, list) or len(choices) != 1 or not isinstance(choices[0], dict):
         raise ProviderError("model response has no choices", category="protocol_error")
     choice = choices[0]
     raw_message = choice.get("message")
@@ -139,17 +176,213 @@ def parse_chat_completion(payload: dict[str, Any]) -> ModelResponse:
     finish_reason = choice.get("finish_reason")
     if finish_reason is not None and not isinstance(finish_reason, str):
         raise ProviderError("model response finish_reason must be text or null", category="protocol_error")
+    if finish_reason not in {None, "stop", "length", "tool_calls", "content_filter"}:
+        raise ProviderError("model response contains an unsupported finish_reason", category="protocol_error")
     usage = payload.get("usage", {})
     if usage is None:
         usage = {}
     if not isinstance(usage, dict):
         raise ProviderError("model response usage must be an object", category="protocol_error")
-    safe_usage = {str(key): value for key, value in list(usage.items())[:32] if isinstance(value, (int, float)) and not isinstance(value, bool)}
+    safe_usage: dict[str, int | float] = {}
+    if len(usage) > 32:
+        raise ProviderError("model response usage contains too many fields", category="response_limit")
+    for key, value in usage.items():
+        if not isinstance(key, str) or not key or len(key) > 128:
+            raise ProviderError("model response usage has an invalid field name", category="protocol_error")
+        if isinstance(value, float) and not math.isfinite(value):
+            raise ProviderError("model response usage contains a non-finite number", category="protocol_error")
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise ProviderError("model response usage fields must be finite numbers", category="protocol_error")
+        if value < 0:
+            raise ProviderError("model response usage cannot be negative", category="protocol_error")
+        safe_usage[key] = value
+    if calls and finish_reason is not None and finish_reason != "tool_calls":
+        raise ProviderError("tool calls require finish_reason=tool_calls", category="protocol_error")
+    if not calls and finish_reason == "tool_calls":
+        raise ProviderError("tool_calls finish_reason has no tool calls", category="protocol_error")
     return ModelResponse(Message(role="assistant", content=content, tool_calls=calls), finish_reason, safe_usage)
 
 
+def _sse_json_events(chunks: Iterable[bytes], *, max_bytes: int = 4_000_000, max_events: int = 2_000) -> tuple[list[dict[str, Any]], bool]:
+    """Parse a bounded OpenAI-compatible SSE byte stream.
+
+    We decode only complete UTF-8 lines and complete JSON data frames.  A
+    malformed or interrupted stream raises before any assembled tool call is
+    returned to the loop.
+    """
+    buffer = b""
+    total = 0
+    events: list[dict[str, Any]] = []
+    done = False
+    for chunk in chunks:
+        if not isinstance(chunk, (bytes, bytearray)):
+            raise ProviderError("stream transport yielded a non-byte chunk", category="stream_protocol_error")
+        total += len(chunk)
+        if total > max_bytes:
+            raise ProviderError("stream response exceeded the configured size limit", category="response_limit")
+        buffer += bytes(chunk)
+        while b"\n" in buffer:
+            raw_line, buffer = buffer.split(b"\n", 1)
+            line = raw_line.rstrip(b"\r")
+            if not line:
+                continue
+            if not line.startswith(b"data:"):
+                # Ignore bounded SSE comments/fields, but reject arbitrary
+                # bytes that could hide a tool fragment.
+                if line.startswith((b":", b"event:", b"id:", b"retry:")):
+                    continue
+                raise ProviderError("malformed SSE frame", category="stream_protocol_error")
+            data = line[5:].lstrip()
+            if data == b"[DONE]":
+                if done:
+                    raise ProviderError("SSE stream repeated [DONE]", category="stream_protocol_error")
+                done = True
+                continue
+            if done:
+                raise ProviderError("SSE data appeared after [DONE]", category="stream_protocol_error")
+            try:
+                decoded = data.decode("utf-8")
+                payload = json.loads(decoded)
+            except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+                raise ProviderError("malformed SSE JSON frame", category="stream_protocol_error") from exc
+            if not isinstance(payload, dict):
+                raise ProviderError("SSE frame must contain a JSON object", category="stream_protocol_error")
+            events.append(payload)
+            if len(events) > max_events:
+                raise ProviderError("stream contains too many events", category="response_limit")
+    if buffer.strip():
+        raise ProviderError("stream ended with an incomplete SSE frame", category="stream_protocol_error")
+    if not done:
+        raise ProviderError("stream ended before [DONE]", category="stream_incomplete")
+    return events, done
+
+
+def assemble_chat_stream(events: Iterable[dict[str, Any]], *, max_content_chars: int = 200_000, max_argument_chars: int = 200_000) -> ModelResponse:
+    """Assemble deltas and validate complete tool calls before returning."""
+    content_parts: list[str] = []
+    finish_reason: str | None = None
+    usage: dict[str, Any] = {}
+    calls: dict[int, dict[str, Any]] = {}
+    order: list[int] = []
+    finished = False
+    for event in events:
+        choices = event.get("choices")
+        # OpenAI-compatible providers may send a final usage-only frame with
+        # choices=[] before [DONE]. It carries no delta and cannot complete a
+        # tool call by itself, so accept it only when usage is a valid object.
+        if choices == [] and "usage" in event:
+            raw_usage = event.get("usage")
+            if not isinstance(raw_usage, dict) or len(raw_usage) > 32:
+                raise ProviderError("stream usage must be a bounded object", category="stream_protocol_error")
+            safe_usage: dict[str, int | float] = {}
+            for key, value in raw_usage.items():
+                if not isinstance(key, str) or not key or len(key) > 128:
+                    raise ProviderError("stream usage has an invalid field name", category="stream_protocol_error")
+                if isinstance(value, float) and not math.isfinite(value):
+                    raise ProviderError("stream usage contains a non-finite number", category="stream_protocol_error")
+                if isinstance(value, bool) or not isinstance(value, (int, float)) or value < 0:
+                    raise ProviderError("stream usage fields must be finite non-negative numbers", category="stream_protocol_error")
+                safe_usage[key] = value
+            usage = safe_usage
+            continue
+        if finished:
+            raise ProviderError("stream emitted data after finish_reason", category="stream_protocol_error")
+        if not isinstance(choices, list) or len(choices) != 1 or not isinstance(choices[0], dict):
+            raise ProviderError("stream frame has invalid choices", category="stream_protocol_error")
+        choice = choices[0]
+        index = choice.get("index", 0)
+        if index != 0:
+            raise ProviderError("multiple stream choices are unsupported", category="stream_protocol_error")
+        delta = choice.get("delta", {})
+        if not isinstance(delta, dict):
+            raise ProviderError("stream delta is not an object", category="stream_protocol_error")
+        text = delta.get("content")
+        if text is not None:
+            if not isinstance(text, str):
+                raise ProviderError("stream content delta is not text", category="stream_protocol_error")
+            content_parts.append(text)
+            if sum(len(part) for part in content_parts) > max_content_chars:
+                raise ProviderError("stream content exceeded the configured size limit", category="response_limit")
+        raw_calls = delta.get("tool_calls", [])
+        if raw_calls is None:
+            raw_calls = []
+        if not isinstance(raw_calls, list):
+            raise ProviderError("stream tool_calls delta must be a list", category="stream_protocol_error")
+        for raw in raw_calls:
+            if not isinstance(raw, dict) or not isinstance(raw.get("index"), int) or isinstance(raw.get("index"), bool):
+                raise ProviderError("stream tool call fragment has no integer index", category="stream_protocol_error")
+            call_index = raw["index"]
+            if call_index not in calls:
+                if order and call_index <= max(order):
+                    raise ProviderError("stream introduced an out-of-order tool index", category="stream_protocol_error")
+                calls[call_index] = {"id": None, "name": None, "arguments": ""}
+                order.append(call_index)
+            current = calls[call_index]
+            if raw.get("id") is not None:
+                if not isinstance(raw["id"], str) or (current["id"] is not None and current["id"] != raw["id"]):
+                    raise ProviderError("stream tool call id changed or is invalid", category="stream_protocol_error")
+                current["id"] = raw["id"]
+            function = raw.get("function", {})
+            if not isinstance(function, dict):
+                raise ProviderError("stream function fragment is invalid", category="stream_protocol_error")
+            if function.get("name") is not None:
+                if not isinstance(function["name"], str) or (current["name"] is not None and current["name"] != function["name"]):
+                    raise ProviderError("stream tool function name changed or is invalid", category="stream_protocol_error")
+                current["name"] = function["name"]
+            arguments = function.get("arguments", "")
+            if not isinstance(arguments, str):
+                raise ProviderError("stream tool arguments fragment is not text", category="stream_protocol_error")
+            current["arguments"] += arguments
+            if len(current["arguments"]) > max_argument_chars:
+                raise ProviderError("stream tool arguments exceeded the configured size limit", category="response_limit")
+        if choice.get("finish_reason") is not None:
+            if not isinstance(choice["finish_reason"], str) or choice["finish_reason"] not in {"stop", "length", "tool_calls", "content_filter"}:
+                raise ProviderError("stream finish_reason is invalid", category="stream_protocol_error")
+            finish_reason = choice["finish_reason"]
+            finished = True
+        if event.get("usage") is not None:
+            if not isinstance(event.get("usage"), dict):
+                raise ProviderError("stream usage must be an object", category="stream_protocol_error")
+            if len(event["usage"]) > 32:
+                raise ProviderError("stream usage contains too many fields", category="response_limit")
+            safe_usage: dict[str, int | float] = {}
+            for key, value in event["usage"].items():
+                if not isinstance(key, str) or not key or len(key) > 128:
+                    raise ProviderError("stream usage has an invalid field name", category="stream_protocol_error")
+                if isinstance(value, float) and not math.isfinite(value):
+                    raise ProviderError("stream usage contains a non-finite number", category="stream_protocol_error")
+                if isinstance(value, bool) or not isinstance(value, (int, float)) or value < 0:
+                    raise ProviderError("stream usage fields must be finite non-negative numbers", category="stream_protocol_error")
+                safe_usage[key] = value
+            usage = safe_usage
+    parsed_calls: list[ToolCall] = []
+    seen_ids: set[str] = set()
+    for index in order:
+        call = calls[index]
+        if not isinstance(call["id"], str) or not call["id"] or not isinstance(call["name"], str) or not call["name"]:
+            raise ProviderError("stream tool call is incomplete", category="stream_incomplete")
+        if call["id"] in seen_ids:
+            raise ProviderError("stream repeats a tool call id", category="stream_protocol_error")
+        try:
+            arguments = json.loads(call["arguments"] or "{}", parse_constant=_reject_nonfinite)
+        except (json.JSONDecodeError, ValueError) as exc:
+            raise ProviderError("stream tool call has incomplete JSON arguments", category="stream_incomplete") from exc
+        if not isinstance(arguments, dict):
+            raise ProviderError("stream tool arguments must be an object", category="stream_protocol_error")
+        _validate_json_value(arguments)
+        seen_ids.add(call["id"])
+        parsed_calls.append(ToolCall(call["id"], call["name"], arguments))
+    if not finished:
+        raise ProviderError("stream has no finish_reason", category="stream_incomplete")
+    if parsed_calls and finish_reason != "tool_calls":
+        raise ProviderError("stream tool calls did not finish with tool_calls", category="stream_protocol_error")
+    if not parsed_calls and finish_reason not in {"stop", "length", "content_filter"}:
+        raise ProviderError("stream finish_reason is unsupported", category="stream_protocol_error")
+    return ModelResponse(Message("assistant", "".join(content_parts), tool_calls=tuple(parsed_calls)), finish_reason, usage)
+
+
 class OpenAICompatibleProvider:
-    def __init__(self, *, api_key: str, base_url: str, model: str, transport: JsonTransport | None = None, timeout: float = 60.0, max_response_bytes: int = 4_000_000, max_request_bytes: int = 4_000_000, max_retries: int = 2, retry_base_delay: float = 0.25):
+    def __init__(self, *, api_key: str, base_url: str, model: str, transport: JsonTransport | None = None, timeout: float = 60.0, max_response_bytes: int = 4_000_000, max_request_bytes: int = 4_000_000, max_retries: int = 2, retry_base_delay: float = 0.25, streaming: bool = False, stream_required: bool = False):
         if not api_key:
             raise ProviderError("FORGECODE_API_KEY is not configured", category="configuration_error")
         if not model:
@@ -175,6 +408,8 @@ class OpenAICompatibleProvider:
         self.max_request_bytes = max_request_bytes
         self.max_retries = max_retries
         self.retry_base_delay = retry_base_delay
+        self.streaming = bool(streaming)
+        self.stream_required = bool(stream_required)
         self.retry_events: list[dict[str, Any]] = []
 
     @classmethod
@@ -191,10 +426,61 @@ class OpenAICompatibleProvider:
             tool_payloads = [_tool_schema_to_payload(schema) for schema in tools]
         except AttributeError as exc:
             raise ProviderError("tool schema must be an object", category="protocol_error") from exc
-        body = json.dumps({"model": self.model, "messages": [_message_to_payload(message) for message in messages], "tools": tool_payloads}, ensure_ascii=False).encode("utf-8")
+        body = json.dumps({"model": self.model, "messages": [_message_to_payload(message) for message in messages], "tools": tool_payloads}, ensure_ascii=False, allow_nan=False).encode("utf-8")
         if len(body) > self.max_request_bytes:
             raise ProviderError("model request exceeded the configured size limit", category="request_limit")
         headers = {"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"}
+        if self.streaming:
+            stream_method = getattr(self.transport, "post_stream", None)
+            if stream_method is None:
+                if self.stream_required:
+                    raise ProviderError("streaming is required but transport does not support SSE", category="configuration_error")
+            else:
+                try:
+                    stream_body = json.dumps({"model": self.model, "messages": [_message_to_payload(message) for message in messages], "tools": tool_payloads, "stream": True}, ensure_ascii=False, allow_nan=False).encode("utf-8")
+                    if len(stream_body) > self.max_request_bytes:
+                        raise ProviderError("model request exceeded the configured size limit", category="request_limit")
+                    self.retry_events = []
+                    for attempt in range(1, self.max_retries + 2):
+                        try:
+                            status, chunks = await asyncio.to_thread(stream_method, f"{self.base_url}/chat/completions", {**headers, "Accept": "text/event-stream"}, stream_body, self.timeout)
+                        except (TimeoutError, error.URLError, OSError) as exc:
+                            if attempt <= self.max_retries:
+                                await self._retry(attempt, "stream_transport_error", str(exc))
+                                continue
+                            raise ProviderError(_redact(f"stream request failed: {exc}", self.api_key), category="stream_error", retryable=True, attempt=attempt) from exc
+                        if isinstance(status, bool) or not isinstance(status, int):
+                            raise ProviderError("stream transport returned an invalid HTTP status", category="stream_error", attempt=attempt)
+                        if status in {408, 429} or 500 <= status <= 599:
+                            if attempt <= self.max_retries:
+                                await self._retry(attempt, f"stream_http_{status}", f"HTTP {status}")
+                                continue
+                        if status < 200 or status >= 300:
+                            raise ProviderError(f"model returned HTTP {status}", category="http_error", retryable=status in {408, 429} or 500 <= status <= 599, status_code=status, attempt=attempt)
+                        try:
+                            events, _done = await asyncio.to_thread(_sse_json_events, chunks, max_bytes=self.max_response_bytes)
+                            return assemble_chat_stream(events)
+                        except ProviderError:
+                            raise
+                        except (TimeoutError, error.URLError, OSError) as exc:
+                            if attempt <= self.max_retries:
+                                await self._retry(attempt, "stream_transport_error", str(exc))
+                                continue
+                            raise ProviderError(_redact(f"stream request failed: {exc}", self.api_key), category="stream_error", retryable=True, attempt=attempt) from exc
+                except ProviderError:
+                    raise
+                except (AttributeError, NotImplementedError) as exc:
+                    if self.stream_required:
+                        raise ProviderError("streaming is required but transport does not implement SSE", category="configuration_error") from exc
+                    # A transport may expose an optional method that is not
+                    # implemented by a particular backend.  In auto/on mode
+                    # fall through to the bounded non-stream request; only
+                    # malformed/partial streams remain fatal above.
+                    pass
+                except Exception as exc:
+                    raise ProviderError(_redact(f"stream request failed: {type(exc).__name__}: {exc}", self.api_key), category="stream_error") from exc
+        if self.stream_required:
+            raise ProviderError("streaming is required but no stream was requested", category="configuration_error")
         self.retry_events = []
         for attempt in range(1, self.max_retries + 2):
             try:

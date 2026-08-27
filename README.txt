@@ -8,14 +8,13 @@
 `--demo-task json`。在线模型只从 FORGECODE_API_KEY、FORGECODE_BASE_URL、
 FORGECODE_MODEL 环境变量读取凭据。
 
-特色：自研 provider-neutral 协议、tool calling、AgentLoop、上下文预算、错误
-回传和有限修复；Plan/Act 双层权限与 WorkspaceGuard 路径保护；unified/
-Begin Patch 多文件预验证、diff 预览、审批、事务 id、哈希冲突、原子替换和进程内
-回滚；命令风险分类、危险硬拦截、超时、进程终止、输出限制和脱敏；repository
-map；带 schema_version/run_id/sequence 的 JSONL 事件、checkpoint、session
-show/export、status/diff、安全 resume dry-run。Plan 不执行副作用，恢复冲突返回
-退出码 3，不会自动重放写入或命令。
+特色：自研 provider-neutral 协议、tool calling、AgentLoop、错误回传与有限修复；
+Plan/Act 双层权限、WorkspaceGuard、命令风险/超时/脱敏；作用域 AGENTS.md 规则、
+@文件/目录/Git 精确上下文、结构化计划和含 /plan、/test、/review、/compact、/undo
+的脚本化交互；安全 patch、真实测试、JSONL 审计、checkpoint、上下文压缩与
+resume/fork；持久事务 ledger、ignored 原始备份和 hash 冲突保护的跨进程撤销；
+typed TOML profile 与安全 SSE tool-call 组装。Plan 不执行副作用，断流不执行工具，
+恢复/撤销冲突返回退出码 3且不会覆盖外部编辑。
 
-版本 v0.0.5；测试全部通过，Windows 无符号链接权限时跳过对应测试。风险识别是
-启发式审批边界，不是操作系统沙箱；掉电/磁盘损坏时无法保证跨文件原子性。暂不
-包含 IDE、浏览器、MCP marketplace、云执行和多代理。
+版本 v0.0.6；最后一次全套离线测试为 189 passed、6 skipped，跳过项均因当前 Windows 进程无符号链接创建权限。
+本项目是启发式审批边界而非操作系统沙箱；暂不包含 IDE、浏览器、云执行和多代理。

@@ -1,8 +1,10 @@
 from pathlib import Path
+from dataclasses import dataclass
 
 import pytest
 
 from forgecode.storage import SessionStore
+from forgecode.security.redaction import redact_value
 
 
 def test_session_store_appends_jsonl(tmp_path: Path):
@@ -41,3 +43,21 @@ def test_session_redacts_nested_credential_shapes(tmp_path: Path):
 def test_session_rejects_an_event_limit_too_small_for_valid_jsonl(tmp_path: Path):
     with pytest.raises(ValueError, match="at least 128"):
         SessionStore(tmp_path / "run.jsonl", max_event_chars=127)
+
+
+def test_redaction_walker_handles_dataclass_bytes_exception_and_cycles():
+    @dataclass
+    class Metadata:
+        token: str
+        path: Path
+
+    cycle = []
+    cycle.append(cycle)
+    value = {"metadata": Metadata("secret-token", Path("src/a.py")), "bytes": b"abc", "error": RuntimeError("password=hidden"), "cycle": cycle}
+    redacted = redact_value(value, secrets=("secret-token",))
+    assert redacted["metadata"]["token"] == "[REDACTED]"
+    assert redacted["metadata"]["path"] == "src/a.py"
+    assert redacted["bytes"].startswith("[bytes omitted")
+    assert redacted["error"]["type"] == "RuntimeError"
+    assert "hidden" not in str(redacted["error"])
+    assert "circular" in redacted["cycle"][0]

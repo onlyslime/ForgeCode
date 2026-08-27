@@ -31,7 +31,27 @@ Chat Completions 返回结构化 tool calls，ForgeCode 在用户指定工作区
 - **真实离线演示**：DemoProvider 在隔离工作区读取有 bug 的 calculator，先跑
   出失败测试，再走 patch 和审批，最后取得真实通过结果；不需要网络或 API key。
 
-当前版本：`v0.0.5`。
+当前版本：`v0.0.6`。
+
+### v0.0.6 工作流
+
+- **作用域规则**：`rules show/check` 从根目录及目标目录链加载
+  `AGENTS.md`，展示 source、scope、priority、digest、截断和冲突；规则只是
+  不可信上下文，不能绕过安全策略。
+- **精确上下文**：任务文本支持 `@relative/file.py`、带引号路径、bounded
+  目录以及 `@git:status`、`@git:diff`、`@git:log`；敏感、二进制、ignored
+  和越界路径不会进入模型。
+- **结构化计划与交互**：`plan` 生成有 schema/revision/DAG/status/evidence
+  的计划；`chat` 提供 `/help`、`/status`、`/plan`、`/mode`、`/rules`、
+  `/files`、`/review`、`/test`、`/compact`、`/undo`、`/quit`。
+- **恢复与撤销**：completed session 默认 inspect-only；`--fork` 或
+  `session fork` 生成带 parent evidence 的新 run。压缩只追加 factual
+  summary，不重写 JSONL。写入/patch 保存 ignored content-addressed backup，
+  `transaction --execute` 在 after hash 一致时跨进程撤销。
+- **配置与流式响应**：`.forgecode/config.toml`（ignored）提供 typed profile
+  和 tool narrowing policy，优先级为 CLI > TOML > environment > defaults；
+  API key 仍只能来自环境。可选 SSE 会先完整组装并校验 tool call，断流执行
+  零工具。
 
 ## English overview
 
@@ -55,6 +75,8 @@ Requires Python 3.11+ and [uv](https://docs.astral.sh/uv/).
 uv sync
 uv run forgecode doctor
 uv run forgecode tools
+uv run forgecode rules show
+uv run forgecode config validate
 uv run pytest
 ```
 
@@ -71,6 +93,8 @@ Offline assessment demo (use a fresh directory; it refuses fixture conflicts):
 $demo = Join-Path ([System.IO.Path]::GetTempPath()) ('forgecode-demo-' + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $demo | Out-Null
 uv run forgecode --workspace $demo run --demo --auto-approve
+uv run forgecode --workspace $demo transaction
+uv run forgecode --workspace $demo transaction latest --execute --auto-approve
 ```
 
 For a real provider, keep credentials outside Git:
@@ -92,10 +116,24 @@ deterministic repository snapshot, `sessions`/`session show|export` for audit,
 preview safe recovery. Recovery conflicts return exit code 3 and never replay
 side effects automatically.
 
+Interactive offline demo (input is pipeable and therefore testable):
+
+```powershell
+$lines = @('/help', 'inspect calculator', '/mode act', 'fix calculator', '/review', '/compact', '/quit')
+$lines | uv run forgecode --workspace $demo chat --demo --auto-approve
+```
+
+Useful read-only commands include `plan`, `rules show|check`, `config
+show|validate`, `session show|export|inspect|compact|fork`, `status`, `diff`,
+and `transaction`. Machine-readable commands use `--json`; interactive JSON
+mode emits one JSON object per line. Exit codes are 0 success, 1 execution or
+audit failure, 2 invalid input/unavailable resource, 3 recovery/hash/config
+conflict, and 130 cancellation.
+
 ## Repository layout
 
 ```text
-src/forgecode/       provider, protocol, loop, lifecycle, context, tools, security, storage, CLI
+src/forgecode/       provider, protocol, loop, lifecycle, context, rules, references, plan, application services, tools, security, storage, CLI
 tests/               deterministic offline regression tests
 docs/assignment/     assessment PDF
 docs/research/       research plan and feature report

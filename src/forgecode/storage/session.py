@@ -13,11 +13,17 @@ import json
 import math
 import os
 from pathlib import Path
+import re
 import threading
 from typing import Any, Iterable, Iterator
 import uuid
 
 from ..security.redaction import redact_value
+from ..security.workspace import WorkspaceViolation, assert_no_path_alias
+
+
+MAX_SESSION_BYTES = 32_000_000
+MAX_SESSION_EVENTS = 20_000
 
 
 class SessionFormatError(ValueError):
@@ -134,12 +140,25 @@ class SessionStore:
     """Append-only JSONL store with bounded, recoverable reads."""
 
     def __init__(self, path: Path, *, secrets: Iterable[str] = (), max_event_chars: int = 100_000, run_id: str | None = None, mode: str | None = None):
-        self.path = Path(path)
+        try:
+            self.path = assert_no_path_alias(Path(path), message="session path is a symlink or junction alias")
+        except WorkspaceViolation as exc:
+            raise ValueError(str(exc)) from exc
         self.secrets = tuple(secret for secret in secrets if isinstance(secret, str) and secret)
         if max_event_chars < 128:
             raise ValueError("max_event_chars must be at least 128 characters")
         self.max_event_chars = max_event_chars
-        self.run_id = run_id or self._discover_run_id() or uuid.uuid4().hex
+        # Retain the caller-supplied identity separately from the identity
+        # discovered in an existing stream. Inspection must diagnose a
+        # requested run that does not match the persisted stream, rather than
+        # presenting that stream as safe to continue.
+        self._requested_run_id = run_id
+        if run_id is not None and not _safe_run_id(run_id):
+            raise ValueError("run_id must contain only bounded letters, digits, '-' or '_'")
+        discovered = self._discover_run_id()
+        if discovered is not None and not _safe_run_id(discovered):
+            discovered = None
+        self.run_id = run_id or discovered or uuid.uuid4().hex
         self.mode = mode
         self._lock = threading.RLock()
         self._next_sequence = self._discover_next_sequence()
@@ -193,6 +212,11 @@ class SessionStore:
         if not isinstance(payload, dict):
             raise ValueError("event payload must be an object")
         with self._lock:
+            try:
+                assert_no_path_alias(self.path, message="session path is a symlink or junction alias")
+            except WorkspaceViolation as exc:
+                raise SessionFormatError(str(exc)) from exc
+            self._validate_append_target()
             # Normalize first so cyclic containers and non-JSON values cannot
             # recurse through the redaction walker or reach json.dumps.
             safe_payload = bounded(redact_value(bounded(payload), self.secrets))
@@ -224,10 +248,40 @@ class SessionStore:
             self._next_sequence += 1
             return event
 
+    def _validate_append_target(self) -> None:
+        """Refuse to append to a stream that cannot be safely continued.
+
+        The append-only log is also the audit boundary.  Silently adding a
+        fresh run id after a corrupt, legacy, gapped, or mixed stream would
+        make reconstruction ambiguous and could turn untrusted history into
+        apparent authorization.  Callers that need to inspect such a file
+        can still use ``read_with_issues``; continuation requires an explicit
+        resume/fork workflow that creates a new stream.
+        """
+        if not self.path.is_file() or self.path.stat().st_size == 0:
+            return
+        result = self.read_with_issues()
+        if result.issues:
+            first = result.issues[0]
+            raise SessionFormatError(f"cannot append to an inconsistent session (line {first.line}: {first.message})")
+        if any(event.schema_version == 0 for event in result.events):
+            raise SessionFormatError("cannot append to a legacy session; create a fork")
+        run_ids = {event.run_id for event in result.events if event.run_id}
+        if len(run_ids) > 1 or (run_ids and self.run_id not in run_ids):
+            raise SessionFormatError("cannot append with a different or mixed run id")
+
     def read_with_issues(self, *, strict: bool = False) -> SessionReadResult:
         events: list[SessionEvent] = []
         event_lines: list[int] = []
         issues: list[SessionReadIssue] = []
+        try:
+            assert_no_path_alias(self.path, message="session path is a symlink or junction alias")
+        except WorkspaceViolation as exc:
+            issue = SessionReadIssue(0, str(exc))
+            self.last_read_issues = (issue,)
+            if strict:
+                raise SessionFormatError(issue.message) from exc
+            return SessionReadResult((), (issue,))
         if not self.path.exists():
             self.last_read_issues = ()
             return SessionReadResult((), ())
@@ -238,17 +292,55 @@ class SessionStore:
                 raise SessionFormatError(issue.message)
             return SessionReadResult((), (issue,))
         try:
-            stream = self.path.open(encoding="utf-8")
+            before_stat = self.path.stat()
+            if before_stat.st_size > MAX_SESSION_BYTES:
+                issue = SessionReadIssue(0, f"session exceeds the {MAX_SESSION_BYTES}-byte safety limit")
+                self.last_read_issues = (issue,)
+                if strict:
+                    raise SessionFormatError(issue.message)
+                return SessionReadResult((), (issue,))
+            raw_bytes = self.path.read_bytes()
+            after_stat = self.path.stat()
         except (OSError, UnicodeError) as exc:
-            issue = SessionReadIssue(0, f"cannot open session: {type(exc).__name__}: {exc}")
+            issue = SessionReadIssue(0, f"cannot read session: {type(exc).__name__}: {exc}")
             self.last_read_issues = (issue,)
             if strict:
                 raise SessionFormatError(issue.message) from exc
             return SessionReadResult((), (issue,))
-        with stream:
-            for line_number, line in enumerate(stream, 1):
+        if len(raw_bytes) > MAX_SESSION_BYTES:
+            issue = SessionReadIssue(0, f"session exceeds the {MAX_SESSION_BYTES}-byte safety limit")
+            self.last_read_issues = (issue,)
+            if strict:
+                raise SessionFormatError(issue.message)
+            return SessionReadResult((), (issue,))
+        if (before_stat.st_size, before_stat.st_mtime_ns) != (after_stat.st_size, after_stat.st_mtime_ns):
+            issues.append(SessionReadIssue(0, "session changed while it was read"))
+        try:
+            text = raw_bytes.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            issue = SessionReadIssue(0, f"UnicodeDecodeError: session is not valid UTF-8 at byte {exc.start}")
+            issues.append(issue)
+            self.last_read_issues = tuple(issues)
+            if strict:
+                raise SessionFormatError(issue.message) from exc
+            return SessionReadResult((), tuple(issues))
+        for line_number, line in enumerate(text.splitlines(), 1):
                 if not line.strip():
                     continue
+                if len(line) > self.max_event_chars:
+                    issue = SessionReadIssue(line_number, f"event line exceeds the {self.max_event_chars}-character safety limit")
+                    issues.append(issue)
+                    if strict:
+                        self.last_read_issues = tuple(issues)
+                        raise SessionFormatError(f"line {line_number}: {issue.message}")
+                    continue
+                if len(events) >= MAX_SESSION_EVENTS:
+                    issue = SessionReadIssue(line_number, f"session exceeds the {MAX_SESSION_EVENTS}-event safety limit")
+                    issues.append(issue)
+                    if strict:
+                        self.last_read_issues = tuple(issues)
+                        raise SessionFormatError(f"line {line_number}: {issue.message}")
+                    break
                 try:
                     raw = json.loads(line)
                     if not isinstance(raw, dict):
@@ -260,9 +352,21 @@ class SessionStore:
                     event = SessionEvent(**raw)
                     if not isinstance(event.kind, str) or not isinstance(event.payload, dict) or not isinstance(event.timestamp, str):
                         raise SessionFormatError("event has invalid envelope types")
+                    if len(event.timestamp) > 128:
+                        raise SessionFormatError("event timestamp is too long")
+                    try:
+                        parsed_timestamp = datetime.fromisoformat(event.timestamp.replace("Z", "+00:00"))
+                    except ValueError as exc:
+                        raise SessionFormatError("event timestamp is not valid ISO-8601") from exc
+                    if parsed_timestamp.tzinfo is None or parsed_timestamp.utcoffset() is None:
+                        raise SessionFormatError("event timestamp must include a timezone")
+                    if event.schema_version >= 1 and not _safe_run_id(event.run_id):
+                        raise SessionFormatError("event run_id must be bounded text")
+                    if event.mode is not None and not isinstance(event.mode, str):
+                        raise SessionFormatError("event mode must be text or null")
                     if isinstance(event.schema_version, bool) or not isinstance(event.schema_version, int) or event.schema_version not in {0, 1}:
                         raise SessionFormatError(f"unsupported schema_version {event.schema_version!r}")
-                    if event.sequence and (not isinstance(event.sequence, int) or isinstance(event.sequence, bool) or event.sequence < 1):
+                    if event.schema_version >= 1 and (not isinstance(event.sequence, int) or isinstance(event.sequence, bool) or event.sequence < 1):
                         raise SessionFormatError("event sequence must be a positive integer")
                     events.append(event)
                     event_lines.append(line_number)
@@ -280,6 +384,61 @@ class SessionStore:
                 elif previous and event.sequence != previous + 1:
                     issues.append(SessionReadIssue(event_lines[index], f"event sequence gap after {previous}"))
                 previous = event.sequence
+
+        # Validate explicit lifecycle evidence at read time. Status, export
+        # and recovery must not treat a forged transition after a terminal
+        # state as authorization to continue. Older hand-written events that
+        # only carry ``to`` remain inspectable for compatibility.
+        lifecycle_state: str | None = None
+        for line, event in zip(event_lines, events):
+            if event.kind == "run_created":
+                # An interactive session may contain several bounded AgentLoop
+                # turns under one run id. Each loop emits run_created and
+                # starts a fresh lifecycle; this marker is the explicit reset
+                # boundary, not an implicit terminal-state transition.
+                lifecycle_state = "created"
+                continue
+            if event.kind != "state_transition" or not isinstance(event.payload, dict):
+                continue
+            source = event.payload.get("from")
+            target = event.payload.get("to")
+            if source is None and target is None:
+                continue
+            if not isinstance(source, str) or not isinstance(target, str):
+                issues.append(SessionReadIssue(line, "state transition must contain text from/to states"))
+                continue
+            if source not in _STATE_TRANSITIONS or target not in _STATE_TRANSITIONS:
+                issues.append(SessionReadIssue(line, "state transition contains an unknown run state"))
+                continue
+            if lifecycle_state is not None and source != lifecycle_state:
+                issues.append(SessionReadIssue(line, f"state transition source {source!r} does not follow {lifecycle_state!r}"))
+                continue
+            if target not in _STATE_TRANSITIONS[source]:
+                issues.append(SessionReadIssue(line, f"invalid terminal or lifecycle transition: {source} -> {target}"))
+                continue
+            lifecycle_state = target
+
+        # Append rejects these conditions, but inspection, status, export and
+        # recovery must expose them too. Otherwise a mixed stream could look
+        # like a valid partial audit until a write is attempted.
+        v1_events = [(line, event) for line, event in zip(event_lines, events) if event.schema_version >= 1]
+        legacy_events = [(line, event) for line, event in zip(event_lines, events) if event.schema_version == 0]
+        if v1_events and legacy_events:
+            first_mixed_line = min(v1_events[0][0], legacy_events[0][0])
+            issues.append(SessionReadIssue(first_mixed_line, "legacy and v1 events are mixed; session is inspect-only"))
+
+        run_id_values = {event.run_id for _, event in v1_events + legacy_events if event.run_id}
+        if len(run_id_values) > 1:
+            first_run_id = next(iter(run_id_values))
+            differing_line = next((line for line, event in zip(event_lines, events) if event.run_id and event.run_id != first_run_id), event_lines[0] if event_lines else 0)
+            issues.append(SessionReadIssue(differing_line, "session contains mixed run_id values; session is inspect-only"))
+        if self._requested_run_id is not None and run_id_values and self._requested_run_id not in run_id_values:
+            issues.append(SessionReadIssue(event_lines[0] if event_lines else 0, "session run_id differs from requested store run_id (different or mixed run id); session is inspect-only"))
+
+        if strict and issues:
+            first = issues[0]
+            self.last_read_issues = tuple(issues)
+            raise SessionFormatError(f"line {first.line}: {first.message}")
         self.last_read_issues = tuple(issues)
         return SessionReadResult(tuple(events), tuple(issues))
 
@@ -300,6 +459,25 @@ class SessionStore:
             chunks.append(line)
             used += len(line)
         return "".join(chunks)
+
+
+def _safe_run_id(value: Any) -> bool:
+    return isinstance(value, str) and 1 <= len(value) <= 128 and bool(re.fullmatch(r"[A-Za-z0-9_-]+", value))
+
+
+_STATE_TRANSITIONS: dict[str, frozenset[str]] = {
+    "created": frozenset({"discovering", "cancelled", "failed"}),
+    "discovering": frozenset({"planning", "failed", "cancelled", "recovery_required"}),
+    "planning": frozenset({"awaiting_approval", "verifying", "completed", "failed", "cancelled", "paused"}),
+    "awaiting_approval": frozenset({"acting", "paused", "cancelled", "failed", "recovery_required"}),
+    "acting": frozenset({"discovering", "verifying", "completed", "paused", "failed", "cancelled", "recovery_required"}),
+    "verifying": frozenset({"completed", "acting", "awaiting_approval", "discovering", "paused", "failed", "cancelled", "recovery_required"}),
+    "paused": frozenset({"discovering", "cancelled", "failed", "recovery_required"}),
+    "recovery_required": frozenset({"discovering", "cancelled", "failed"}),
+    "completed": frozenset(),
+    "failed": frozenset(),
+    "cancelled": frozenset(),
+}
 
 
 __all__ = ["SessionEvent", "SessionFormatError", "SessionReadIssue", "SessionReadResult", "SessionStore", "bounded", "redact"]
