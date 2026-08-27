@@ -31,7 +31,7 @@ Chat Completions 返回结构化 tool calls，ForgeCode 在用户指定工作区
 - **真实离线演示**：DemoProvider 在隔离工作区读取有 bug 的 calculator，先跑
   出失败测试，再走 patch 和审批，最后取得真实通过结果；不需要网络或 API key。
 
-当前版本：`v0.0.4`。
+当前版本：`v0.0.5`。
 
 ## English overview
 
@@ -85,13 +85,17 @@ uv run forgecode --workspace . run --mode act "inspect and implement a small tes
 Act mode asks before side effects by default. `--auto-approve`/`--yes` is an
 explicit approval choice for demos or CI; it never bypasses workspace checks,
 hard risk blocks, timeouts, output limits, or session recording. Runs store
-redacted JSONL under `.forgecode/` and print bounded status/diff; they never
-create commits automatically.
+redacted JSONL and checkpoint metadata under `.forgecode/` and print bounded
+status/diff; they never create commits automatically. Use `inspect`/`map` for a
+deterministic repository snapshot, `sessions`/`session show|export` for audit,
+`status`/`diff` for transaction evidence, and `run --resume ID --dry-run` to
+preview safe recovery. Recovery conflicts return exit code 3 and never replay
+side effects automatically.
 
 ## Repository layout
 
 ```text
-src/forgecode/       provider, protocol, loop, tools, security, storage, CLI
+src/forgecode/       provider, protocol, loop, lifecycle, context, tools, security, storage, CLI
 tests/               deterministic offline regression tests
 docs/assignment/     assessment PDF
 docs/research/       research plan and feature report

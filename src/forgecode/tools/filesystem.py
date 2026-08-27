@@ -4,6 +4,8 @@ import os
 import fnmatch
 import re
 import tempfile
+import hashlib
+import uuid
 from typing import Any
 
 from .base import ToolContext, ToolDefinition, ToolResult
@@ -202,22 +204,61 @@ class WriteFileTool:
             raise ValueError(f"content exceeds the {_MAX_WRITE_CHARS}-character safety limit")
         path = context.guard.resolve(path_value)
         context.guard.resolve(path.parent)
-        if not context.request_approval(self.definition.name, arguments):
-            return ToolResult(False, "write_file denied by approval policy", {"error": "approval_denied", "approval": "denied"})
-        path.parent.mkdir(parents=True, exist_ok=True)
-        descriptor, temporary_name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".forgecode.tmp", dir=path.parent)
-        temporary = context.guard.resolve(temporary_name)
+        transaction_id = uuid.uuid4().hex
+        before_exists = path.exists()
+        before_hash = None
+        before_content: bytes | None = None
+        before_size = 0
+        before_mtime = 0
+        before_mode = None
+        if before_exists:
+            if not path.is_file():
+                raise ValueError(f"not a file: {path_value}")
+            stat = path.stat()
+            before_size, before_mtime = stat.st_size, stat.st_mtime_ns
+            before_mode = stat.st_mode
+            before_content = path.read_bytes()
+            before_hash = hashlib.sha256(before_content).hexdigest()
+        preview = content[:4_000] + ("\n[content truncated]" if len(content) > 4_000 else "")
+        approval_arguments = {"path": path_value, "content": preview, "transaction_id": transaction_id, "operation": "update" if before_exists else "create"}
+        if not context.request_approval(self.definition.name, approval_arguments):
+            return ToolResult(False, "write_file denied by approval policy", {"error": "approval_denied", "approval": "denied", "transaction_id": transaction_id})
+        current_exists = path.exists()
+        current_hash = hashlib.sha256(path.read_bytes()).hexdigest() if current_exists and path.is_file() else None
+        current_stat = path.stat() if current_exists else None
+        if (current_hash, current_stat.st_size if current_stat else 0, current_stat.st_mtime_ns if current_stat else 0) != (before_hash, before_size, before_mtime):
+            return ToolResult(False, f"write conflict: {path_value} changed after preview", {"error": "concurrency_conflict", "transaction_id": transaction_id, "path": path_value})
         try:
-            with os.fdopen(descriptor, "w", encoding="utf-8", newline="") as stream:
-                stream.write(content)
-                stream.flush()
-                os.fsync(stream.fileno())
-            os.replace(temporary, path)
-        finally:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            descriptor, temporary_name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".forgecode.tmp", dir=path.parent)
+            temporary = context.guard.resolve(temporary_name)
             try:
-                os.close(descriptor)
+                with os.fdopen(descriptor, "w", encoding="utf-8", newline="") as stream:
+                    stream.write(content)
+                    stream.flush()
+                    os.fsync(stream.fileno())
+                if before_mode is not None:
+                    os.chmod(temporary, before_mode)
+                os.replace(temporary, path)
+            finally:
+                try:
+                    os.close(descriptor)
+                except OSError:
+                    pass
+                if temporary.exists():
+                    temporary.unlink()
+        except OSError as exc:
+            rolled_back = False
+            try:
+                if before_content is None:
+                    if path.exists():
+                        path.unlink()
+                else:
+                    path.write_bytes(before_content)
+                rolled_back = True
             except OSError:
                 pass
-            if temporary.exists():
-                temporary.unlink()
-        return ToolResult(True, f"wrote {context.guard.relative(path)}", {"path": context.guard.relative(path), "bytes": len(content.encode("utf-8")), "approval": "approved", "mutated": True})
+            return ToolResult(False, f"write failed: {exc}", {"error": "write_failed", "transaction_id": transaction_id, "rolled_back": rolled_back, "path": path_value})
+        after_bytes = content.encode("utf-8")
+        operation = "update" if before_exists else "create"
+        return ToolResult(True, f"wrote {context.guard.relative(path)}", {"path": context.guard.relative(path), "bytes": len(after_bytes), "approval": "approved", "mutated": True, "transaction_id": transaction_id, "transaction": "committed", "operation": operation, "before_sha256": before_hash, "after_sha256": hashlib.sha256(after_bytes).hexdigest(), "before_bytes": before_size, "after_bytes": len(after_bytes), "newline": "\r\n" if "\r\n" in content else "\n"})

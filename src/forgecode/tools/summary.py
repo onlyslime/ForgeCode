@@ -99,7 +99,7 @@ class WorkspaceSummaryTool:
         top_level_omitted = max(0, len(top_level) - _MAX_TOP_LEVEL)
         shown_top_level = top_level[:_MAX_TOP_LEVEL]
         lines = [
-            f"workspace: {root}",
+            "workspace: .",
             "top_level: " + (", ".join(shown_top_level) or "(empty)"),
             "languages: " + (", ".join(f"{name} ({count})" for name, count in sorted(language_counts.items())) or "unknown"),
             "build_files: " + (", ".join(build_files) or "none detected"),

@@ -5,6 +5,8 @@ import re
 import signal
 import subprocess
 import time
+import uuid
+from datetime import datetime, timezone
 from typing import Any
 
 from ..security.redaction import redact_value
@@ -125,7 +127,9 @@ class ShellTool:
         if len(command) > _MAX_COMMAND_CHARS:
             raise ValueError(f"command exceeds the {_MAX_COMMAND_CHARS}-character safety limit")
         risk, reasons, hard_blocked = classify_command(command)
-        risk_metadata = {"risk": risk, "risk_reasons": list(reasons), "hard_blocked": hard_blocked}
+        command_id = uuid.uuid4().hex
+        started_at = datetime.now(timezone.utc).isoformat()
+        risk_metadata = {"command_id": command_id, "risk": risk, "risk_reasons": list(reasons), "hard_blocked": hard_blocked, "cwd": "."}
         if hard_blocked:
             return ToolResult(False, f"command blocked by safety policy ({'; '.join(reasons)})", {"error": "risk_blocked", **risk_metadata, "command": command})
         approval = context.approval or self.approval
@@ -142,6 +146,9 @@ class ShellTool:
         timeout = float(timeout_value)
         if not 1 <= timeout <= 120:
             raise ValueError("timeout_seconds must be between 1 and 120")
+        effective_timeout = context.remaining_seconds(timeout)
+        if effective_timeout <= 0:
+            return ToolResult(False, "command skipped because the run deadline has expired", {"error": "deadline_exceeded", "timed_out": True, "started_at": started_at, "ended_at": datetime.now(timezone.utc).isoformat(), **risk_metadata})
         environment = {
             name: value
             for name, value in os.environ.items()
@@ -165,7 +172,25 @@ class ShellTool:
                 env=environment,
                 **process_options,
             )
-            stdout_value, stderr_value = process.communicate(timeout=timeout)
+            deadline = time.monotonic() + effective_timeout
+            while True:
+                if context.cancelled:
+                    _terminate_process_tree(process)
+                    try:
+                        final_stdout, final_stderr = process.communicate(timeout=5)
+                    except subprocess.TimeoutExpired:
+                        final_stdout, final_stderr = "", ""
+                    stdout, stdout_truncated = _bounded(_text(final_stdout))
+                    stderr, stderr_truncated = _bounded(_text(final_stderr))
+                    return ToolResult(False, f"[stdout]\n{stdout}\n[stderr]\n{stderr}\ncommand cancelled", {"error": "cancelled", "timed_out": False, "termination_result": "requested", "command": command, "approval": "approved", "stdout": stdout, "stderr": stderr, "exit_code": process.returncode, "duration_seconds": round(time.monotonic() - started, 3), "started_at": started_at, "ended_at": datetime.now(timezone.utc).isoformat(), "truncated": stdout_truncated or stderr_truncated, **risk_metadata})
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise subprocess.TimeoutExpired(command, effective_timeout)
+                try:
+                    stdout_value, stderr_value = process.communicate(timeout=min(0.2, remaining))
+                    break
+                except subprocess.TimeoutExpired:
+                    continue
         except subprocess.TimeoutExpired as exc:
             assert process is not None
             _terminate_process_tree(process)
@@ -175,14 +200,14 @@ class ShellTool:
                 final_stdout, final_stderr = "", ""
             stdout, stdout_truncated = _bounded(_text(final_stdout) or _text(exc.stdout))
             stderr, stderr_truncated = _bounded(_text(final_stderr) or _text(exc.stderr))
-            output = f"[stdout]\n{stdout}\n[stderr]\n{stderr}\ncommand timed out after {timeout:g}s"
-            return ToolResult(False, output, {"error": "timeout", "timed_out": True, "command": command, "approval": "approved", "stdout": stdout, "stderr": stderr, "exit_code": process.returncode, "duration_seconds": round(time.monotonic() - started, 3), "truncated": stdout_truncated or stderr_truncated, **risk_metadata})
+            output = f"[stdout]\n{stdout}\n[stderr]\n{stderr}\ncommand timed out after {effective_timeout:g}s"
+            return ToolResult(False, output, {"error": "timeout", "timed_out": True, "termination_result": "requested", "command": command, "approval": "approved", "stdout": stdout, "stderr": stderr, "exit_code": process.returncode, "duration_seconds": round(time.monotonic() - started, 3), "started_at": started_at, "ended_at": datetime.now(timezone.utc).isoformat(), "truncated": stdout_truncated or stderr_truncated, **risk_metadata})
         except OSError as exc:
-            return ToolResult(False, f"command could not start: {exc}", {"error": "execution_error", "command": command, "approval": "approved", "duration_seconds": round(time.monotonic() - started, 3), **risk_metadata})
+            return ToolResult(False, f"command could not start: {exc}", {"error": "execution_error", "command": command, "approval": "approved", "duration_seconds": round(time.monotonic() - started, 3), "started_at": started_at, "ended_at": datetime.now(timezone.utc).isoformat(), **risk_metadata})
         stdout, stdout_truncated = _bounded(_text(stdout_value))
         stderr, stderr_truncated = _bounded(_text(stderr_value))
         output = f"[stdout]\n{stdout}\n[stderr]\n{stderr}"
-        return ToolResult(process.returncode == 0, output, {"command": command, "exit_code": process.returncode, "approval": "approved", "mutated": False, "stdout": stdout, "stderr": stderr, "duration_seconds": round(time.monotonic() - started, 3), "truncated": stdout_truncated or stderr_truncated, **risk_metadata})
+        return ToolResult(process.returncode == 0, output, {"command": command, "exit_code": process.returncode, "approval": "approved", "mutated": False, "stdout": stdout, "stderr": stderr, "duration_seconds": round(time.monotonic() - started, 3), "started_at": started_at, "ended_at": datetime.now(timezone.utc).isoformat(), "truncated": stdout_truncated or stderr_truncated, **risk_metadata})
 
 
 class InteractiveApproval:

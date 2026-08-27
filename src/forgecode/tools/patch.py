@@ -8,12 +8,13 @@ failure-safe replacements are made.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 import difflib
 import os
 import re
 import tempfile
 from typing import Any
+import hashlib
 
 from .base import ToolContext, ToolDefinition, ToolResult
 
@@ -40,6 +41,38 @@ class PatchOperation:
     hunks: tuple[PatchHunk, ...]
     create: bool = False
     delete: bool = False
+
+
+@dataclass(frozen=True)
+class ChangeOperation:
+    """Auditable description of one planned filesystem operation."""
+
+    path: str
+    operation: str
+    before_sha256: str | None
+    after_sha256: str | None
+    before_bytes: int
+    after_bytes: int
+    encoding: str = "utf-8"
+    newline: str = "\\n"
+    outcome: str = "planned"
+
+
+@dataclass(frozen=True)
+class ChangePlan:
+    transaction_id: str
+    operations: tuple[ChangeOperation, ...]
+    preview: str
+    approval: str = "pending"
+
+
+@dataclass(frozen=True)
+class ChangeResult:
+    transaction_id: str
+    ok: bool
+    operations: tuple[ChangeOperation, ...]
+    rolled_back: bool = False
+    error: str | None = None
 
 
 class PatchFormatError(ValueError):
@@ -269,6 +302,11 @@ def _apply_operation(operation: PatchOperation, original: str | None) -> str | N
 
 
 def _atomic_write(path, content: str) -> None:
+    original_mode = None
+    try:
+        original_mode = path.stat().st_mode
+    except FileNotFoundError:
+        pass
     path.parent.mkdir(parents=True, exist_ok=True)
     descriptor, temporary_name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".forgecode.patch.tmp", dir=path.parent)
     try:
@@ -277,6 +315,8 @@ def _atomic_write(path, content: str) -> None:
             stream.write(content)
             stream.flush()
             os.fsync(stream.fileno())
+        if original_mode is not None:
+            os.chmod(temporary, original_mode)
         os.replace(temporary, path)
     finally:
         try:
@@ -321,7 +361,7 @@ class ApplyPatchTool:
             operations = parse_patch(patch_text)
             if any(operation.delete for operation in operations) and not allow_delete:
                 return ToolResult(False, "delete patches require allow_delete=true", {"error": "delete_requires_explicit_flag"})
-            planned: list[tuple[PatchOperation, Any, str | None, str | None]] = []
+            planned: list[tuple[PatchOperation, Any, str | None, str | None, str | None, int, int, int]] = []
             resolved_targets: set[Any] = set()
             for operation in operations:
                 target = self.guard.resolve(operation.path)
@@ -330,37 +370,72 @@ class ApplyPatchTool:
                     raise PatchFormatError(f"patch contains duplicate target paths: {operation.path}")
                 resolved_targets.add(target)
                 original = None
+                before_hash: str | None = None
+                before_size = 0
+                before_mtime = 0
                 if target.exists():
                     if not target.is_file():
                         raise PatchFormatError(f"patch target is not a file: {operation.path}")
                     try:
-                        if target.stat().st_size > _MAX_TARGET_FILE_BYTES:
+                        stat = target.stat()
+                        before_size = stat.st_size
+                        before_mtime = stat.st_mtime_ns
+                        if before_size > _MAX_TARGET_FILE_BYTES:
                             raise PatchFormatError(f"patch target exceeds the {_MAX_TARGET_FILE_BYTES}-byte limit: {operation.path}")
                         # Keep newline bytes intact so an edit does not turn a
                         # CRLF file into LF or add a trailing newline.
                         with target.open("r", encoding="utf-8", newline="") as stream:
                             original = stream.read()
+                        before_hash = hashlib.sha256(original.encode("utf-8")).hexdigest()
                     except UnicodeDecodeError as exc:
                         raise PatchFormatError(f"patch target is not UTF-8 text: {operation.path}") from exc
                 updated = _apply_operation(operation, original)
-                planned.append((operation, target, original, updated))
+                planned.append((operation, target, original, updated, before_hash, before_size, before_mtime, len((updated or "").encode("utf-8"))))
         except (PatchFormatError, OSError, ValueError) as exc:
             return ToolResult(False, str(exc), {"error": "patch_invalid"})
 
         previews: list[str] = []
-        for operation, target, original, updated in planned:
+        import uuid
+        transaction_id = uuid.uuid4().hex
+        change_operations = tuple(
+            ChangeOperation(
+                path=operation.path,
+                operation="delete" if operation.delete else ("create" if operation.create else "update"),
+                before_sha256=before_hash,
+                after_sha256=hashlib.sha256((updated or "").encode("utf-8")).hexdigest() if updated is not None else None,
+                before_bytes=len((original or "").encode("utf-8")),
+                after_bytes=after_bytes,
+                newline="\r\n" if original is not None and "\r\n" in original else "\n",
+            )
+            for operation, _target, original, updated, before_hash, _before_size, _before_mtime, after_bytes in planned
+        )
+        for operation, target, original, updated, _before_hash, _before_size, _before_mtime, _after_bytes in planned:
             before = (original or "").splitlines(keepends=True)
             after = (updated or "").splitlines(keepends=True)
             previews.extend(difflib.unified_diff(before, after, fromfile=f"a/{operation.path}", tofile=f"b/{operation.path}"))
         preview = "".join(previews)
         preview_truncated = len(preview) > _MAX_PREVIEW_CHARS
         safe_preview = preview[:_MAX_PREVIEW_CHARS] + ("\n[patch preview truncated]" if preview_truncated else "")
-        approval_arguments = {"patch": safe_preview, "allow_delete": allow_delete}
+        change_plan = ChangePlan(transaction_id, change_operations, safe_preview)
+        approval_arguments = {"patch": safe_preview, "allow_delete": allow_delete, "transaction_id": transaction_id, "operations": [operation.path for operation in change_operations], "change_plan": asdict(change_plan)}
         if not context.request_approval(self.definition.name, approval_arguments):
-            return ToolResult(False, "apply_patch denied by approval policy", {"error": "approval_denied", "approval": "denied", "diff": safe_preview})
+            return ToolResult(False, "apply_patch denied by approval policy", {"error": "approval_denied", "approval": "denied", "diff": safe_preview, "transaction_id": transaction_id, "operations": [asdict(op) for op in change_operations], "change_plan": asdict(change_plan)})
+        # Optimistic concurrency: an approval callback may take time or even
+        # modify a target. Never silently overwrite that newer content.
+        for operation, target, _original, _updated, before_hash, before_size, before_mtime, _after_bytes in planned:
+            current_hash = None
+            current_size = 0
+            current_mtime = 0
+            if target.exists():
+                stat = target.stat()
+                current_size, current_mtime = stat.st_size, stat.st_mtime_ns
+                if target.is_file():
+                    current_hash = hashlib.sha256(target.read_bytes()).hexdigest()
+            if (current_hash, current_size, current_mtime) != (before_hash, before_size, before_mtime):
+                return ToolResult(False, f"patch conflict: {operation.path} changed after preview", {"error": "concurrency_conflict", "transaction_id": transaction_id, "path": operation.path, "diff": safe_preview})
         written: list[tuple[Any, str | None]] = []
         try:
-            for operation, target, _original, updated in planned:
+            for operation, target, _original, updated, _before_hash, _before_size, _before_mtime, _after_bytes in planned:
                 written.append((target, _original))
                 if updated is None:
                     target.unlink()
@@ -376,18 +451,23 @@ class ApplyPatchTool:
                         _atomic_write(target, original)
                 except OSError:
                     pass
-            return ToolResult(False, f"patch write failed: {exc}", {"error": "write_failed", "diff": safe_preview})
-        changed = [operation.path for operation, _target, _original, _updated in planned]
+            return ToolResult(False, f"patch write failed: {exc}", {"error": "write_failed", "diff": safe_preview, "transaction_id": transaction_id, "rolled_back": True, "operations": [asdict(op) for op in change_operations]})
+        changed = [operation.path for operation, _target, _original, _updated, _before_hash, _before_size, _before_mtime, _after_bytes in planned]
         metadata = {
             "paths": changed,
             "hunks": sum(len(operation.hunks) for operation in operations),
             "created": [operation.path for operation in operations if operation.create],
             "deleted": [operation.path for operation in operations if operation.delete],
-            "old_chars": sum(len(original or "") for _operation, _target, original, _updated in planned),
-            "new_chars": sum(len(updated or "") for _operation, _target, _original, updated in planned),
+            "old_chars": sum(len(original or "") for _operation, _target, original, _updated, _before_hash, _before_size, _before_mtime, _after_bytes in planned),
+            "new_chars": sum(len(updated or "") for _operation, _target, _original, updated, _before_hash, _before_size, _before_mtime, _after_bytes in planned),
             "approval": "approved",
             "mutated": True,
             "diff": safe_preview,
             "truncated": preview_truncated,
+            "transaction_id": transaction_id,
+            "transaction": "committed",
+            "operations": [asdict(op) for op in change_operations],
+            "change_plan": asdict(ChangePlan(transaction_id, change_operations, safe_preview, approval="approved")),
+            "change_result": asdict(ChangeResult(transaction_id, True, change_operations)),
         }
         return ToolResult(True, f"patched {', '.join(changed)}", metadata)

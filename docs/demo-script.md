@@ -2,7 +2,8 @@
 
 The demo is deterministic and offline. It needs Python 3.11+, `uv`, and no
 API key. Always use a fresh temporary directory: the CLI refuses to overwrite
-an existing `demo_calculator.py` or `test_demo_calculator.py`.
+an existing fixture. The default calculator scenario and the JSON configuration
+scenario both use the production loop, tools, approvals and verification.
 
 ```powershell
 uv sync
@@ -11,6 +12,9 @@ uv run forgecode tools
 $demo = Join-Path ([System.IO.Path]::GetTempPath()) ('forgecode-demo-' + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $demo | Out-Null
 uv run forgecode --workspace $demo run --demo --auto-approve
+uv run forgecode --workspace $demo sessions
+uv run forgecode --workspace $demo status
+uv run forgecode --workspace $demo diff
 ```
 
 ## What to point out
@@ -27,7 +31,15 @@ uv run forgecode --workspace $demo run --demo --auto-approve
    the source file.
 5. The second pytest and the final verification pass. The terminal shows mode,
    approvals, risk metadata, changed files, diff, final message and session
-   JSONL path.
+   JSONL path. `sessions`, `status` and `diff` inspect that same bounded audit.
+
+To demonstrate a second real offline task, use a different fresh directory:
+
+```powershell
+$json_demo = Join-Path ([System.IO.Path]::GetTempPath()) ('forgecode-json-' + [guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Path $json_demo | Out-Null
+uv run forgecode --workspace $json_demo run --demo --demo-task json --auto-approve
+```
 
 For the read-only boundary, run the same command with `--mode plan`:
 
@@ -46,7 +58,11 @@ and cannot write, patch or run commands even if a provider requests one.
 - `FORGECODE_API_KEY is not configured`: the command omitted `--demo`; use the
   offline command above or configure the three provider environment variables.
 - A fixture conflict means the workspace is not fresh; choose another temp
-  directory. Inspect the printed session file for structured events.
+  directory. Use `forgecode session show latest` and `forgecode session export
+  latest` to inspect structured events without exposing full source files.
+- To preview recovery without side effects, run `forgecode --workspace $demo
+  run --resume latest --dry-run`. A changed fingerprint returns exit code 3 and
+  requires explicit recovery handling.
 
 The demo deliberately does not claim IDE UI, browser control, MCP marketplace,
 cloud execution, worktrees or parallel agents. It demonstrates the self-built

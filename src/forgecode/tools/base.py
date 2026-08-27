@@ -3,6 +3,8 @@
 from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any, Callable, Protocol
+import time
+import math
 
 from ..security.redaction import redact_text, redact_value
 from ..security.workspace import WorkspaceGuard
@@ -35,10 +37,23 @@ class ToolContext:
     approval_observer: Callable[[str, dict[str, Any], bool], None] | None = None
     mode: AgentMode | str = AgentMode.ACT
     secrets: tuple[str, ...] = ()
+    deadline_monotonic: float | None = None
+    cancellation_requested: Callable[[], bool] | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "mode", AgentMode(self.mode))
         object.__setattr__(self, "secrets", tuple(secret for secret in self.secrets if isinstance(secret, str) and secret))
+        if self.deadline_monotonic is not None and (isinstance(self.deadline_monotonic, bool) or not isinstance(self.deadline_monotonic, (int, float)) or not math.isfinite(self.deadline_monotonic)):
+            raise ValueError("deadline_monotonic must be a finite number or None")
+
+    def remaining_seconds(self, requested: float) -> float:
+        if self.deadline_monotonic is None:
+            return requested
+        return max(0.0, min(requested, self.deadline_monotonic - time.monotonic()))
+
+    @property
+    def cancelled(self) -> bool:
+        return bool(self.cancellation_requested and self.cancellation_requested())
 
     def request_approval(self, tool_name: str, arguments: dict[str, Any]) -> bool:
         approved = self.approval is not None and self.approval.approve(tool_name, arguments)

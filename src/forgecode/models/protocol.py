@@ -23,6 +23,7 @@ class Message:
 class ModelResponse:
     message: Message
     finish_reason: str | None = None
+    usage: dict[str, Any] = field(default_factory=dict)
 
 
 def is_valid_response(response: Any) -> bool:
@@ -32,6 +33,8 @@ def is_valid_response(response: Any) -> bool:
     if not isinstance(response.message.role, str) or not isinstance(response.message.content, str):
         return False
     if response.finish_reason is not None and not isinstance(response.finish_reason, str):
+        return False
+    if not isinstance(response.usage, dict):
         return False
     if not isinstance(response.message.tool_calls, tuple):
         return False
@@ -49,6 +52,9 @@ class ModelProvider(Protocol):
 class ProviderError(RuntimeError):
     """A safe, user-facing model provider or protocol error."""
 
-    def __init__(self, message: str, *, category: str = "provider_error"):
+    def __init__(self, message: str, *, category: str = "provider_error", retryable: bool = False, status_code: int | None = None, attempt: int | None = None):
         super().__init__(message)
         self.category = category
+        self.retryable = retryable
+        self.status_code = status_code
+        self.attempt = attempt

@@ -19,7 +19,8 @@ CLI (workspace, mode, approval, session)
             -> read/list/search/summary (read-only context)
             -> write_file/apply_patch (approved atomic writes)
             -> run_command (risk + approval + timeout)
-       -> SessionStore (bounded, redacted append-only JSONL)
+       -> RepositoryMap/ContextPlan (bounded deterministic snapshot)
+       -> SessionStore + CheckpointStore (bounded redacted JSONL + fingerprints)
 ```
 
 For each model turn, `AgentLoop` sends the system/user intent and the most
@@ -97,19 +98,36 @@ character budget is exceeded. `ToolRegistry` bounds and redacts tool output
 before it reaches the model. `SessionStore` appends JSONL events for mode,
 messages, calls, approvals, tool results, verification, errors and stop
 reasons. Nested sensitive keys and credential-shaped text are redacted, and
-large strings/collections are bounded. A session is an audit record, not a
-resume protocol; it must not be treated as trusted executable input.
+large strings/collections are bounded. v1 events carry a run id, sequence,
+mode and schema version; corrupt lines are reported with safe partial reads.
+Checkpoints capture file SHA-256/size/mtime fingerprints and pending actions.
+Resume validates those identities and requires a fresh preview/approval; it
+never treats session text as trusted executable input or silently replays a
+side effect. `inspect`/`map` exposes the same deterministic repository map and
+budgeted relevance planner as a read-only context layer.
+
+## Lifecycle, transactions and verification
+
+Runs use a checked `RunState` machine (`created`, `discovering`, `planning`,
+`awaiting_approval`, `acting`, `verifying`, `paused`, `completed`, `failed`,
+`cancelled`, `recovery_required`). State transitions and model/tool/approval,
+checkpoint, transaction and verification events share the monotonic session
+sequence. Patches and writes expose transaction ids, before/after hashes and
+bounded previews; approval-time fingerprints prevent overwriting an external
+edit, and in-process failures restore already-written targets. Verification is
+represented by typed results with exit code, streams, timeout, changed files
+and next action, with a finite repair budget.
 
 ## Reproducible demo
 
 `DemoProvider` uses the same loop, schemas, registry and tools as an online
 provider. In Act mode the CLI first creates a fresh, intentionally broken
-calculator fixture through `write_file`; the model then summarizes and reads
-it, runs a real failing pytest, applies an approved patch, reruns pytest and
-passes a final verification command. `python -B` avoids stale bytecode when a
-same-size source file is atomically replaced. Plan demo creates no fixture and
-ends with a read-only plan. A user workspace containing either fixture name is
-rejected rather than overwritten.
+calculator or JSON-config fixture through `write_file`; the model then
+summarizes and reads it, runs a real failing pytest, applies an approved patch,
+reruns pytest and passes a final verification command. `python -B` avoids
+stale bytecode when a same-size source file is atomically replaced. Plan demo
+creates no fixture and ends with a read-only plan. A user workspace containing
+an existing fixture is rejected rather than overwritten.
 
 ## Current scope and limitations
 

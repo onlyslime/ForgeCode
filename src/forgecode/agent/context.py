@@ -57,7 +57,7 @@ class ContextBuilder:
         )
         content = (
             "You are ForgeCode, a local coding agent.\n"
-            f"Workspace root: {workspace}\n"
+            "Workspace root: . (all paths are relative to the validated workspace)\n"
             f"Execution mode: {mode}. {mode_rule}\n"
             f"Available tools: {tools}\n"
             f"Approval mode: {approval_mode}. Never assume a denied operation ran.\n"

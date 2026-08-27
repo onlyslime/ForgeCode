@@ -1,20 +1,21 @@
-项目名称：ForgeCode（自研本地 coding agent）
+项目：ForgeCode（自研、可审计的本地 coding agent）
 
-Git 仓库地址：https://github.com/onlyslime/ForgeCode
+仓库：https://github.com/onlyslime/ForgeCode
 
-如何运行：
-1. 安装 Python 3.11+ 与 uv，在项目根目录执行 uv sync。
-2. 执行 uv run forgecode doctor 检查环境，uv run forgecode tools 查看工具，uv run pytest 运行测试。
-3. 离线演示请创建新的临时目录后执行：
-   uv run forgecode --workspace <临时目录> run --demo --auto-approve
-   演示会读取有缺陷的 calculator，运行失败测试，经审批应用 patch，再运行测试通过。
-4. 真实模型需在环境变量设置 FORGECODE_API_KEY、FORGECODE_BASE_URL、FORGECODE_MODEL，再执行 forgecode run "任务"；默认逐次询问写入和命令审批。
+运行：Python 3.11+、uv；根目录执行 `uv sync`、`uv run forgecode doctor`、
+`uv run forgecode tools`、`uv run pytest`。离线演示用全新目录：
+`uv run forgecode --workspace <目录> run --demo --auto-approve`，或加
+`--demo-task json`。在线模型只从 FORGECODE_API_KEY、FORGECODE_BASE_URL、
+FORGECODE_MODEL 环境变量读取凭据。
 
-特色功能：
-- 自行实现 provider-neutral 协议、结构化 tool calling、AgentLoop、上下文预算、错误回传、有限修复和验证，不依赖现成 agent 框架或 SDK。
-- Plan/Act 权限边界：plan 只读且工具执行层拒绝副作用；act 支持审批后的写入、命令和 apply_patch。
-- apply_patch 支持 unified diff、*** Begin Patch、多文件/多 hunk、新建和显式删除，预验证、路径保护、diff 预览、原子写入和失败恢复。
-- WorkspaceGuard 防止路径和符号链接逃逸；命令有风险分类、硬拒绝、超时、输出限制、进程终止和敏感环境变量清理。
-- workspace summary 提供语言、构建文件、测试目录和 Git 状态；SessionStore 以脱敏、有上限的 JSONL 记录模式、工具、审批、结果和验证。
+特色：自研 provider-neutral 协议、tool calling、AgentLoop、上下文预算、错误
+回传和有限修复；Plan/Act 双层权限与 WorkspaceGuard 路径保护；unified/
+Begin Patch 多文件预验证、diff 预览、审批、事务 id、哈希冲突、原子替换和进程内
+回滚；命令风险分类、危险硬拦截、超时、进程终止、输出限制和脱敏；repository
+map；带 schema_version/run_id/sequence 的 JSONL 事件、checkpoint、session
+show/export、status/diff、安全 resume dry-run。Plan 不执行副作用，恢复冲突返回
+退出码 3，不会自动重放写入或命令。
 
-补充说明：项目面向题目的单智能体本地 MVP，演示不需要网络或 API key。命令风险识别是保守启发式策略，不等同于操作系统沙箱；暂不包含 IDE、浏览器、MCP、云执行和多代理。当前发布版本为 v0.0.4。
+版本 v0.0.5；测试全部通过，Windows 无符号链接权限时跳过对应测试。风险识别是
+启发式审批边界，不是操作系统沙箱；掉电/磁盘损坏时无法保证跨文件原子性。暂不
+包含 IDE、浏览器、MCP marketplace、云执行和多代理。
