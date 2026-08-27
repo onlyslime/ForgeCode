@@ -285,7 +285,7 @@ CLI/TUI
 
 ## 七、来源清单（官方）
 
-- [考核题目 PDF（本地文件）](推免考核题目学生版.pdf)
+- [考核题目 PDF（本地文件）](../assignment/推免考核题目学生版.pdf)
 - [Claude Code Overview](https://docs.anthropic.com/en/docs/claude-code/overview)
 - [OpenAI Codex 文档](https://developers.openai.com/codex)、[Codex cloud](https://developers.openai.com/codex/cloud)、[Build skills](https://developers.openai.com/codex/skills)
 - [GitHub Copilot cloud agent](https://docs.github.com/en/copilot/concepts/agents/coding-agent/about-coding-agent)、[Copilot code review](https://docs.github.com/en/copilot/concepts/agents/code-review)

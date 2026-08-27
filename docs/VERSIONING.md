@@ -10,3 +10,5 @@ ForgeCode uses semantic-looking versions in the form `vA.B.C` for every commit a
 - Commit subjects use `vA.B.C: short description`; release tags use the exact same version.
 
 The initial framework commit is `v0.0.1: initialize framework`.
+
+The current framework version is `v0.0.2`. The ordinary next version is `v0.0.3`.

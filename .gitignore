@@ -30,6 +30,10 @@ logs/
 *.log
 sessions/
 
+# Persistent goal prompts (kept locally, never committed)
+docs/goals/*
+!docs/goals/.gitkeep
+
 # OS and editor files
 .DS_Store
 Thumbs.db
