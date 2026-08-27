@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Environments and package manager state
+.venv/
+venv/
+env/
+ENV/
+.python-version
+
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.secret
+
+# Agent runtime data
+.forgecode/
+logs/
+*.jsonl
+*.log
+sessions/
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/settings.example.json
+
+# Build artifacts and temporary files
+dist/
+build/
+tmp/
+temp/
+*.tmp
+*.swp
