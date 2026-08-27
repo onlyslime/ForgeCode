@@ -1,3 +1,3 @@
-from .session import SessionEvent, SessionStore
+from .session import SessionEvent, SessionStore, redact
 
-__all__ = ["SessionEvent", "SessionStore"]
+__all__ = ["SessionEvent", "SessionStore", "redact"]

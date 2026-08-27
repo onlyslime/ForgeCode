@@ -24,7 +24,7 @@ Every commit and release tag uses `vA.B.C`.
 - Commit subjects use `vA.B.C: short description`; tags use the exact version.
 - Before committing, run relevant tests and inspect `git status` for secrets and unintended files.
 
-The current version is `v0.0.2`; the next ordinary commit is `v0.0.3` unless the user explicitly requests an A or B update.
+The current version is `v0.0.3`; the next ordinary commit is `v0.0.4` unless the user explicitly requests an A or B update.
 
 ## Documentation boundaries
 

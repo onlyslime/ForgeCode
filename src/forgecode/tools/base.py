@@ -1,7 +1,7 @@
 """Small provider-neutral tool protocol."""
 
 from dataclasses import dataclass, field
-from typing import Any, Protocol
+from typing import Any, Callable, Protocol
 
 from ..security.workspace import WorkspaceGuard
 
@@ -24,6 +24,13 @@ class ToolResult:
 class ToolContext:
     guard: WorkspaceGuard
     approval: "ApprovalPolicy | None" = None
+    approval_observer: Callable[[str, dict[str, Any], bool], None] | None = None
+
+    def request_approval(self, tool_name: str, arguments: dict[str, Any]) -> bool:
+        approved = self.approval is not None and self.approval.approve(tool_name, arguments)
+        if self.approval_observer:
+            self.approval_observer(tool_name, arguments, approved)
+        return approved
 
 
 class ApprovalPolicy(Protocol):
@@ -39,8 +46,11 @@ class Tool(Protocol):
 
 
 class ToolRegistry:
-    def __init__(self):
+    def __init__(self, *, max_output_chars: int = 20_000):
         self._tools: dict[str, Tool] = {}
+        if max_output_chars < 1:
+            raise ValueError("max_output_chars must be positive")
+        self.max_output_chars = max_output_chars
 
     def register(self, tool: Tool) -> None:
         if tool.definition.name in self._tools:
@@ -55,7 +65,14 @@ class ToolRegistry:
 
     def schemas(self) -> list[dict[str, Any]]:
         return [
-            {"name": definition.name, "description": definition.description, "parameters": definition.parameters}
+            {
+                "type": "function",
+                "function": {
+                    "name": definition.name,
+                    "description": definition.description,
+                    "parameters": definition.parameters,
+                },
+            }
             for definition in self.definitions()
         ]
 
@@ -63,7 +80,17 @@ class ToolRegistry:
         tool = self._tools.get(name)
         if tool is None:
             return ToolResult(False, f"unknown tool: {name}", {"error": "unknown_tool"})
+        if not isinstance(arguments, dict):
+            return ToolResult(False, "tool arguments must be an object", {"error": "invalid_arguments"})
         try:
-            return tool.execute(arguments, context)
+            result = tool.execute(arguments, context)
+            if not isinstance(result, ToolResult):
+                return ToolResult(False, "tool returned an invalid result", {"error": "invalid_tool_result"})
+            if not isinstance(result.output, str):
+                return ToolResult(False, "tool returned non-text output", {"error": "invalid_tool_result"})
+            if len(result.output) <= self.max_output_chars:
+                return result
+            metadata = {**result.metadata, "truncated": True, "original_output_chars": len(result.output)}
+            return ToolResult(result.ok, result.output[: self.max_output_chars] + "\n[tool output truncated]", metadata)
         except Exception as exc:  # tool errors become model context, never process crashes
             return ToolResult(False, f"{type(exc).__name__}: {exc}", {"error": type(exc).__name__})

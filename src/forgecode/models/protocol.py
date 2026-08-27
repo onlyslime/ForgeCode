@@ -25,6 +25,30 @@ class ModelResponse:
     finish_reason: str | None = None
 
 
+def is_valid_response(response: Any) -> bool:
+    """Validate the small provider-neutral response contract at the loop boundary."""
+    if not isinstance(response, ModelResponse) or not isinstance(response.message, Message):
+        return False
+    if not isinstance(response.message.role, str) or not isinstance(response.message.content, str):
+        return False
+    if response.finish_reason is not None and not isinstance(response.finish_reason, str):
+        return False
+    if not isinstance(response.message.tool_calls, tuple):
+        return False
+    for call in response.message.tool_calls:
+        if not isinstance(call, ToolCall) or not isinstance(call.id, str) or not call.id or not isinstance(call.name, str) or not call.name or not isinstance(call.arguments, dict):
+            return False
+    return True
+
+
 class ModelProvider(Protocol):
     async def complete(self, messages: Sequence[Message], tools: Sequence[dict[str, Any]]) -> ModelResponse:
         """Return the next assistant message, possibly containing tool calls."""
+
+
+class ProviderError(RuntimeError):
+    """A safe, user-facing model provider or protocol error."""
+
+    def __init__(self, message: str, *, category: str = "provider_error"):
+        super().__init__(message)
+        self.category = category

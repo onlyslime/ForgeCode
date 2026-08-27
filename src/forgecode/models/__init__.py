@@ -1,3 +1,5 @@
-from .protocol import Message, ModelProvider, ModelResponse, ToolCall
+from .protocol import Message, ModelProvider, ModelResponse, ProviderError, ToolCall, is_valid_response
+from .openai_compatible import OpenAICompatibleProvider, parse_chat_completion
+from .fake import DemoProvider
 
-__all__ = ["Message", "ModelProvider", "ModelResponse", "ToolCall"]
+__all__ = ["DemoProvider", "Message", "ModelProvider", "ModelResponse", "OpenAICompatibleProvider", "ProviderError", "ToolCall", "is_valid_response", "parse_chat_completion"]

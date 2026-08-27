@@ -1,6 +1,6 @@
 from .base import ToolContext, ToolDefinition, ToolRegistry, ToolResult
 from .filesystem import ListFilesTool, ReadFileTool, SearchTool, WriteFileTool
-from .shell import AllowAllApproval, DenyAllApproval, ShellTool
+from .shell import AllowAllApproval, DenyAllApproval, InteractiveApproval, ShellTool
 
 
 def build_default_registry(guard) -> ToolRegistry:
@@ -16,6 +16,7 @@ def build_default_registry(guard) -> ToolRegistry:
 __all__ = [
     "AllowAllApproval",
     "DenyAllApproval",
+    "InteractiveApproval",
     "ToolContext",
     "ToolDefinition",
     "ToolRegistry",
