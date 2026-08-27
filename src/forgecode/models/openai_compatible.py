@@ -12,6 +12,7 @@ import os
 from typing import Any, Protocol, Sequence
 from urllib import error, request
 
+from ..security.redaction import redact_text
 from .protocol import Message, ModelResponse, ProviderError, ToolCall
 
 
@@ -31,11 +32,7 @@ class UrllibTransport:
 
 
 def _redact(text: str, secret: str | None = None) -> str:
-    value = text
-    if secret:
-        value = value.replace(secret, "[REDACTED]")
-    value = value.replace("Bearer ", "Bearer [REDACTED]")
-    return value
+    return redact_text(text, (secret,) if secret else ())
 
 
 def _error_message(payload: bytes, secret: str | None) -> str:

@@ -10,19 +10,33 @@ from typing import Any, Sequence
 from ..models import Message
 
 
-def _message_size(message: Message) -> int:
-    calls = [{"id": call.id, "name": call.name, "arguments": call.arguments} for call in message.tool_calls]
-    return len(message.content) + len(json.dumps(calls, ensure_ascii=False, default=str))
+_MAX_CONTEXT_ITEMS = 128
+_MAX_CONTEXT_TOOL_CALLS = 64
 
 
 def _bounded_value(value: Any, limit: int) -> Any:
     if isinstance(value, str) and len(value) > limit:
         return value[:limit] + "\n[argument truncated]"
     if isinstance(value, dict):
-        return {str(key): _bounded_value(item, limit) for key, item in value.items()}
-    if isinstance(value, list):
-        return [_bounded_value(item, limit) for item in value]
+        items = list(value.items())
+        result = {str(key): _bounded_value(item, limit) for key, item in items[:_MAX_CONTEXT_ITEMS]}
+        if len(items) > _MAX_CONTEXT_ITEMS:
+            result["_truncated_items"] = len(items) - _MAX_CONTEXT_ITEMS
+        return result
+    if isinstance(value, (list, tuple)):
+        result = [_bounded_value(item, limit) for item in value[:_MAX_CONTEXT_ITEMS]]
+        if len(value) > _MAX_CONTEXT_ITEMS:
+            result.append(f"[omitted {len(value) - _MAX_CONTEXT_ITEMS} items]")
+        return result
     return value
+
+
+def _message_size(message: Message) -> int:
+    calls = [
+        {"id": call.id, "name": call.name, "arguments": _bounded_value(call.arguments, 4_000)}
+        for call in message.tool_calls[:_MAX_CONTEXT_TOOL_CALLS]
+    ]
+    return len(message.content) + len(json.dumps(calls, ensure_ascii=False, default=str))
 
 
 @dataclass(frozen=True)
@@ -34,11 +48,17 @@ class ContextBuilder:
         if self.max_chars < 1 or self.max_message_chars < 1:
             raise ValueError("context limits must be positive")
 
-    def system_message(self, workspace: Path, tool_names: Sequence[str], *, approval_mode: str) -> Message:
+    def system_message(self, workspace: Path, tool_names: Sequence[str], *, approval_mode: str, mode: str = "act") -> Message:
         tools = ", ".join(tool_names) or "none"
+        mode_rule = (
+            "You are in PLAN mode. Explore and produce a concrete plan only; file changes, commands, and verification are forbidden."
+            if mode == "plan"
+            else "You are in ACT mode. Side effects still require approval and every change must be verified."
+        )
         content = (
             "You are ForgeCode, a local coding agent.\n"
             f"Workspace root: {workspace}\n"
+            f"Execution mode: {mode}. {mode_rule}\n"
             f"Available tools: {tools}\n"
             f"Approval mode: {approval_mode}. Never assume a denied operation ran.\n"
             "Inspect relevant files before editing, make the smallest safe change, and verify with a real command. "
@@ -127,6 +147,6 @@ class ContextBuilder:
             content = content[:limit] + "\n[message truncated]"
         calls = tuple(
             type(call)(call.id, call.name, _bounded_value(call.arguments, max(256, limit // 2)))
-            for call in message.tool_calls
+            for call in message.tool_calls[:_MAX_CONTEXT_TOOL_CALLS]
         )
         return Message(role=message.role, content=content, tool_call_id=message.tool_call_id, tool_calls=calls)

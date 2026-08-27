@@ -1,41 +1,121 @@
 # ForgeCode Architecture
 
-ForgeCode is a small provider-neutral local coding agent. It owns the protocol conversion, conversation history, tool execution, loop termination, error propagation, and safety boundary instead of importing an agent framework.
+ForgeCode is a small provider-neutral local coding agent. The repository owns
+the protocol conversion, conversation history, tool execution, loop
+termination, error propagation, and safety boundary. It does not wrap a
+ready-made agent framework or a hosted file/code-execution product.
+
+## Components and data flow
 
 ```text
-CLI (doctor/tools/run)
+CLI (workspace, mode, approval, session)
   -> AgentLoop
-       -> ContextBuilder (system instructions + bounded history)
+       -> ContextBuilder (system policy + bounded history)
        -> ModelProvider
-            -> OpenAICompatibleProvider (urllib, Chat Completions)
-            -> DemoProvider (deterministic offline provider)
-       -> ToolRegistry (JSON schemas + dispatch)
-            -> WorkspaceGuard (resolved workspace paths, symlink boundary)
-            -> list_files / read_file / search / write_file
-            -> run_command (approval + timeout + stdout/stderr/exit code)
-       -> SessionStore (redacted append-only JSONL events)
+            -> OpenAICompatibleProvider (urllib + Chat Completions)
+            -> DemoProvider (deterministic offline calls)
+       -> ToolRegistry (schemas + mode filter + dispatch)
+            -> WorkspaceGuard (resolved paths and symlink boundary)
+            -> read/list/search/summary (read-only context)
+            -> write_file/apply_patch (approved atomic writes)
+            -> run_command (risk + approval + timeout)
+       -> SessionStore (bounded, redacted append-only JSONL)
 ```
 
-## Request/response flow
+For each model turn, `AgentLoop` sends the system/user intent and the most
+useful bounded recent messages to a provider. A provider returns a neutral
+`Message` and zero or more `ToolCall` values. The registry validates and
+dispatches every call, then the loop appends a tool result with the matching
+`tool_call_id`. Tool errors, approval denials, non-zero exits and timeouts are
+ordinary model-visible results. The loop stops on a final response, provider
+or protocol error, interruption, repeated-call limit, verification failure or
+the configured step limit.
 
-1. `forgecode run` resolves a workspace and creates an approval policy, registry, session store, provider, and `AgentLoop`.
-2. The loop sends a system message describing the workspace root, available tools, approval behavior, and verification requirement, followed by the user prompt.
-3. The provider converts provider-neutral `Message` values and tool definitions to the OpenAI-compatible Chat Completions JSON shape. It converts assistant text, `finish_reason`, and every tool call (`id`, function name, JSON object arguments) back to `ModelResponse`.
-4. The loop appends the assistant message unchanged, executes each tool call through the registry, and appends one tool result per call with the matching `tool_call_id`. Unknown tools, invalid arguments, denied approvals, exceptions, non-zero exits, and timeouts are ordinary structured tool results for the next model turn.
-5. The loop stops on a final assistant message, provider/protocol error, empty or invalid response, user interruption, repeated identical calls, verification failure, or a configurable maximum step count. A final assistant message can trigger a bounded verification command; failed verification is returned as context for a limited repair attempt.
+## Plan/Act safety boundary
 
-## Safety boundary
+`AgentMode.PLAN` and `AgentMode.ACT` are state in `ToolContext` and
+`AgentLoop`, not just prompt wording.
 
-`WorkspaceGuard` resolves relative and absolute paths and rejects paths outside the root, `..` escapes, and symlink escapes. Read/search operations skip common generated directories and enforce file, line, match, and output limits. `write_file` validates the destination before an approval request and uses a temporary file plus replace for failure-safe writes. `run_command` executes with the workspace as cwd, requires approval, accepts only a 1--120 second timeout, and preserves bounded stdout, stderr, exit code, and timeout metadata.
+- Plan mode exposes only `list_files`, `read_file`, `search` and
+  `workspace_summary`. The registry rejects a side-effecting call with a
+  structured `mode_denied` result; write, patch, command and verification
+  paths also defend themselves when called directly.
+- Act mode exposes every tool, but each write, patch and command still needs
+  an approval decision. `--auto-approve` changes only that decision policy.
+- The system message states the active mode, available tools and verification
+  rule. A plan run records a copyable plan summary and explicitly skips
+  verification. Session events include `mode`, `mode_denied`, approval and
+  final results.
 
-The default CLI approval policy is interactive. `--auto-approve`/`--yes` is explicit and intended for demos or CI. Approval decisions are emitted as events. The registry catches tool exceptions and turns them into model-visible errors rather than crashing the process.
+This two-layer design protects against both an over-eager model and a caller
+that bypasses the schema filter and invokes a tool object directly.
 
-## Context and auditability
+## Workspace and file operations
 
-`ContextBuilder` keeps the system and user intent, recent complete messages, and bounded tool arguments/results under a character budget. Older messages are represented by an omission marker. `SessionStore` appends timestamped JSONL events for user messages, model messages, tool calls, approvals, tool results, verification, errors, and final stop reasons. Sensitive key names and configured secret values are replaced with `[REDACTED]`.
+`WorkspaceGuard` resolves every user path and rejects absolute paths outside
+the root, `..` traversal and symlink/junction escapes. Listing and searching
+use stable ordering, bounded file/match/line sizes and built-in plus basic
+`.gitignore` exclusions. `.env`, credentials, key/certificate files, generated
+directories and session/goal data are not used as default context.
 
-## CLI and current limitations
+`write_file` means complete UTF-8 replacement. It validates the destination,
+asks for approval, writes an fsynced same-directory temporary file and uses an
+atomic replace.
 
-`doctor` reports configuration and tools; `tools` prints schemas; `run` supports a prompt, `--workspace`, `--max-steps`, `--session`, `--verify`, `--auto-approve`, and `--demo`. A run prints bounded progress, verification, status, and Git diff without creating commits. The demo deliberately performs inspect -> write -> failed command -> repair -> verification without network access.
+`apply_patch` is a separate structured editing operation. It parses unified
+diffs and the `*** Begin Patch` form; supports multiple files, hunks, line
+offsets, creation and explicitly opted-in deletion; rejects malformed,
+ambiguous, duplicate, binary, oversized or out-of-workspace targets. All
+targets are read and all hunks are applied in memory before one approval. A
+bounded unified preview is shown in approval/session/CLI output. If writing
+one target fails, already-written targets are restored from their original
+bytes; the implementation documents that an abrupt machine/filesystem failure
+outside the process cannot be made a full transaction by a standard file API.
+CRLF and no-final-newline text are preserved.
 
-This MVP intentionally does not implement IDE UI, autocomplete, browser/computer control, voice, MCP marketplace, cloud execution, worktrees, parallel subagents, or enterprise governance. The provider and tool contracts leave room for those later extensions without changing the local safety boundary.
+## Command policy
+
+`run_command` runs with the workspace as cwd and a 1--120 second timeout.
+Output is bounded and returned with stdout, stderr, exit code, duration,
+timeout and truncation metadata. A conservative classifier labels commands as
+`normal`, `filesystem_destructive`, `privilege_or_system`,
+`network_or_remote` or `repository_irreversible`.
+
+Shutdown/reboot, disk format, root deletion, `git reset --hard`, forced
+`git clean` and force-push patterns are hard-blocked; auto-approve cannot
+override them. Other mutation, privilege, network/install and Git operations
+are surfaced for approval. The classifier is a heuristic, not a sandbox.
+The child environment removes variables whose names suggest API keys, tokens,
+secrets, passwords or cookies. Timeout handling attempts to terminate the
+process tree (Taskkill on Windows, process group on POSIX).
+
+## Context budget and audit log
+
+`ContextBuilder` keeps system and user intent, truncates oversized messages,
+prefers recent complete tool context and inserts an omission marker when the
+character budget is exceeded. `ToolRegistry` bounds and redacts tool output
+before it reaches the model. `SessionStore` appends JSONL events for mode,
+messages, calls, approvals, tool results, verification, errors and stop
+reasons. Nested sensitive keys and credential-shaped text are redacted, and
+large strings/collections are bounded. A session is an audit record, not a
+resume protocol; it must not be treated as trusted executable input.
+
+## Reproducible demo
+
+`DemoProvider` uses the same loop, schemas, registry and tools as an online
+provider. In Act mode the CLI first creates a fresh, intentionally broken
+calculator fixture through `write_file`; the model then summarizes and reads
+it, runs a real failing pytest, applies an approved patch, reruns pytest and
+passes a final verification command. `python -B` avoids stale bytecode when a
+same-size source file is atomically replaced. Plan demo creates no fixture and
+ends with a read-only plan. A user workspace containing either fixture name is
+rejected rather than overwritten.
+
+## Current scope and limitations
+
+The project intentionally does not implement IDE UI, autocomplete, browser or
+computer control, voice, MCP marketplace, cloud execution, worktrees,
+parallel subagents, background scheduling or enterprise governance. Model
+providers, registry and safety contracts leave room for later extensions, but
+the current assessment deliverable focuses on one auditable local agent and a
+repeatable offline coding task.

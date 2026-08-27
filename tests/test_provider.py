@@ -58,6 +58,16 @@ def test_provider_http_error_redacts_key():
     assert "REDACTED" in str(exc_info.value)
 
 
+def test_provider_error_redacts_bearer_and_named_secret_text():
+    transport = RecordingTransport(status=500, payload={"error": {"message": "Authorization: Bearer abc123 token=inline-secret"}})
+    provider = OpenAICompatibleProvider(api_key="key-123", base_url="https://example.test/v1", model="demo", transport=transport)
+    with pytest.raises(ProviderError) as exc_info:
+        asyncio.run(provider.complete([], []))
+    message = str(exc_info.value)
+    assert "abc123" not in message
+    assert "inline-secret" not in message
+
+
 def test_provider_rejects_malformed_tool_arguments():
     with pytest.raises(ProviderError, match="invalid JSON arguments"):
         parse_chat_completion({"choices": [{"message": {"content": None, "tool_calls": [{"id": "x", "function": {"name": "read_file", "arguments": "{"}}]}}]})

@@ -11,9 +11,10 @@ from . import __version__
 from .agent import AgentConfig, AgentLoop
 from .config import Settings
 from .models import DemoProvider, OpenAICompatibleProvider, ProviderError
+from .security.redaction import redact_text
 from .security.workspace import WorkspaceGuard
 from .storage import SessionStore
-from .tools import InteractiveApproval, ToolContext, build_default_registry
+from .tools import AgentMode, AllowAllApproval, InteractiveApproval, ToolContext, build_default_registry
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -30,6 +31,7 @@ def _parser() -> argparse.ArgumentParser:
     run_parser.add_argument("--auto-approve", "--yes", action="store_true", help="approve writes and commands automatically")
     run_parser.add_argument("--verify", help="command to run after the model finishes editing")
     run_parser.add_argument("--demo", action="store_true", help="run the deterministic offline demonstration")
+    run_parser.add_argument("--mode", choices=[mode.value for mode in AgentMode], default=AgentMode.ACT.value, help="execution mode: plan is read-only; act permits approved side effects")
     return parser
 
 
@@ -68,29 +70,45 @@ def main(argv: list[str] | None = None) -> int:
             print(f"invalid session path: {exc}", file=sys.stderr)
             return 2
         session = SessionStore(session_path, secrets=[api_key])
+        if args.demo and args.mode == AgentMode.ACT.value:
+            try:
+                _prepare_demo_workspace(registry, guard)
+            except OSError as exc:
+                print(f"forgecode run failed: {_redact_display(str(exc), [api_key])}", file=sys.stderr)
+                return 1
         events: list[tuple[str, dict[str, Any]]] = []
 
         def on_event(kind: str, payload: dict[str, Any]) -> None:
             events.append((kind, payload))
-            if kind == "tool_call":
+            if kind == "mode":
+                print(f"[mode] {payload['mode']} (side effects {'enabled' if payload['side_effects_allowed'] else 'disabled'})")
+            elif kind == "tool_call":
                 print(f"[tool] {payload['tool']} id={payload['id']} args={_safe_summary(payload.get('arguments', {}), [api_key])}")
             elif kind == "approval":
                 print(f"[approval] {payload['tool']}: {'approved' if payload['approved'] else 'denied'}")
             elif kind == "tool_result":
                 status = "ok" if payload["ok"] else "error"
                 output = _redact_display(payload["output"], [api_key])[:500].replace("\n", "\\n")
-                print(f"[result:{status}] {output}")
+                risk = payload.get("metadata", {}).get("risk")
+                risk_label = f" risk={risk}" if risk else ""
+                print(f"[result:{status}{risk_label}] {output}")
+                patch_preview = payload.get("metadata", {}).get("diff")
+                if patch_preview:
+                    print(f"[patch] {_redact_display(patch_preview, [api_key])[:4_000]}")
             elif kind == "verification_result":
                 print(f"[verify] {'passed' if payload['ok'] else 'failed'}: {_redact_display(payload['output'], [api_key])[:500]}")
             elif kind == "error":
                 print(f"[error] {_redact_display(payload['message'], [api_key])}", file=sys.stderr)
-            elif kind == "model_message" and payload.get("content"):
-                print(f"[model] {_redact_display(str(payload['content']), [api_key])[:1_000]}")
+            elif kind == "session_error":
+                print(
+                    f"[session error] event={payload.get('event')}: {_redact_display(payload.get('error', ''), [api_key])}",
+                    file=sys.stderr,
+                )
 
         try:
             provider = DemoProvider() if args.demo else OpenAICompatibleProvider.from_environment()
-            context = ToolContext(guard, approval)
-            verification_command = args.verify or ("python -c \"print('verification passed')\"" if args.demo else _default_verification_command(workspace))
+            context = ToolContext(guard, approval, mode=args.mode, secrets=tuple(secret for secret in (api_key,) if secret))
+            verification_command = args.verify or ("python -B -m pytest -q test_demo_calculator.py" if args.demo else _default_verification_command(workspace))
             loop = AgentLoop(provider, registry, context, session=session, config=AgentConfig(max_steps=args.max_steps, verification_command=verification_command), on_event=on_event)
             result = asyncio.run(loop.run(prompt))
         except (ProviderError, ValueError, OSError) as exc:
@@ -98,6 +116,12 @@ def main(argv: list[str] | None = None) -> int:
             return 1
 
         print(f"[final] stop={result.stopped_reason} verification={result.verification_ok}")
+        print(f"[mode] {result.mode}")
+        if result.plan_summary is not None:
+            print(f"[plan] {_redact_display(result.plan_summary, [api_key])[:4_000]}")
+            print("[plan] no files or commands were executed")
+        if result.explored:
+            print("[explored] " + ", ".join(_redact_display(item, [api_key]) for item in result.explored[:100]))
         final_messages = [message for message in result.messages if message.role == "assistant" and message.content]
         if final_messages:
             print(f"[final message] {_redact_display(final_messages[-1].content, [api_key])[:4_000]}")
@@ -151,16 +175,26 @@ def _safe_summary(arguments: dict[str, Any], secrets=()) -> str:
             values[key] = value[:120] + ("..." if len(value) > 120 else "")
         else:
             values[key] = value
-    rendered = repr(values)
-    for secret in secrets:
-        if secret:
-            rendered = rendered.replace(secret, "[REDACTED]")
-    return rendered.replace("Bearer ", "Bearer [REDACTED]")
+    return redact_text(repr(values), secrets)
 
 
 def _redact_display(value: str, secrets=()) -> str:
-    rendered = str(value)
-    for secret in secrets:
-        if secret:
-            rendered = rendered.replace(secret, "[REDACTED]")
-    return rendered.replace("Bearer ", "Bearer [REDACTED]")
+    return redact_text(value, secrets)
+
+
+def _prepare_demo_workspace(registry, guard: WorkspaceGuard) -> None:
+    """Create a tiny intentionally broken fixture through the normal write tool."""
+    fixtures = {
+        "demo_calculator.py": "def add(a, b):\n    return a - b\n",
+        "test_demo_calculator.py": "from demo_calculator import add\n\ndef test_add():\n    assert add(2, 3) == 5\n",
+    }
+    context = ToolContext(guard, AllowAllApproval(), mode=AgentMode.ACT)
+    paths = {name: guard.resolve(name) for name in fixtures}
+    conflicts = [name for name, path in paths.items() if path.exists()]
+    if conflicts:
+        raise OSError(f"demo workspace already contains {', '.join(conflicts)}; use a fresh workspace")
+    for name, content in fixtures.items():
+        path = paths[name]
+        result = registry.execute("write_file", {"path": name, "content": content}, context)
+        if not result.ok:
+            raise OSError(f"could not prepare demo fixture {name}: {result.output}")

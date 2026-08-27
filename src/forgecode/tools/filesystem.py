@@ -1,6 +1,7 @@
 """Workspace-scoped filesystem and search tools."""
 
 import os
+import fnmatch
 import re
 import tempfile
 from typing import Any
@@ -8,7 +9,8 @@ from typing import Any
 from .base import ToolContext, ToolDefinition, ToolResult
 
 
-_SKIP_DIRS = {".git", ".venv", "node_modules", "__pycache__", "dist", "build"}
+_SKIP_DIRS = {".git", ".venv", "node_modules", "__pycache__", ".pytest_cache", ".forgecode", "dist", "build", "tmp", "temp"}
+_SKIP_FILES = {".env", ".env.local", ".env.example", "id_rsa", "credentials.json"}
 _MAX_LIST_FILES = 1_000
 _MAX_FILE_BYTES = 2_000_000
 _MAX_READ_CHARS = 100_000
@@ -17,12 +19,33 @@ _MAX_SEARCH_LINE_CHARS = 4_000
 _MAX_WRITE_CHARS = 1_000_000
 
 
-def _is_skipped(path, guard) -> bool:
+def _is_ignored(path, guard) -> bool:
     try:
-        relative_parts = guard.relative(path).split("/")
+        relative = guard.relative(path)
     except (OSError, ValueError):
         return True
-    return any(part in _SKIP_DIRS for part in relative_parts)
+    relative_parts = relative.split("/")
+    if any(part in _SKIP_DIRS for part in relative_parts):
+        return True
+    name = path.name.lower()
+    if name in _SKIP_FILES or name.startswith(".env.") or name.endswith((".pem", ".key", ".secret")):
+        return True
+    gitignore = guard.root / ".gitignore"
+    try:
+        patterns = [line.strip() for line in gitignore.read_text(encoding="utf-8").splitlines() if line.strip() and not line.lstrip().startswith("#")]
+    except (OSError, UnicodeDecodeError):
+        patterns = []
+    for pattern in patterns:
+        if pattern.startswith("!"):
+            continue
+        normalized = pattern.rstrip("/")
+        if fnmatch.fnmatch(relative, normalized) or fnmatch.fnmatch(name, normalized) or any(fnmatch.fnmatch(part, normalized) for part in relative_parts):
+            return True
+    return False
+
+
+def _is_skipped(path, guard) -> bool:
+    return _is_ignored(path, guard)
 
 
 def _required(arguments: dict[str, Any], name: str) -> str:
@@ -44,7 +67,7 @@ def _positive_int(arguments: dict[str, Any], name: str, default: int, maximum: i
 class ListFilesTool:
     definition = ToolDefinition(
         "list_files",
-        "List workspace files matching a glob.",
+        "List workspace files matching a glob while excluding generated and sensitive paths.",
         {"type": "object", "properties": {"pattern": {"type": "string"}, "max_files": {"type": "integer", "minimum": 1, "maximum": _MAX_LIST_FILES}}, "required": ["pattern"]},
     )
 
@@ -65,9 +88,14 @@ class ListFilesTool:
             except (OSError, ValueError):
                 continue
         matches = sorted(set(candidates))
+        total_count = len(matches)
         truncated = len(matches) > limit
         matches = matches[:limit]
-        return ToolResult(True, "\n".join(matches), {"count": len(matches), "limit": limit, "truncated": truncated})
+        omitted = max(0, total_count - len(matches))
+        output = "\n".join(matches)
+        if omitted:
+            output += f"\n[{omitted} files omitted]"
+        return ToolResult(True, output, {"count": len(matches), "total_count": total_count, "omitted": omitted, "limit": limit, "truncated": truncated})
 
 
 class ReadFileTool:
@@ -82,6 +110,8 @@ class ReadFileTool:
 
     def execute(self, arguments, context):
         path = context.guard.resolve(_required(arguments, "path"), must_exist=True)
+        if _is_ignored(path, context.guard):
+            raise ValueError("reading ignored or sensitive files is not allowed")
         if not path.is_file():
             raise ValueError(f"not a file: {arguments['path']}")
         max_chars = _positive_int(arguments, "max_chars", 20_000, _MAX_READ_CHARS)
@@ -118,10 +148,9 @@ class SearchTool:
             raise ValueError(f"invalid regular expression: {exc}") from exc
         limit = _positive_int(arguments, "max_matches", 100, _MAX_SEARCH_MATCHES)
         results = []
+        omitted = 0
         files = [root] if root.is_file() else root.rglob("*")
         for path in sorted(files, key=lambda candidate: candidate.as_posix()):
-            if len(results) >= limit:
-                break
             if _is_skipped(path, context.guard):
                 continue
             try:
@@ -135,11 +164,19 @@ class SearchTool:
                 continue
             for number, line in enumerate(lines, 1):
                 if pattern.search(line):
-                    shown_line = line[:_MAX_SEARCH_LINE_CHARS] + ("..." if len(line) > _MAX_SEARCH_LINE_CHARS else "")
-                    results.append(f"{context.guard.relative(safe_path)}:{number}:{shown_line}")
-                    if len(results) >= limit:
+                    if len(results) < limit:
+                        shown_line = line[:_MAX_SEARCH_LINE_CHARS] + ("..." if len(line) > _MAX_SEARCH_LINE_CHARS else "")
+                        results.append(f"{context.guard.relative(safe_path)}:{number}:{shown_line}")
+                    else:
+                        omitted += 1
+                    if omitted >= 1_000:
                         break
-        return ToolResult(True, "\n".join(results), {"count": len(results), "limit": limit, "truncated": len(results) >= limit})
+            if omitted >= 1_000:
+                break
+        output = "\n".join(results)
+        if omitted:
+            output += f"\n[at least {omitted} matches omitted]"
+        return ToolResult(True, output, {"count": len(results), "omitted_at_least": omitted, "limit": limit, "truncated": omitted > 0})
 
 
 class WriteFileTool:
@@ -147,12 +184,16 @@ class WriteFileTool:
         "write_file",
         "Write UTF-8 text to a workspace file after approval.",
         {"type": "object", "properties": {"path": {"type": "string"}, "content": {"type": "string"}}, "required": ["path", "content"]},
+        side_effecting=True,
     )
 
     def __init__(self, guard):
         self.guard = guard
 
     def execute(self, arguments, context):
+        denied = context.deny_if_plan(self.definition.name)
+        if denied:
+            return denied
         path_value = _required(arguments, "path")
         content = arguments.get("content")
         if not isinstance(content, str):

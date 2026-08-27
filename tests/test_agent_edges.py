@@ -5,7 +5,7 @@ from forgecode.agent import AgentConfig, AgentLoop
 from forgecode.models import Message, ModelResponse, ToolCall
 from forgecode.security import WorkspaceGuard
 from forgecode.storage import SessionStore
-from forgecode.tools import AllowAllApproval, DenyAllApproval, ToolContext, build_default_registry
+from forgecode.tools import AgentMode, AllowAllApproval, DenyAllApproval, ToolContext, build_default_registry
 
 
 class ScriptedProvider:
@@ -111,6 +111,16 @@ def test_session_records_and_redacts_secret(tmp_path):
     assert "REDACTED" in raw
 
 
+def test_session_write_failure_does_not_discard_agent_result(tmp_path):
+    provider = ScriptedProvider([ModelResponse(Message("assistant", "done"))])
+    # A directory is intentionally supplied where JSONL should be a file.
+    broken_session = tmp_path / "session-dir"
+    broken_session.mkdir()
+    loop = _loop(tmp_path, provider, AllowAllApproval(), session=SessionStore(broken_session))
+    result = asyncio.run(loop.run("x"))
+    assert result.succeeded
+
+
 def test_context_budget_keeps_request_bounded(tmp_path):
     provider = ScriptedProvider([
         ModelResponse(Message("assistant", tool_calls=(ToolCall("x", "write_file", {"path": "a.txt", "content": "z" * 10_000}),))),
@@ -125,9 +135,69 @@ def test_context_budget_keeps_request_bounded(tmp_path):
     assert sum(_message_size(message) for message in provider.requests[1][0]) <= 1_000
 
 
+def test_context_budget_bounds_nested_arguments_and_many_tool_calls(tmp_path):
+    calls = tuple(
+        ToolCall(str(index), "search", {"items": list(range(1_000)), "query": f"x{index}" + "y" * 20_000})
+        for index in range(200)
+    )
+    provider = ScriptedProvider([
+        ModelResponse(Message("assistant", tool_calls=calls)),
+        ModelResponse(Message("assistant", "done")),
+    ])
+    loop = _loop(tmp_path, provider, AllowAllApproval())
+    loop.context_builder = loop.context_builder.__class__(max_chars=2_000, max_message_chars=400)
+    result = asyncio.run(loop.run("x"))
+    assert result.succeeded, result.stopped_reason
+    from forgecode.agent.context import _message_size
+
+    assert sum(_message_size(message) for message in provider.requests[1][0]) <= 2_000
+
+
 def test_verification_failure_is_visible_without_invalid_tool_message(tmp_path):
     provider = ScriptedProvider([ModelResponse(Message("assistant", "done")), ModelResponse(Message("assistant", "still done"))])
     loop = _loop(tmp_path, provider, AllowAllApproval(), config=AgentConfig(verification_command="python -c \"import sys; sys.exit(2)\"", max_verification_attempts=1))
     result = asyncio.run(loop.run("x"))
     assert result.stopped_reason == "verification_failed"
     assert all(message.role != "tool" or message.tool_call_id is not None for message in result.messages)
+
+
+def test_plan_mode_blocks_side_effects_and_filters_schemas(tmp_path):
+    provider = ScriptedProvider([
+        ModelResponse(Message("assistant", tool_calls=(ToolCall("write", "write_file", {"path": "blocked.txt", "content": "no"}),))),
+        ModelResponse(Message("assistant", "Plan: inspect first, then edit in act mode.")),
+    ])
+    guard = WorkspaceGuard(tmp_path)
+    loop = AgentLoop(provider, build_default_registry(guard), ToolContext(guard, AllowAllApproval(), mode=AgentMode.PLAN))
+    result = asyncio.run(loop.run("plan a fix"))
+    assert result.mode == "plan"
+    assert result.plan_summary and "act mode" in result.plan_summary
+    assert not (tmp_path / "blocked.txt").exists()
+    assert all(schema["function"]["name"] not in {"write_file", "apply_patch", "run_command"} for schema in provider.requests[0][1])
+    blocked = next(message for message in provider.requests[1][0] if message.role == "tool")
+    assert "plan mode" in blocked.content
+
+
+def test_plan_mode_never_runs_verification(tmp_path):
+    provider = ScriptedProvider([ModelResponse(Message("assistant", "plan only"))])
+    guard = WorkspaceGuard(tmp_path)
+    session = SessionStore(tmp_path / "plan.jsonl")
+    loop = AgentLoop(provider, build_default_registry(guard), ToolContext(guard, AllowAllApproval(), mode="plan"), session=session, config=AgentConfig(verification_command="python -c \"raise SystemExit(9)\""))
+    result = asyncio.run(loop.run("plan"))
+    assert result.succeeded
+    assert result.verification_ok is None
+    events = list(session.read())
+    assert any(event.kind == "verification_skipped" and event.payload["reason"] == "plan_mode" for event in events)
+
+
+def test_plan_mode_records_mode_denial_event(tmp_path):
+    provider = ScriptedProvider([
+        ModelResponse(Message("assistant", tool_calls=(ToolCall("blocked", "write_file", {"path": "x.txt", "content": "no"}),))),
+        ModelResponse(Message("assistant", "plan only")),
+    ])
+    guard = WorkspaceGuard(tmp_path)
+    session = SessionStore(tmp_path / "plan.jsonl")
+    loop = AgentLoop(provider, build_default_registry(guard), ToolContext(guard, AllowAllApproval(), mode="plan"), session=session)
+    asyncio.run(loop.run("plan"))
+    events = list(session.read())
+    denied = [event for event in events if event.kind == "mode_denied"]
+    assert denied and denied[0].payload["tool"] == "write_file"
