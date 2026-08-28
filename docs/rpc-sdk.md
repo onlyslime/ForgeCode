@@ -91,6 +91,9 @@ completion before revocation so an in-flight worker cannot lose its recovery
 metadata.
 After cancellation, close also waits for any still-live isolated process to
 exit; the handle is not revoked while teardown is in flight.
+Cancellation uses a bounded terminate-then-kill fallback for isolated workers;
+the resulting `termination` method (`terminate`, `kill`, or `unresolved`) is
+recorded in the control event for audit and recovery decisions.
 Paused handles are also considered active and cannot be closed until resumed
 or cancelled, preventing an orphaned suspended worker.
 `session.events` accepts bounded `after` and `limit` cursors and returns

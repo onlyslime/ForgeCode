@@ -362,7 +362,19 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                             info["cancel_requested"] = True
                             process = info.get("process")
                             if process is not None and process.poll() is None:
-                                process.terminate()
+                                try:
+                                    process.terminate()
+                                    process.wait(timeout=0.5)
+                                    info["termination"] = "terminate"
+                                except subprocess.TimeoutExpired:
+                                    try:
+                                        process.kill()
+                                        process.wait(timeout=1.0)
+                                        info["termination"] = "kill"
+                                    except (OSError, subprocess.TimeoutExpired):
+                                        info["termination"] = "unresolved"
+                                except OSError:
+                                    info["termination"] = "unresolved"
                         elif method == "session.pause":
                             info["state"] = "paused"
                             process = info.get("process")
@@ -384,6 +396,8 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                         if method in {"session.cancel", "session.pause", "session.resume", "session.approval"}:
                             info["sequence"] = int(info.get("sequence", 0)) + 1
                             event = {"sequence": info["sequence"], "type": method.rsplit(".", 1)[-1], "state": info.get("state")}
+                            if method == "session.cancel" and info.get("termination") is not None:
+                                event["termination"] = info["termination"]
                             if method == "session.pause": event["signal"] = info.get("pause_signal", "cooperative")
                             if method == "session.resume": event["signal"] = info.get("resume_signal", "cooperative")
                             info.setdefault("events", []).append(event)

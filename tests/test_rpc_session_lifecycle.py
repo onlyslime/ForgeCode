@@ -262,6 +262,23 @@ def test_rpc_close_waits_for_cancelled_process_exit(tmp_path):
         process.wait(timeout=3)
 
 
+def test_rpc_cancel_records_process_termination(tmp_path):
+    import subprocess
+    from forgecode import rpc
+    handle = _call({"method": "session.open", "params": {"workspace": str(tmp_path)}})["data"]["session"]
+    process = subprocess.Popen(["cmd", "/c", "ping -n 2 127.0.0.1 > nul"])
+    rpc._RPC_SESSIONS[handle]["state"] = "running"
+    rpc._RPC_SESSIONS[handle]["process"] = process
+    try:
+        cancelled = _call({"method": "session.cancel", "params": {"session": handle}})
+        assert cancelled["ok"] is True
+        events = _call({"method": "session.events", "params": {"session": handle}})["data"]["events"]
+        assert events[-1].get("termination") in {"terminate", "kill", "unresolved"}
+    finally:
+        if process.poll() is None: process.kill()
+        process.wait(timeout=3)
+
+
 def test_rpc_session_run_rejects_cancelled_handle(tmp_path):
     handle = _call({"method": "session.open", "params": {"workspace": str(tmp_path)}})["data"]["session"]
     _call({"method": "session.cancel", "params": {"session": handle}})

@@ -54,6 +54,8 @@ slice.
   `completed` rather than being misclassified as failed.
 - Prevented closing cancelled handles while their isolated child process is
   still alive, eliminating a teardown/recovery race.
+- Added bounded terminate/kill cancellation fallback and auditable termination
+  method metadata for isolated RPC workers.
 - Finalized isolated RPC handles on child-process startup failure with a
   structured process error instead of leaving them stuck in `running`.
 - Added read-only `session.result` RPC and Node helper for retrieving bounded
