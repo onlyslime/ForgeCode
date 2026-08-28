@@ -227,6 +227,10 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                         events = [item for item in info.get("events", []) if int(item.get("sequence", 0)) > after]
                         data["events"] = events[: min(limit, 100)]
                         data["next_sequence"] = int(data["events"][-1]["sequence"]) if data["events"] else after
+                        retained = info.get("events", [])
+                        oldest = int(retained[0].get("sequence", 0)) if retained else int(info.get("sequence", 0)) + 1
+                        data["oldest_sequence"] = oldest
+                        data["truncated"] = bool(retained) and after < oldest - 1
                     payload = {"schema_version": 1, "kind": "session", "ok": True, "command": method, "data": data, "exit_code": 0}
                     if request_id is not None: payload["id"] = request_id
                     encoded = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))

@@ -33,7 +33,10 @@ or approval-denied state, allowing clients to complete an explicit approval
 handshake without bypassing CLI policy.
 `session.events` accepts bounded `after` and `limit` cursors and returns
 `next_sequence`, so a disconnected client can resume event consumption without
-replaying already acknowledged records.
+replaying already acknowledged records. Responses also include
+`oldest_sequence` and `truncated`; a true `truncated` value means the cursor
+predates the bounded retention window, so clients must treat the event history
+as incomplete and reacquire a status/review snapshot.
 Terminal states are monotonic: a completed, failed, cancelled, or denied
 session rejects later pause/resume/cancel/approval requests.
 

@@ -115,9 +115,21 @@ def test_rpc_session_event_history_is_bounded(tmp_path):
     for _ in range(520):
         _call({"method": "session.pause", "params": {"session": handle}})
         _call({"method": "session.resume", "params": {"session": handle}})
-    events = _call({"method": "session.events", "params": {"session": handle, "limit": 100}})["data"]["events"]
+    response = _call({"method": "session.events", "params": {"session": handle, "limit": 100}})
+    data = response["data"]
+    events = data["events"]
     assert len(events) == 100
     assert events[0]["sequence"] > 512
+    assert data["oldest_sequence"] == events[0]["sequence"]
+    assert data["truncated"] is True
+
+
+def test_rpc_session_events_reports_cursor_is_current(tmp_path):
+    handle = _call({"method": "session.open", "params": {"workspace": str(tmp_path)}})["data"]["session"]
+    _call({"method": "session.pause", "params": {"session": handle}})
+    data = _call({"method": "session.events", "params": {"session": handle, "after": 0}})["data"]
+    assert data["oldest_sequence"] == 1
+    assert data["truncated"] is False
 
 
 def test_rpc_session_handle_can_be_recovered_from_workspace_metadata(tmp_path):
