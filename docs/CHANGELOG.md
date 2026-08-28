@@ -16,6 +16,7 @@ slice.
 - Hardened Node streaming JSON parsing to return typed `invalid_json` errors.
 - Aligned Python embedding stream parsing with the typed `invalid_json` error
   contract.
+- Added telemetry event-family classification and unknown-event audit markers.
 - Verification: version/import consistency and targeted telemetry checks.
 
 ## v0.0.26 — 2026-08-28

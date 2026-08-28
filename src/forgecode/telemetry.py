@@ -17,6 +17,11 @@ class Telemetry:
     MAX_RECORDS = 5_000
     SCHEMA_VERSION = 1
     _SENSITIVE_KEYS = ("prompt", "content", "secret", "token", "api_key", "password", "credential", "command", "args", "stdout", "stderr", "workspace", "environment", "env")
+    _FAMILIES = {
+        "provider": "provider", "model": "provider", "tool": "tool", "approval": "approval",
+        "transaction": "transaction", "recovery": "recovery", "session": "session", "run": "session",
+        "cli": "session", "profile": "provider",
+    }
     def __init__(self, workspace: Path, *, mode: str = "off", offline: bool = False):
         self.workspace = Path(workspace).resolve()
         self.mode = "off" if offline else mode
@@ -31,7 +36,11 @@ class Telemetry:
         if self.mode != "local":
             return False
         event_text = re.sub(r"[^A-Za-z0-9_.-]+", "_", str(event))[:128] or "event"
-        safe = {"schema_version": self.SCHEMA_VERSION, "event": event_text, "timestamp": int(time.time())}
+        prefix = event_text.split("_", 1)[0].split(".", 1)[0].lower()
+        family = self._FAMILIES.get(prefix, "unknown")
+        safe = {"schema_version": self.SCHEMA_VERSION, "event": event_text, "event_family": family, "timestamp": int(time.time())}
+        if family == "unknown":
+            safe["audit_warning"] = "unclassified_event"
         dropped = 0
         for key, value in metadata.items():
             key_text = str(key)[:64]
