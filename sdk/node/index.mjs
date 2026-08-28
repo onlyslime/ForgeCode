@@ -48,7 +48,11 @@ export function invokeStream(argv = [], options = {}) {
       const lines = buffer.split(/\r?\n/); buffer = lines.pop();
       for (const line of lines) if (line.trim()) {
         if (events.length >= (options.maxItems ?? 1024)) { child.kill(); settled = true; clearTimeout(timer); reject(new ForgeCodeError("response exceeds item limit", { code: "output_limit" })); return; }
-        try { events.push(JSON.parse(line)); }
+        try {
+          const envelope = JSON.parse(line);
+          if (envelope?.ok === false) { child.kill(); settled = true; clearTimeout(timer); reject(new ForgeCodeError(envelope.error?.message || "ForgeCode request failed", { code: envelope.error?.code || "request_failed", envelope })); return; }
+          events.push(envelope);
+        }
         catch (error) { child.kill(); settled = true; clearTimeout(timer); reject(new ForgeCodeError(error.message, { code: "invalid_json" })); return; }
       }
     });
@@ -56,7 +60,13 @@ export function invokeStream(argv = [], options = {}) {
     child.on("error", (error) => { if (!settled) { settled = true; clearTimeout(timer); reject(error); } });
     child.on("close", (code) => {
       if (settled) return; settled = true; clearTimeout(timer);
-      if (buffer.trim()) { try { events.push(JSON.parse(buffer)); } catch (error) { return reject(new ForgeCodeError(error.message, { code: "invalid_json", exitCode: code })); } }
+      if (buffer.trim()) {
+        try {
+          const envelope = JSON.parse(buffer);
+          if (envelope?.ok === false) return reject(new ForgeCodeError(envelope.error?.message || "ForgeCode request failed", { code: envelope.error?.code || "request_failed", envelope, exitCode: code }));
+          events.push(envelope);
+        } catch (error) { return reject(new ForgeCodeError(error.message, { code: "invalid_json", exitCode: code })); }
+      }
       if (!events.length) return reject(new ForgeCodeError(err.trim() || `forgecode exited ${code}`, { code: "empty_response", exitCode: code }));
       resolve({ events, process_exit_code: code });
     });
