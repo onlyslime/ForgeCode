@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from forgecode.embed import ForgeCodeError, invoke, stream
+from forgecode.embed import ForgeCodeError, invoke, session_result, stream
 
 
 def test_embed_raise_for_status_preserves_envelope(tmp_path):
@@ -60,3 +60,10 @@ def test_embed_stream_invalid_json_uses_typed_error(monkeypatch):
     with pytest.raises(ForgeCodeError) as caught:
         list(stream([{"method": "doctor"}]))
     assert caught.value.code == "invalid_json"
+
+
+def test_embed_session_result_validates_handle():
+    with pytest.raises(ValueError):
+        session_result("")
+    with pytest.raises(ValueError):
+        session_result("x\ny")

@@ -50,6 +50,20 @@ def invoke(argv: list[str], *, request_id: str | int | None = None, raise_for_st
     return envelopes
 
 
+def session_result(session: str, *, workspace: str | None = None, request_id: str | int | None = None, raise_for_status: bool = False, max_response_bytes: int = 2_000_000) -> list[dict[str, Any]]:
+    """Retrieve a bounded background-session result through the RPC contract."""
+    if not isinstance(session, str) or not session or len(session) > 512 or any(ch in session for ch in "\r\n"):
+        raise ValueError("session must be bounded newline-safe text")
+    params: dict[str, Any] = {"session": session}
+    if workspace is not None:
+        if not isinstance(workspace, str) or not workspace or len(workspace) > 1_000 or any(ch in workspace for ch in "\r\n"):
+            raise ValueError("workspace must be bounded newline-safe text")
+        params["workspace"] = workspace
+    request = {"method": "session.result", "params": params}
+    if request_id is not None: request["id"] = request_id
+    return list(stream([request], raise_for_status=raise_for_status, max_response_bytes=max_response_bytes))
+
+
 def stream(requests: Iterable[dict[str, Any]], *, raise_for_status: bool = False, max_items: int = 1024, max_response_bytes: int = 2_000_000) -> Iterable[dict[str, Any]]:
     """Process JSON-compatible RPC requests in order."""
     if isinstance(max_items, bool) or max_items < 1 or max_items > 100_000:
@@ -84,7 +98,7 @@ def stream(requests: Iterable[dict[str, Any]], *, raise_for_status: bool = False
         yield envelope
 
 
-__all__ = ["ForgeCodeError", "invoke", "stream"]
+__all__ = ["ForgeCodeError", "invoke", "session_result", "stream"]
 
 
 class EmbeddedSession:
