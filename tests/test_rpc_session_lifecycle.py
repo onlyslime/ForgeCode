@@ -313,6 +313,9 @@ def test_rpc_recovery_marks_orphaned_running_worker(tmp_path):
     rpc._RPC_SESSIONS.pop(handle, None)
     recovered = _call({"method": "session.open", "params": {"workspace": str(tmp_path), "session": handle}})
     assert recovered["data"]["state"] == "recovery_required"
+    denied = _call({"method": "session.pause", "params": {"session": handle}})
+    assert denied["ok"] is False
+    assert "recovery" in denied["error"]["message"]
 
 
 def test_rpc_recovery_open_is_idempotent_by_request_id(tmp_path):

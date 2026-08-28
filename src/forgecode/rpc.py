@@ -318,6 +318,8 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                         raise ValueError("session handle is unknown")
                     with _SESSION_LOCK:
                         info = _RPC_SESSIONS.get(handle, {})
+                        if info.get("state") == "recovery_required" and method in {"session.pause", "session.resume", "session.cancel", "session.approval", "session.close"}:
+                            raise ValueError("session requires explicit recovery run")
                         if info.get("mode") == "act":
                             try:
                                 trusted = TrustStore(Path(info["workspace"])).status().get("trusted", False)
@@ -546,6 +548,8 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                 code = "approval_denied"
             elif "session is " in message and "open a new session" in message:
                 code = "session_terminal"
+            elif "requires explicit recovery" in message:
+                code = "recovery_required"
             else:
                 code = "invalid_request"
             if method in {"run", "session.run"} and handle:

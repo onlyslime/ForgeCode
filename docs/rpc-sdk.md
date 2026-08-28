@@ -18,6 +18,8 @@ requires current workspace trust for Act handles before returning success.
 If a persisted handle was `running` when the daemon disappeared, recovery
 returns `recovery_required` rather than claiming a worker still exists. A new
 `session.run` explicitly reclaims that handle and emits `recovery_restarted`.
+Control and close requests against a `recovery_required` handle fail with
+`recovery_required`; only an explicit new run may reclaim it.
 The persisted record includes only the bounded recent event window and its
 sequence, allowing cursor-based event recovery after daemon restart.
 Each handle retains only the most recent 512 control/run events. Clients must
