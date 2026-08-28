@@ -245,6 +245,17 @@ def test_rpc_recovery_restores_event_cursor(tmp_path):
     assert events["data"]["events"][0]["type"] == "pause"
 
 
+def test_rpc_recovery_restores_cancel_request_marker(tmp_path):
+    handle = _call({"method": "session.open", "params": {"workspace": str(tmp_path)}})["data"]["session"]
+    _call({"method": "session.cancel", "params": {"session": handle}})
+    from forgecode import rpc
+    rpc._RPC_SESSIONS.pop(handle, None)
+    restored = _call({"method": "session.open", "params": {"workspace": str(tmp_path), "session": handle}})
+    assert restored["ok"] is True
+    status = _call({"method": "session.status", "params": {"session": handle}})
+    assert status["data"]["cancel_requested"] is True
+
+
 def test_rpc_act_recovery_rejects_revoked_workspace(tmp_path):
     _call({"method": "trust.grant", "params": {"workspace": str(tmp_path)}})
     opened = _call({"method": "session.open", "params": {"workspace": str(tmp_path), "mode": "act"}})

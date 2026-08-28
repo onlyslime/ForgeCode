@@ -29,6 +29,7 @@ slice.
 - Added stable RPC lifecycle error codes for busy, terminal, and denied states.
 - Bounded JSONL RPC request lines to 1 MiB before parsing.
 - Documented the bounded request-line contract and `request_too_large` error.
+- Verified cancellation markers survive persisted RPC handle recovery.
 - Canonicalized persisted RPC workspaces and bounded request identifiers.
 - Normalized Node/Python SDK limits and process/JSON error contracts.
 - Verification: targeted RPC/embed/provider/telemetry gate (43 passed), Node

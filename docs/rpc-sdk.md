@@ -50,6 +50,8 @@ the active run ends, while `session_terminal` and `approval_denied` require a
 new handle.
 Cancellation responses expose `cancel_requested` so clients can distinguish a
 recorded cancellation request from a worker completion event.
+The marker is persisted and restored across daemon recovery, preserving the
+cancelled terminal decision.
 
 The handle registry is deliberately bounded by request validation and does not
 create a second execution loop. Production execution remains owned by the
