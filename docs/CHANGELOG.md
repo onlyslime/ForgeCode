@@ -46,6 +46,8 @@ slice.
   revocation for post-incident audit evidence.
 - Spool-isolated RPC stdout to bounded temporary storage, preventing large
   provider/tool output from exhausting daemon memory.
+- Corrected output truncation handling so successful isolated runs remain
+  `completed` rather than being misclassified as failed.
 - Finalized isolated RPC handles on child-process startup failure with a
   structured process error instead of leaving them stuck in `running`.
 - Added read-only `session.result` RPC and Node helper for retrieving bounded

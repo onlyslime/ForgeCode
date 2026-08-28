@@ -69,7 +69,8 @@ def _finish_background_session(handle: str, code: int, output: str, error_code: 
         info = _RPC_SESSIONS.get(handle)
         if info is None:
             return
-        state = "cancelled" if info.get("cancel_requested") or code == 130 else ("failed" if error_code else ("completed" if code == 0 else "failed"))
+        fatal_error = error_code not in {None, "output_truncated"}
+        state = "cancelled" if info.get("cancel_requested") or code == 130 else ("failed" if fatal_error else ("completed" if code == 0 else "failed"))
         info["state"] = state
         info["sequence"] = int(info.get("sequence", 0)) + 1
         results = []

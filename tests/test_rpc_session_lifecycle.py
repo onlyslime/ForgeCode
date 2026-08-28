@@ -201,6 +201,15 @@ def test_rpc_isolated_worker_start_failure_releases_handle(tmp_path, monkeypatch
     assert status["data"]["state"] == "failed"
 
 
+def test_rpc_output_truncation_is_warning_not_failure(tmp_path):
+    import forgecode.rpc as rpc
+    handle = _call({"method": "session.open", "params": {"workspace": str(tmp_path)}})["data"]["session"]
+    rpc._RPC_SESSIONS[handle]["state"] = "running"
+    rpc._finish_background_session(handle, 0, json.dumps({"ok": True}), "output_truncated")
+    status = _call({"method": "session.status", "params": {"session": handle}})
+    assert status["data"]["state"] == "completed"
+
+
 def test_rpc_session_run_rejects_denied_approval(tmp_path):
     handle = _call({"method": "session.open", "params": {"workspace": str(tmp_path)}})["data"]["session"]
     _call({"method": "session.approval", "params": {"session": handle, "approved": False}})
