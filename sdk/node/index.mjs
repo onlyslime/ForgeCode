@@ -8,6 +8,12 @@ function boundedNumber(value, name, { min = 1, integer = false } = {}) {
 function validateArgv(argv) {
   if (!Array.isArray(argv) || argv.length > 128 || argv.some((item) => typeof item !== "string" || item.length > 1000)) throw new TypeError("argv must contain at most 128 bounded string arguments");
 }
+function validateParams(params) {
+  if (params === null || typeof params !== "object" || Array.isArray(params)) throw new TypeError("params must be an object");
+  let encoded;
+  try { encoded = JSON.stringify(params); } catch { throw new TypeError("params must be JSON-serializable"); }
+  if (Buffer.byteLength(encoded, "utf8") > 1_000_000) throw new TypeError("params exceed 1 MiB");
+}
 
 export class ForgeCodeError extends Error {
   constructor(message, { code = "sdk_error", envelope = null, exitCode = null } = {}) {
@@ -17,6 +23,7 @@ export class ForgeCodeError extends Error {
 
 export function invoke(argv = [], { cwd, executable = "forgecode", method, params = {}, id, timeoutMs = 30000, maxOutputBytes = 2_000_000 } = {}) {
   validateArgv(argv);
+  if (method !== undefined) validateParams(params);
   boundedNumber(timeoutMs, "timeoutMs"); boundedNumber(maxOutputBytes, "maxOutputBytes", { integer: true });
   return new Promise((resolve, reject) => {
     const rpc = method !== undefined;
@@ -45,6 +52,7 @@ export function invoke(argv = [], { cwd, executable = "forgecode", method, param
 }
 
 export function invokeStream(argv = [], options = {}) {
+    if (options.method !== undefined) validateParams(options.params ?? {});
     boundedNumber(options.timeoutMs ?? 30000, "timeoutMs");
     boundedNumber(options.maxOutputBytes ?? 2_000_000, "maxOutputBytes", { integer: true });
     boundedNumber(options.maxItems ?? 1024, "maxItems", { integer: true });
