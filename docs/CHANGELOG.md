@@ -40,6 +40,8 @@ slice.
   error redaction.
 - Bounded Python embedding stream requests to JSON objects and 1 MiB payloads,
   aligning client-side validation with the RPC protocol.
+- Included persisted state, sequence, and cancellation metadata in recovered
+  `session.open` responses.
 - Added profile/provider credential selectors to the Node login helper.
 - Normalized Node child-process spawn failures to typed `process_error` errors.
 - Verification: version/import consistency and targeted telemetry checks.
