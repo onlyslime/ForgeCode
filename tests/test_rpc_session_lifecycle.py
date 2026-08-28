@@ -108,3 +108,13 @@ def test_rpc_session_status_exposes_bounded_lifecycle_metadata(tmp_path):
     status = _call({"method": "session.status", "params": {"session": handle}})
     assert status["data"]["workspace"] == str(tmp_path)
     assert "created_monotonic" not in status["data"]
+
+
+def test_rpc_session_event_history_is_bounded(tmp_path):
+    handle = _call({"method": "session.open", "params": {"workspace": str(tmp_path)}})["data"]["session"]
+    for _ in range(520):
+        _call({"method": "session.pause", "params": {"session": handle}})
+        _call({"method": "session.resume", "params": {"session": handle}})
+    events = _call({"method": "session.events", "params": {"session": handle, "limit": 100}})["data"]["events"]
+    assert len(events) == 100
+    assert events[0]["sequence"] > 512

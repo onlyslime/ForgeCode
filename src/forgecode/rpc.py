@@ -24,6 +24,7 @@ _RPC_REPLAYS: dict[str | int, tuple[str, ...]] = {}
 _RPC_FINGERPRINTS: dict[str | int, str] = {}
 _SESSION_TTL_SECONDS = 8 * 60 * 60
 _MAX_RPC_SESSIONS = 256
+_MAX_SESSION_EVENTS = 512
 
 
 def _prune_sessions() -> None:
@@ -125,6 +126,8 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                         if method in {"session.cancel", "session.pause", "session.resume", "session.approval"}:
                             info["sequence"] = int(info.get("sequence", 0)) + 1
                             info.setdefault("events", []).append({"sequence": info["sequence"], "type": method.rsplit(".", 1)[-1], "state": info.get("state")})
+                            if len(info["events"]) > _MAX_SESSION_EVENTS:
+                                del info["events"][:-_MAX_SESSION_EVENTS]
                         if method == "session.close": _RPC_SESSIONS.pop(handle, None)
                     data = {"session": handle, "closed": method == "session.close", "state": info.get("state"), "sequence": info.get("sequence", 0), "workspace": info.get("workspace"), "mode": info.get("mode")}
                     if method == "session.events":
