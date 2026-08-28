@@ -89,6 +89,14 @@ def test_rpc_session_run_updates_handle_state(tmp_path):
     assert status["data"]["state"] in {"completed", "failed", "cancelled"}
 
 
+def test_rpc_session_run_rejects_denied_approval(tmp_path):
+    handle = _call({"method": "session.open", "params": {"workspace": str(tmp_path)}})["data"]["session"]
+    _call({"method": "session.approval", "params": {"session": handle, "approved": False}})
+    denied = _call({"method": "session.run", "params": {"session": handle, "prompt": "hello", "demo": True}})
+    assert denied["ok"] is False
+    assert "approval" in denied["error"]["message"]
+
+
 def test_rpc_idempotency_caches_multi_event_response(tmp_path):
     request = {"id": "doctor-replay", "method": "doctor", "params": {}}
     first = list(serve_lines([json.dumps(request)]))
