@@ -65,14 +65,36 @@ class EmbeddedSession:
         environment["PYTHONPATH"] = source_root + os.pathsep + environment.get("PYTHONPATH", "")
         self.process = subprocess.Popen([*command, "--workspace", workspace, "chat", "--mode", mode, "--jsonl"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8", bufsize=1, env=environment)
         self._events: Queue[dict[str, Any]] = Queue()
+        self._stderr: Queue[str] = Queue(maxsize=128)
+        self._stderr_text = ""
         self._reader = threading.Thread(target=self._read, daemon=True)
+        self._err_reader = threading.Thread(target=self._read_stderr, daemon=True)
         self._reader.start()
+        self._err_reader.start()
 
     def _read(self) -> None:
         assert self.process.stdout is not None
         for line in self.process.stdout:
             try: self._events.put(json.loads(line))
             except ValueError: continue
+        self._events.put({"kind": "process_exit", "code": self.process.returncode})
+
+    def _read_stderr(self) -> None:
+        if self.process.stderr is None: return
+        for line in self.process.stderr:
+            self._stderr_text = (self._stderr_text + line)[-16_000:]
+
+    @property
+    def is_alive(self) -> bool:
+        return self.process.poll() is None
+
+    @property
+    def returncode(self) -> int | None:
+        return self.process.poll()
+
+    @property
+    def stderr(self) -> str:
+        return self._stderr_text
 
     def send(self, text: str) -> None:
         if not isinstance(text, str) or not text.strip() or len(text) > 8_000: raise ValueError("message must be non-empty and bounded")
