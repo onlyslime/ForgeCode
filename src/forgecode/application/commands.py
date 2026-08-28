@@ -22,7 +22,7 @@ from .run_service import RunService
 from .session_service import aggregate_events
 from ..context import ContextIndex, ContextIndexError, RepositoryMapBuilder
 from ..skills import MAX_SKILL_INPUT_CHARS, SkillError, SkillExecutor, SkillInvocation, SkillLoader, SkillRegistry
-from ..config import ConfigError, ConfigLoader, Settings, parse_tool_policy_options
+from ..config import ConfigError, ConfigLoader, Settings, parse_tool_policy_options, SUPPORTED_PROVIDERS, provider_metadata, provider_requires_credential
 from ..references import ReferenceResolver, parse_references
 from ..rules import RuleEngine
 from ..plan import PlanItem, TaskPlan
@@ -750,7 +750,15 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if command == "login":
         machine_json = bool(getattr(args, "json", False) or getattr(args, "jsonl", False))
-        payload = {"provider": args.provider, "api_key_env": args.api_key_env, "configured": bool(os.getenv(args.api_key_env, "")), "storage": "environment-only", "message": f"Set {args.api_key_env} in the environment; ForgeCode never stores credential values."}
+        if args.provider not in SUPPORTED_PROVIDERS:
+            message = f"unsupported provider: {args.provider}"
+            if machine_json:
+                _emit_machine(_machine_error("login", "unsupported_provider", message, exit_code=2))
+            else:
+                print(message, file=sys.stderr)
+            return 2
+        requires_key = provider_requires_credential(args.provider)
+        payload = {"provider": args.provider, "api_key_env": args.api_key_env if requires_key else None, "configured": (not requires_key) or bool(os.getenv(args.api_key_env, "")), "credential": "required" if requires_key else "optional", "storage": "environment-only", "message": (f"Set {args.api_key_env} in the environment; ForgeCode never stores credential values." if requires_key else "Ollama uses a local endpoint and does not require an API key.")}
         if machine_json:
             _emit_machine(_machine_envelope("login", "login", True, data=payload, exit_code=0))
         else:
@@ -784,7 +792,7 @@ def main(argv: list[str] | None = None) -> int:
     # decision. Deterministic offline demos remain available in fresh folders
     # without trust so assessment smoke tests stay self-contained.
     effective_mode = getattr(args, "mode", None) or (settings.effective.default_mode if settings.effective else None)
-    provider_configured = bool(settings.model and settings.api_key_env and os.getenv(settings.api_key_env, ""))
+    provider_configured = bool(settings.model and (not provider_requires_credential(settings.effective.provider if settings.effective else "openai-compatible") or (settings.api_key_env and os.getenv(settings.api_key_env, ""))))
     if command in {"run", "chat", "start"} and effective_mode == "act" and (getattr(args, "require_trust", False) or provider_configured) and not getattr(args, "demo", False):
         try:
             trust = TrustStore(workspace).status()
@@ -862,7 +870,7 @@ def main(argv: list[str] | None = None) -> int:
         machine_json = bool(getattr(args, "json", False) or getattr(args, "jsonl", False))
         command_name = f"provider {action}"
         if action == "list":
-            rows = [{"name": name, "streaming": True, "local": name == "ollama", "credential": "optional" if name == "ollama" else "environment"} for name in ("openai-compatible", "anthropic", "google", "ollama")]
+            rows = list(provider_metadata())
             if machine_json:
                 _emit_machine(_machine_envelope(command_name, "provider_list", True, data={"providers": rows}, exit_code=0))
             else:
@@ -880,7 +888,7 @@ def main(argv: list[str] | None = None) -> int:
             "profile": settings.profile,
             "model": settings.model,
             "base_url": redact_text(settings.base_url),
-            "configured": bool(settings.model and (effective.provider == "ollama" or os.getenv(settings.api_key_env, ""))),
+            "configured": bool(settings.model and (not provider_requires_credential(effective.provider) or os.getenv(settings.api_key_env, ""))),
             "streaming": effective.streaming if effective else "auto",
             "capabilities": {
                 "tool_calling": True,
@@ -2077,7 +2085,9 @@ def main(argv: list[str] | None = None) -> int:
 
         def login_command() -> Any:
             effective = settings.effective
-            return {"provider": effective.provider if effective else "openai-compatible", "profile": settings.profile, "api_key_env": effective.api_key_env if effective else "FORGECODE_API_KEY", "configured": bool(effective and os.getenv(effective.api_key_env, "")), "storage": "environment-only"}
+            provider = effective.provider if effective else "openai-compatible"
+            requires_key = provider_requires_credential(provider)
+            return {"provider": provider, "profile": settings.profile, "api_key_env": effective.api_key_env if effective and requires_key else None, "configured": (not requires_key) or bool(effective and os.getenv(effective.api_key_env, "")), "credential": "required" if requires_key else "optional", "storage": "environment-only"}
 
         def plan_command(_args: list[str]) -> Any:
             state["mode"] = "plan"
@@ -2324,7 +2334,7 @@ def main(argv: list[str] | None = None) -> int:
         effective = settings.effective
         provider_health = {
             "provider": effective.provider if effective else "openai-compatible",
-            "configured": bool(settings.model and os.getenv(settings.api_key_env, "")),
+            "configured": bool(settings.model and (not provider_requires_credential(effective.provider if effective else "openai-compatible") or os.getenv(settings.api_key_env, ""))),
             "model": settings.model,
             "base_url": redact_text(settings.base_url),
             "streaming": effective.streaming if effective else "auto",

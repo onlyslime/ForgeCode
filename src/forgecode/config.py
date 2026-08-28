@@ -31,6 +31,28 @@ MAX_TOOL_POLICY_OPTION_CHARS = 4_000
 SUPPORTED_PROVIDERS = ("openai-compatible", "anthropic", "google", "ollama")
 
 
+def provider_requires_credential(provider: str) -> bool:
+    """Return whether a provider needs a non-empty credential environment variable.
+
+    Ollama is a local adapter and deliberately uses an internal auth marker, so
+    users must not be forced to create a meaningless API-key variable.
+    """
+    return provider != "ollama"
+
+
+def provider_metadata() -> tuple[dict[str, Any], ...]:
+    """Stable, redacted provider registry metadata shared by CLI and SDK."""
+    return tuple(
+        {
+            "name": name,
+            "streaming": True,
+            "local": name == "ollama",
+            "credential": "required" if provider_requires_credential(name) else "optional",
+        }
+        for name in SUPPORTED_PROVIDERS
+    )
+
+
 @dataclass(frozen=True)
 class ModelProfile:
     name: str
@@ -61,7 +83,7 @@ class ModelProfile:
             "base_url": self.base_url,
             "model": self.model,
             "api_key_env": self.api_key_env,
-            "api_key_configured": bool(os.getenv(self.api_key_env, "")),
+            "api_key_configured": (not provider_requires_credential(self.provider)) or bool(os.getenv(self.api_key_env, "")),
             "streaming": self.streaming,
         }
 
@@ -481,4 +503,4 @@ def _reject_secret_fields(value: Any, *, _path: str = "config") -> None:
     walk(value, _path, 0)
 
 
-__all__ = ["MAX_CONFIG_BYTES", "MAX_TOOL_POLICY_OPTION_CHARS", "SUPPORTED_PROVIDERS", "ConfigError", "ConfigLoader", "EffectiveConfig", "ModelProfile", "Settings", "ToolPolicy", "load_effective_config", "parse_tool_policy_options"]
+__all__ = ["MAX_CONFIG_BYTES", "MAX_TOOL_POLICY_OPTION_CHARS", "SUPPORTED_PROVIDERS", "provider_requires_credential", "provider_metadata", "ConfigError", "ConfigLoader", "EffectiveConfig", "ModelProfile", "Settings", "ToolPolicy", "load_effective_config", "parse_tool_policy_options"]
