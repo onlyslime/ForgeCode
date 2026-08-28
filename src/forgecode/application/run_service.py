@@ -71,6 +71,15 @@ class RunService:
     def resume(self) -> dict[str, Any]:
         loop = self._current_loop()
         if loop is None:
+            with self._active_lock:
+                # A synchronous pre-loop operation (such as an interactive
+                # command shortcut) uses the same service as its cancellation
+                # boundary.  Allow /resume to release a pause retained during
+                # that initialization window instead of reporting a false
+                # idle worker.
+                if self._starting and self._pending_pause:
+                    self._pending_pause = False
+                    return {"resumed": True, "pending": False, "message": "pending pause released before worker initialization"}
             return {"resumed": False, "error": "no active worker"}
         if loop.lifecycle.terminal:
             return {"resumed": False, "error": "worker is already terminal", "state": loop.lifecycle.state.value}
@@ -127,16 +136,22 @@ class RunService:
         return None
 
     def cancel(self, reason: str = "interactive cancel") -> dict[str, Any]:
+        safe_reason = str(reason or "interactive cancel")[:256]
+        # A command shortcut can be executing before AgentLoop has been
+        # constructed.  Cancel the shared token immediately so ShellTool can
+        # terminate its process instead of waiting for a later loop boundary.
+        if self.cancellation_token is not None:
+            self.cancellation_token.cancel(safe_reason)
         loop = self._current_loop()
         if loop is None:
             with self._active_lock:
                 if self._starting:
-                    self._pending_cancel = str(reason or "interactive cancel")[:256]
+                    self._pending_cancel = safe_reason
                     return {"cancelled": True, "pending": True, "message": "cancel will apply when the worker is initialized"}
             return {"cancelled": False, "error": "no active worker"}
         if loop.lifecycle.terminal:
             return {"cancelled": False, "error": "worker is already terminal", "state": loop.lifecycle.state.value}
-        return {"cancelled": loop.cancel(reason), "message": reason[:256]}
+        return {"cancelled": loop.cancel(safe_reason), "message": safe_reason}
 
     async def execute(
         self,

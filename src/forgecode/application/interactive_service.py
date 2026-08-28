@@ -15,6 +15,60 @@ import threading
 from typing import Callable, Iterable, TextIO
 
 
+SHORTCUT_MAX_COMMAND_CHARS = 4_000
+
+
+@dataclass(frozen=True)
+class CommandShortcut:
+    """A validated terminal command shortcut.
+
+    ``model`` (``!``) feeds the bounded command result into the next
+    provider-neutral turn; ``local`` (``!!``) is user/audit-only.  The raw
+    command is retained only in memory until the existing ShellTool executes
+    it and is never part of the shortcut event schema.
+    """
+
+    kind: str
+    command: str
+
+    @property
+    def prefix(self) -> str:
+        return "!!" if self.kind == "local" else "!"
+
+
+class ShortcutParseError(ValueError):
+    """Input looked like a shortcut but violated its bounded grammar."""
+
+    def __init__(self, code: str, message: str):
+        super().__init__(message)
+        self.code = code
+
+
+def parse_command_shortcut(line: str) -> CommandShortcut | None:
+    """Parse only an input-line prefix; ordinary prose containing ``!`` wins.
+
+    The parser deliberately accepts no leading whitespace, no multiline input,
+    and no ``!!!`` ambiguity.  This keeps the command boundary deterministic
+    for both REPL and scripted transports.
+    """
+
+    if not isinstance(line, str):
+        raise TypeError("interactive input must be text")
+    if not line.startswith("!"):
+        return None
+    if "\n" in line or "\r" in line:
+        raise ShortcutParseError("shortcut_multiline", "command shortcut must be a single input line")
+    if line.startswith("!!!"):
+        raise ShortcutParseError("shortcut_prefix", "command shortcut prefix must be ! or !!")
+    prefix = "!!" if line.startswith("!!") else "!"
+    command = line[len(prefix):].strip()
+    if not command:
+        raise ShortcutParseError("shortcut_empty", f"{prefix} command must not be empty")
+    if len(command) > SHORTCUT_MAX_COMMAND_CHARS:
+        raise ShortcutParseError("shortcut_too_long", f"command shortcut exceeds the {SHORTCUT_MAX_COMMAND_CHARS}-character safety limit")
+    return CommandShortcut("local" if prefix == "!!" else "model", command)
+
+
 class SlashCommandError(ValueError):
     pass
 
@@ -24,6 +78,8 @@ def _interactive_success(value: object) -> bool:
     if not isinstance(value, dict):
         return True
     if value.get("error") or value.get("recovery_required") or value.get("unresolved"):
+        return False
+    if value.get("cancelled") is True or value.get("ok") is False:
         return False
     if "succeeded" in value and value.get("succeeded") is not True:
         return False
@@ -79,11 +135,15 @@ class InteractiveRunController:
                 "queue_chars": self._queue_chars,
                 "stopped": self._stopped,
                 "cancellation_requested": self._cancel_requested,
+                "pause_requested": self._pending_pause,
             }
 
     def submit(self, message: str) -> dict[str, object]:
-        text = str(message).strip()
-        if not text:
+        # Preserve leading whitespace: `` !cmd`` is ordinary prose, whereas
+        # only a literal line-prefix ``!``/``!!`` is a shortcut.  Trim line
+        # terminators but use ``strip`` solely for the empty-input check.
+        text = str(message).rstrip("\r\n")
+        if not text.strip():
             return {"accepted": False, "error": "message must not be empty"}
         with self._condition:
             if self._stopped:
@@ -280,12 +340,20 @@ class InteractiveSession:
         return f"ForgeCode session run={run_id or '<new>'} workspace=. mode={mode} profile={profile} rules={rules_count} budget={budget}"
 
     def help_text(self) -> str:
-        return "/help /status /plan [show|refresh] /mode plan|act /model [list|show|select <name>] /rules /files [prefix] /skills [id] /tree /review /test [command] /compact /undo [id|latest] /pause /resume /cancel /quit"
+        return "/help /status /plan [show|refresh] /mode plan|act /model [list|show|select <name>] /rules /files [prefix] /skills [id] /tree /review /test [command] /compact /undo [id|latest] /pause /resume /cancel /quit; !<command> sends a bounded result to the model; !!<command> stays local"
 
     def dispatch(self, line: str) -> object | None:
         line = line.rstrip("\r\n")
         if not line.strip():
             return None
+        try:
+            shortcut = parse_command_shortcut(line)
+        except ShortcutParseError as exc:
+            return {"accepted": False, "shortcut": True, "error": str(exc), "code": exc.code}
+        if shortcut is not None:
+            # Keep execution on the controller's single worker so a shortcut
+            # cannot race an active AgentLoop or bypass its FIFO queue.
+            return self.controller.submit(line) if self.controller is not None else self.run_message(line)
         if not line.lstrip().startswith("/"):
             return self.controller.submit(line) if self.controller is not None else self.run_message(line)
         try:
@@ -408,4 +476,12 @@ class InteractiveSession:
         return results
 
 
-__all__ = ["InteractiveRunController", "InteractiveSession", "SlashCommandError"]
+__all__ = [
+    "CommandShortcut",
+    "InteractiveRunController",
+    "InteractiveSession",
+    "SHORTCUT_MAX_COMMAND_CHARS",
+    "ShortcutParseError",
+    "SlashCommandError",
+    "parse_command_shortcut",
+]

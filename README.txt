@@ -13,8 +13,9 @@ Plan/Act 权限边界、WorkspaceGuard、审批、命令风险/超时/脱敏；A
 checkpoint/resume/fork、取消/重试/unresolved 恢复、review/eval、上下文自动压缩、
 路径建议、profile/模型审计和 session tree/clone/import（不重放副作用）。
 
-v0.0.10 增加单一交互 worker：有界 FIFO follow-up、`/pause`、`/resume`、`/cancel`，
-暂停恢复校验 checkpoint/规则/计划/配置指纹，运行中切换模型会拒绝；`chat --jsonl`
+v0.0.10 增加单一交互 worker：有界 FIFO follow-up、`/pause`、`/resume`、`/cancel`；
+v0.0.11 增加 Pi-inspired `!<command>`/`!!<command>`：单 `!` 结果进入模型，双 `!!` 仅用户/审计可见；
+均复用审批、风险、超时、取消和脱敏边界，暂停恢复校验 checkpoint/规则/计划/配置指纹；
 stdout 每行是 envelope，进度/审批只去 stderr。Plan 不执行副作用，取消或未决不会误报成功。
 
 暂不含 IDE、浏览器、云执行、远程 MCP、worktree、并行子代理、后台调度、自动 push 或

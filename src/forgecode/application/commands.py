@@ -12,11 +12,12 @@ import sys
 import re
 import threading
 import uuid
+import hashlib as hashlib_lib
 from typing import Any
 
 from .. import __version__
 from ..agent import AgentConfig, AgentLoop, ContextCompactor, RunState, SessionContextRebuilder
-from .interactive_service import InteractiveRunController, InteractiveSession, _interactive_error_code, _interactive_success
+from .interactive_service import CommandShortcut, InteractiveRunController, InteractiveSession, ShortcutParseError, _interactive_error_code, _interactive_success, parse_command_shortcut
 from .run_service import RunService
 from .session_service import aggregate_events
 from ..context import ContextIndex, ContextIndexError, RepositoryMapBuilder
@@ -26,11 +27,11 @@ from ..references import ReferenceResolver, parse_references
 from ..rules import RuleEngine
 from ..plan import PlanItem, TaskPlan
 from ..storage import TransactionError, TransactionStore
-from ..models import DemoProvider, OpenAICompatibleProvider, ProviderError
+from ..models import CancellationToken, DemoProvider, OpenAICompatibleProvider, ProviderError
 from ..testing import TestProfileError, TestProfileLoader, TestProfileRunner
 from ..review import ReviewArtifactError, ReviewError
 from ..evaluation import evaluate_session
-from ..security.redaction import redact_text
+from ..security.redaction import redact_text, redact_value
 from ..security.json import bounded_json_loads
 from ..security.workspace import WorkspaceGuard
 from ..storage import Checkpoint, CheckpointStore, RecoveryConflict, SessionFormatError, SessionStore
@@ -1495,6 +1496,7 @@ def main(argv: list[str] | None = None) -> int:
         active_service: RunService | None = None
         active_service_lock = threading.RLock()
         controller_holder: dict[str, InteractiveRunController | None] = {"value": None}
+        shortcut_control: dict[str, Any] = {"token": None, "pause": None, "fingerprint": None}
         output_lock = threading.RLock()
         if args.demo and not any((workspace / name).exists() for name in ("demo_calculator.py", "demo_config.json")):
             # The demo fixture is a bounded, explicit offline setup action.
@@ -1508,6 +1510,12 @@ def main(argv: list[str] | None = None) -> int:
             if not message.strip():
                 return {"error": "message must not be empty"}
             try:
+                shortcut = parse_command_shortcut(message)
+                if shortcut is not None:
+                    # Reject/execute at the executor boundary before resolving
+                    # prompt context, so every valid shortcut gets exactly one
+                    # bounded audit event even when project diagnostics fail.
+                    return execute_shortcut(shortcut)
                 references = ReferenceResolver(guard).resolve_prompt(message)
                 target_paths = [item.path for item in references.items if item.path]
                 rules = RuleEngine(guard).discover(target_paths)
@@ -1603,8 +1611,200 @@ def main(argv: list[str] | None = None) -> int:
                     except ValueError:
                         pass
                 return {"stopped_reason": result.stopped_reason, "state": result.state, "succeeded": result.succeeded, "verification_ok": result.verification_ok, "run_id": result.run_id}
+            except ShortcutParseError as exc:
+                return {"accepted": False, "shortcut": True, "error": str(exc), "code": exc.code}
             except (ProviderError, ValueError, OSError) as exc:
                 return {"error": _redact_display(str(exc), [api_key])}
+
+        def execute_shortcut(shortcut: CommandShortcut) -> Any:
+            """Execute a validated ``!``/``!!`` command through ShellTool.
+
+            This helper intentionally does not call ``subprocess``.  It uses
+            the production registry so workspace checks, risk classification,
+            approval, timeout, cancellation and output redaction remain shared
+            with AgentLoop tool calls.
+            """
+            command_fingerprint = hashlib_lib.sha256(shortcut.command.encode("utf-8", errors="replace")).hexdigest()
+            if state["mode"] != AgentMode.ACT.value:
+                session.append(
+                    "command_shortcut",
+                    {"shortcut": shortcut.prefix, "kind": shortcut.kind, "command_fingerprint": command_fingerprint, "ok": False, "risk": "unknown", "approval": "not_requested", "cancelled": False, "timed_out": False, "truncated": False},
+                    mode=state["mode"],
+                    outcome="rejected",
+                    error_code="mode_denied",
+                )
+                return {"accepted": False, "shortcut": shortcut.prefix, "command_fingerprint": command_fingerprint, "error": "command shortcuts require act mode", "code": "mode_denied"}
+            token = CancellationToken()
+            pause_event = threading.Event()
+            shortcut_control.update({"token": token, "pause": pause_event, "fingerprint": command_fingerprint})
+            controller = controller_holder.get("value")
+            if controller is not None:
+                control_snapshot = controller.snapshot()
+                if control_snapshot.get("cancellation_requested"):
+                    token.cancel("interactive cancel")
+                elif control_snapshot.get("pause_requested"):
+                    pause_event.set()
+            expected_rules = state.get("rules_fingerprint", "")
+            expected_references = state.get("reference_fingerprint", "")
+            reference_specs = tuple(state.get("reference_specs", ()))
+            target_paths = tuple(state.get("plan_targets", ()))
+
+            # A caller may start ``chat --mode act`` without first creating an
+            # interactive plan.  Establish the current read-only fingerprints
+            # as the baseline, while still revalidating them immediately
+            # before the command side effect.
+            if not expected_rules:
+                current_rules = RuleEngine(guard).discover(target_paths)
+                if current_rules.has_errors:
+                    shortcut_control.update({"token": None, "pause": None, "fingerprint": None})
+                    session.append(
+                        "command_shortcut",
+                        {"shortcut": shortcut.prefix, "kind": shortcut.kind, "command_fingerprint": command_fingerprint, "ok": False, "risk": "unknown", "approval": "not_requested", "cancelled": False, "timed_out": False, "truncated": False},
+                        mode=state["mode"],
+                        outcome="failed",
+                        error_code="context_source_error",
+                    )
+                    return {"accepted": False, "shortcut": shortcut.prefix, "error": "project rules contain fatal diagnostics", "code": "context_source_error"}
+                expected_rules = current_rules.fingerprint
+
+            def revalidate_shortcut() -> bool | str:
+                try:
+                    if reference_specs:
+                        latest_references = ReferenceResolver(guard).resolve(reference_specs)
+                        if latest_references.has_errors or latest_references.fingerprint != expected_references:
+                            return "explicit referenced context changed after planning"
+                    latest_rules = RuleEngine(guard).discover(target_paths)
+                    if latest_rules.has_errors or latest_rules.fingerprint != expected_rules:
+                        return "project rules changed after planning"
+                    return True
+                except Exception as exc:
+                    return f"shortcut context validation failed: {type(exc).__name__}"
+
+            def pause_wait() -> None:
+                while pause_event.is_set() and not token.is_cancelled():
+                    threading.Event().wait(0.01)
+
+            def approval_observer(tool_name: str, arguments: dict[str, Any], approved: bool) -> None:
+                session.append(
+                    "shortcut_approval",
+                    {
+                        "shortcut": shortcut.prefix,
+                        "tool": tool_name,
+                        "approved": bool(approved),
+                        "command_fingerprint": command_fingerprint,
+                        "risk": arguments.get("_risk"),
+                        "risk_reasons": arguments.get("_risk_reasons", ()),
+                    },
+                    mode=state["mode"],
+                    outcome="approved" if approved else "denied",
+                    error_code=None if approved else "approval_denied",
+                )
+
+            try:
+                result = build_default_registry(guard).execute(
+                    "run_command",
+                    {"command": shortcut.command},
+                    ToolContext(
+                        guard,
+                        approval,
+                        approval_observer=approval_observer,
+                        mode=AgentMode.ACT,
+                        secrets=(api_key,) if api_key else (),
+                        cancellation_token=token,
+                        transaction_store=transaction_store,
+                        run_id=session.run_id,
+                        plan_id=state["plan"].plan_id if state.get("plan") else None,
+                        plan_fingerprint=state["plan"].evidence_fingerprint() if state.get("plan") else "",
+                        rules_fingerprint=expected_rules,
+                        pre_side_effect_check=revalidate_shortcut,
+                        pause_wait=pause_wait,
+                    ),
+                )
+                metadata = result.metadata if isinstance(result.metadata, dict) else {}
+                # A pause arriving while the subprocess is running takes
+                # effect at this command-result boundary before any model
+                # follow-up is created. Cancellation remains fail-closed.
+                pause_wait()
+                safe_metadata = {
+                    key: value
+                    for key, value in metadata.items()
+                    if key not in {"command", "command_id"}
+                }
+                safe_metadata = redact_value(safe_metadata, (api_key,) if api_key else ())
+                redacted_output = redact_text(result.output, (api_key,) if api_key else ())
+                safe_output = redacted_output[:4_000]
+                redacted_stdout = redact_text(str(metadata.get("stdout", "")), (api_key,) if api_key else ())
+                redacted_stderr = redact_text(str(metadata.get("stderr", "")), (api_key,) if api_key else ())
+                if isinstance(safe_metadata, dict):
+                    # ShellTool metadata can retain its larger internal
+                    # capture; shortcut payloads and model context stay at
+                    # the shortcut's smaller, auditable bound.
+                    safe_metadata["stdout"] = redacted_stdout[:4_000]
+                    safe_metadata["stderr"] = redacted_stderr[:4_000]
+                shortcut_truncated = bool(metadata.get("truncated", False)) or any(
+                    len(value) > 4_000 for value in (redacted_output, redacted_stdout, redacted_stderr)
+                )
+                cancelled = metadata.get("error") == "cancelled" or token.is_cancelled()
+                payload = {
+                    "accepted": True,
+                    "shortcut": shortcut.prefix,
+                    "kind": shortcut.kind,
+                    "command_fingerprint": command_fingerprint,
+                    "ok": bool(result.ok) and not cancelled,
+                    "output": safe_output,
+                    "metadata": safe_metadata,
+                    "exit_code": metadata.get("exit_code"),
+                    "timed_out": bool(metadata.get("timed_out", False)),
+                    "cancelled": cancelled,
+                    "truncated": shortcut_truncated,
+                }
+                error_code = "cancelled" if cancelled else ((metadata.get("error") or "command_failed") if not result.ok else None)
+                if error_code:
+                    payload["error"] = str(error_code)[:128]
+                    payload["code"] = str(error_code)[:128]
+                session.append(
+                    "command_shortcut",
+                    {
+                        "shortcut": shortcut.prefix,
+                        "kind": shortcut.kind,
+                        "command_fingerprint": command_fingerprint,
+                        "ok": bool(result.ok),
+                        "risk": metadata.get("risk"),
+                        "risk_reasons": metadata.get("risk_reasons", ()),
+                        "hard_blocked": bool(metadata.get("hard_blocked", False)),
+                        "approval": metadata.get("approval"),
+                        "exit_code": metadata.get("exit_code"),
+                        "timed_out": bool(metadata.get("timed_out", False)),
+                        "cancelled": payload["cancelled"],
+                        "truncated": payload["truncated"],
+                        "stdout": redacted_stdout[:4_000],
+                        "stderr": redacted_stderr[:4_000],
+                    },
+                    mode=state["mode"],
+                    outcome="completed" if result.ok else ("cancelled" if payload["cancelled"] else "failed"),
+                    error_code=str(error_code)[:128] if error_code else None,
+                )
+                if shortcut.kind == "local" or payload["cancelled"] or metadata.get("error") == "paused":
+                    return payload
+                # Only the model-visible shortcut feeds the bounded result into
+                # the existing AgentLoop.  The command text and raw metadata
+                # are intentionally absent from this prompt.
+                context_payload = json.dumps(
+                    {"shortcut": "!", "ok": payload["ok"], "output": safe_output, "metadata": safe_metadata},
+                    ensure_ascii=False,
+                    sort_keys=True,
+                    allow_nan=False,
+                )
+                # The shortcut worker is finished before the model-visible
+                # follow-up begins; controls now target the nested AgentLoop.
+                shortcut_control.update({"token": None, "pause": None, "fingerprint": None})
+                return run_message("A user command shortcut completed. Continue the task using this bounded result; do not repeat the command unless explicitly needed.\n" + context_payload)
+            except (ProviderError, ValueError, OSError) as exc:
+                message = _redact_display(str(exc), [api_key])
+                session.append("command_shortcut", {"shortcut": shortcut.prefix, "kind": shortcut.kind, "command_fingerprint": command_fingerprint, "ok": False, "error": type(exc).__name__}, mode=state["mode"], outcome="failed", error_code="shortcut_failed")
+                return {"accepted": False, "shortcut": shortcut.prefix, "command_fingerprint": command_fingerprint, "error": message, "code": "shortcut_failed"}
+            finally:
+                shortcut_control.update({"token": None, "pause": None, "fingerprint": None})
 
         def _active_service() -> RunService | None:
             with active_service_lock:
@@ -1612,15 +1812,35 @@ def main(argv: list[str] | None = None) -> int:
 
         def pause_active() -> Any:
             service = _active_service()
-            return service.pause() if service is not None else {"paused": False, "error": "no active worker"}
+            if service is not None:
+                return service.pause()
+            pause_event = shortcut_control.get("pause")
+            token = shortcut_control.get("token")
+            if pause_event is not None and token is not None and not token.is_cancelled():
+                pause_event.set()
+                return {"paused": True, "pending": True, "message": "shortcut pause will apply at the next safe boundary"}
+            return {"paused": False, "error": "no active worker"}
 
         def resume_active() -> Any:
             service = _active_service()
-            return service.resume() if service is not None else {"resumed": False, "error": "no active worker"}
+            if service is not None:
+                return service.resume()
+            pause_event = shortcut_control.get("pause")
+            token = shortcut_control.get("token")
+            if pause_event is not None and token is not None and not token.is_cancelled():
+                pause_event.clear()
+                return {"resumed": True, "pending": False, "message": "shortcut pause released"}
+            return {"resumed": False, "error": "no active worker"}
 
         def cancel_active() -> Any:
             service = _active_service()
-            return service.cancel() if service is not None else {"cancelled": False, "error": "no active worker"}
+            if service is not None:
+                return service.cancel()
+            token = shortcut_control.get("token")
+            if token is not None:
+                first = token.cancel("interactive cancel")
+                return {"cancelled": first, "message": "interactive cancel"}
+            return {"cancelled": False, "error": "no active worker"}
 
         def persist_controller_event(kind: str, payload: dict[str, object]) -> None:
             try:
