@@ -37,6 +37,8 @@ def _prune_sessions() -> None:
 
 def serve_lines(lines: Iterable[str]) -> Iterable[str]:
     for line in lines:
+        method = None
+        request_id = None
         try:
             request = json.loads(line)
             if not isinstance(request, dict) or not isinstance(request.get("argv", []), list):
