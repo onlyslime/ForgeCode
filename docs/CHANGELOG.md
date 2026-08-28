@@ -34,7 +34,7 @@ slice.
   warnings after forced termination.
 - Canonicalized persisted RPC workspaces and bounded request identifiers.
 - Normalized Node/Python SDK limits and process/JSON error contracts.
-- Verification: targeted RPC/embed/provider/telemetry/cancellation gate (74 passed), Node
+- Verification: targeted RPC/embed/provider/telemetry/cancellation/context/review gate (86 passed), Node
   smoke, Python compile, doctor JSONL, and diff checks.
 - Additional hardening: bounded SDK argv/params and request ids, typed process
   and JSON errors, RPC busy/terminal/approval taxonomy, cancellation recovery,
