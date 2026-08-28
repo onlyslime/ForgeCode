@@ -64,6 +64,9 @@ For providers that may block, `isolate: true` runs the request in a killable
 child process; `session.cancel` performs a bounded terminate request and the
 result is recorded as cancelled. Isolation is opt-in because it has higher
 startup cost and still uses the same CLI safety checks.
+Isolated stdout is spooled to a temporary file and only a bounded tail is
+parsed after exit, preventing large model/tool output from accumulating in
+daemon memory; oversized captures are marked `output_truncated`.
 Completed background runs retain a bounded list of structured CLI envelopes in
 `session.status` and in recovered `session.open` responses; oversized output
 is represented by a redacted truncation marker.

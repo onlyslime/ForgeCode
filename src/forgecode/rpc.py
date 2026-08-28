@@ -13,6 +13,7 @@ import os
 import subprocess
 import sys
 import signal
+import tempfile
 import threading
 import uuid
 import time
@@ -36,14 +37,20 @@ _MAX_SESSION_RESULT_BYTES = 262_144
 
 def _isolated_session_run(handle: str, argv: list[str]) -> None:
     """Execute a background request in a killable child process."""
-    process = subprocess.Popen([sys.executable, "-m", "forgecode", *argv], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-    with _SESSION_LOCK:
-        info = _RPC_SESSIONS.get(handle)
-        if info is not None:
-            info["process"] = process
-            _persist_session(handle, info)
-    output, _ = process.communicate()
-    _finish_background_session(handle, process.returncode or 0, output)
+    with tempfile.TemporaryFile(mode="w+b") as output_file:
+        process = subprocess.Popen([sys.executable, "-m", "forgecode", *argv], stdout=output_file, stderr=subprocess.STDOUT)
+        with _SESSION_LOCK:
+            info = _RPC_SESSIONS.get(handle)
+            if info is not None:
+                info["process"] = process
+                _persist_session(handle, info)
+        process.wait()
+        output_file.flush()
+        output_file.seek(0, os.SEEK_END)
+        size = output_file.tell()
+        output_file.seek(max(0, size - _MAX_SESSION_RESULT_BYTES), os.SEEK_SET)
+        output = output_file.read(_MAX_SESSION_RESULT_BYTES).decode("utf-8", errors="replace")
+    _finish_background_session(handle, process.returncode or 0, output, "output_truncated" if size > _MAX_SESSION_RESULT_BYTES else None)
 
 
 def _finish_background_session(handle: str, code: int, output: str, error_code: str | None = None) -> None:
