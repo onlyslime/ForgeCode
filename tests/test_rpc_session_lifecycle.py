@@ -50,6 +50,9 @@ def test_rpc_session_control_is_sequenced_and_replayable(tmp_path):
     assert resumed["data"]["sequence"] == 2
     events = _call({"method": "session.events", "params": {"session": handle}})
     assert [item["type"] for item in events["data"]["events"]] == ["pause", "resume"]
+    delta = _call({"method": "session.events", "params": {"session": handle, "after": 1, "limit": 1}})
+    assert [item["type"] for item in delta["data"]["events"]] == ["resume"]
+    assert delta["data"]["next_sequence"] == 2
 
 
 def test_rpc_request_id_replays_without_reapplying_control(tmp_path):

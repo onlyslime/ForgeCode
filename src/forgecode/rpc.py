@@ -119,7 +119,16 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                             info.setdefault("events", []).append({"sequence": info["sequence"], "type": method.rsplit(".", 1)[-1], "state": info.get("state")})
                         if method == "session.close": _RPC_SESSIONS.pop(handle, None)
                     data = {"session": handle, "closed": method == "session.close", "state": info.get("state"), "sequence": info.get("sequence", 0), "workspace": info.get("workspace"), "mode": info.get("mode")}
-                    if method == "session.events": data["events"] = list(info.get("events", []))[-100:]
+                    if method == "session.events":
+                        after = params.get("after", 0)
+                        limit = params.get("limit", 100)
+                        if isinstance(after, bool) or not isinstance(after, int) or after < 0:
+                            raise ValueError("session.events.after must be a non-negative integer")
+                        if isinstance(limit, bool) or not isinstance(limit, int) or limit < 1:
+                            raise ValueError("session.events.limit must be a positive integer")
+                        events = [item for item in info.get("events", []) if int(item.get("sequence", 0)) > after]
+                        data["events"] = events[: min(limit, 100)]
+                        data["next_sequence"] = int(data["events"][-1]["sequence"]) if data["events"] else after
                     payload = {"schema_version": 1, "kind": "session", "ok": True, "command": method, "data": data, "exit_code": 0}
                     if request_id is not None: payload["id"] = request_id
                     encoded = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
