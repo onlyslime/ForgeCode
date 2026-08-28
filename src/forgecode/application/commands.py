@@ -353,6 +353,9 @@ def _parser() -> argparse.ArgumentParser:
     provider_parser.add_argument("--json", action="store_true", default=argparse.SUPPRESS, dest="json")
     provider_parser.add_argument("--jsonl", action="store_true", default=argparse.SUPPRESS, dest="jsonl")
     provider_sub = provider_parser.add_subparsers(dest="provider_action", required=False)
+    provider_list = provider_sub.add_parser("list", help="list supported provider adapters")
+    provider_list.add_argument("--json", action="store_true", default=argparse.SUPPRESS, dest="json")
+    provider_list.add_argument("--jsonl", action="store_true", default=argparse.SUPPRESS, dest="jsonl")
     provider_health = provider_sub.add_parser("health", help="show bounded provider capabilities and configuration")
     provider_health.add_argument("--json", action="store_true", default=argparse.SUPPRESS, dest="json")
     provider_health.add_argument("--jsonl", action="store_true", default=argparse.SUPPRESS, dest="jsonl")
@@ -587,7 +590,7 @@ def _raw_command_name(argv: list[str]) -> str:
     values (which may contain arbitrary prompt text).
     """
     commands = {"doctor", "tools", "skills", "skill", "rules", "config", "provider", "login", "trust", "rpc", "transaction", "rollback", "review", "chat", "start", "inspect", "map", "context", "test", "tests", "sessions", "diff", "status", "session", "plan", "run", "eval", "benchmark"}
-    actions = {"skills": {"list", "check", "show", "run"}, "skill": {"list", "check", "show", "run"}, "rules": {"show", "check"}, "config": {"show", "validate", "profiles"}, "provider": {"health"}, "trust": {"status", "grant", "revoke"}, "context": {"show", "index", "search", "complete", "explain", "diagnostics", "clear"}, "test": {"list", "show", "run"}, "tests": {"list", "show", "run"}, "session": {"show", "export", "inspect", "compact", "fork", "tree", "clone", "import"}}
+    actions = {"skills": {"list", "check", "show", "run"}, "skill": {"list", "check", "show", "run"}, "rules": {"show", "check"}, "config": {"show", "validate", "profiles"}, "provider": {"health", "list"}, "trust": {"status", "grant", "revoke"}, "context": {"show", "index", "search", "complete", "explain", "diagnostics", "clear"}, "test": {"list", "show", "run"}, "tests": {"list", "show", "run"}, "session": {"show", "export", "inspect", "compact", "fork", "tree", "clone", "import"}}
     command = "doctor"
     command_index = -1
     options_with_values = {
@@ -836,6 +839,13 @@ def main(argv: list[str] | None = None) -> int:
         action = getattr(args, "provider_action", None) or "health"
         machine_json = bool(getattr(args, "json", False) or getattr(args, "jsonl", False))
         command_name = f"provider {action}"
+        if action == "list":
+            rows = [{"name": name, "streaming": name == "openai-compatible", "local": name == "ollama", "credential": "optional" if name == "ollama" else "environment"} for name in ("openai-compatible", "anthropic", "google", "ollama")]
+            if machine_json:
+                _emit_machine(_machine_envelope(command_name, "provider_list", True, data={"providers": rows}, exit_code=0))
+            else:
+                for row in rows: print(f"{row['name']} streaming={row['streaming']} local={row['local']} credential={row['credential']}")
+            return 0
         if action != "health":
             if machine_json:
                 _emit_machine(_machine_error(command_name, "unknown_action", "unknown provider action", exit_code=2))
@@ -848,7 +858,7 @@ def main(argv: list[str] | None = None) -> int:
             "profile": settings.profile,
             "model": settings.model,
             "base_url": redact_text(settings.base_url),
-            "configured": bool(settings.model and os.getenv(settings.api_key_env, "")),
+            "configured": bool(settings.model and (effective.provider == "ollama" or os.getenv(settings.api_key_env, ""))),
             "streaming": effective.streaming if effective else "auto",
             "capabilities": {
                 "tool_calling": True,
