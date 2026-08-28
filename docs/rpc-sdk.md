@@ -58,6 +58,10 @@ tail, available as a diagnostic-only `stderr` property.
 Spawn failures are emitted as typed `process_error` events to listeners rather
 than becoming uncaught child-process errors in the host application.
 
+The Node SDK exposes `sessionList({ workspace, limit, state })`, backed by the
+`session.list` method. State filters are bounded to the known lifecycle states
+and workspace paths are canonicalized before discovery; limits are 1–200.
+
 ## Session lifecycle
 
 `session.open` creates an in-memory handle bound to a validated workspace and

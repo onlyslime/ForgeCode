@@ -259,7 +259,7 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
             if method is not None:
                 if not isinstance(method, str) or len(method) > 128 or any(ch.isspace() for ch in method):
                     raise ValueError("method must be bounded non-whitespace text")
-                method_map = {"trust.status": ["trust", "status"], "trust.grant": ["trust", "grant"], "trust.revoke": ["trust", "revoke"], "provider.list": ["provider", "list"], "provider.health": ["provider", "health"], "config.show": ["config", "show"], "config.profiles": ["config", "profiles"], "doctor": ["doctor"], "login": ["login"], "run": ["run"], "session.open": ["session", "open"], "session.run": ["run"], "session.events": ["session", "events"], "session.cancel": ["session", "cancel"], "session.pause": ["session", "pause"], "session.resume": ["session", "resume"], "session.approval": ["session", "approval"], "session.close": ["session", "close"], "session.status": ["session", "status"], "session.result": ["session", "result"], "session.wait": ["session", "wait"], "session.inspect": ["session", "inspect"], "session.tree": ["session", "tree"], "session.export": ["session", "export"]}
+                method_map = {"trust.status": ["trust", "status"], "trust.grant": ["trust", "grant"], "trust.revoke": ["trust", "revoke"], "provider.list": ["provider", "list"], "provider.health": ["provider", "health"], "config.show": ["config", "show"], "config.profiles": ["config", "profiles"], "doctor": ["doctor"], "login": ["login"], "run": ["run"], "session.open": ["session", "open"], "session.run": ["run"], "session.list": ["sessions"], "session.events": ["session", "events"], "session.cancel": ["session", "cancel"], "session.pause": ["session", "pause"], "session.resume": ["session", "resume"], "session.approval": ["session", "approval"], "session.close": ["session", "close"], "session.status": ["session", "status"], "session.result": ["session", "result"], "session.wait": ["session", "wait"], "session.inspect": ["session", "inspect"], "session.tree": ["session", "tree"], "session.export": ["session", "export"]}
                 if method not in method_map:
                     raise ValueError("unsupported RPC method")
                 if argv_value:
@@ -281,6 +281,22 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                     if not Path(workspace).expanduser().is_dir():
                         raise ValueError("workspace must be an existing directory")
                     argv_value = ["--workspace", workspace, *argv_value]
+                if method == "session.list":
+                    workspace = params.get("workspace", ".")
+                    if not isinstance(workspace, str) or len(workspace) > 1_000 or any(ch in workspace for ch in "\r\n"):
+                        raise ValueError("session.list.workspace is invalid")
+                    workspace_path = Path(workspace).expanduser().resolve()
+                    if not workspace_path.is_dir():
+                        raise ValueError("session.list.workspace must be an existing directory")
+                    limit = params.get("limit", 50)
+                    if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 200:
+                        raise ValueError("session.list.limit must be between 1 and 200")
+                    state = params.get("state")
+                    if state is not None and state not in {"running", "paused", "completed", "failed", "cancelled", "recovery_required"}:
+                        raise ValueError("session.list.state is invalid")
+                    argv_value = ["--workspace", str(workspace_path), "sessions", "--limit", str(limit)]
+                    if state is not None:
+                        argv_value.extend(["--state", state])
                 if method == "session.open":
                     workspace = params.get("workspace", ".")
                     mode = params.get("mode", "plan")
@@ -334,7 +350,9 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                                 oldest = next(iter(_RPC_REPLAYS)); _RPC_REPLAYS.pop(oldest, None); _RPC_FINGERPRINTS.pop(oldest, None)
                     yield encoded
                     continue
-                if method in {"session.close", "session.status", "session.result", "session.wait", "session.events", "session.cancel", "session.pause", "session.resume", "session.approval"}:
+                if method == "session.list":
+                    pass
+                elif method in {"session.close", "session.status", "session.result", "session.wait", "session.events", "session.cancel", "session.pause", "session.resume", "session.approval"}:
                     handle = params.get("session") or params.get("session_id")
                     with _SESSION_LOCK: _prune_sessions()
                     if handle not in _RPC_SESSIONS:
@@ -532,7 +550,7 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                         limit = params.get("limit", 50)
                         if isinstance(limit, bool) or not isinstance(limit, int): raise ValueError("session.tree limit must be an integer")
                         argv_value.extend(["--limit", str(max(1, min(200, limit)))])
-                    else:
+                    elif method != "session.list":
                         if not isinstance(session_id, str) or not session_id.strip() or len(session_id) > 512: raise ValueError("session parameter is required and bounded")
                         argv_value.append(session_id)
                 argv_value.append("--jsonl")

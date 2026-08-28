@@ -116,6 +116,7 @@ export const method = (name, options = {}) => invoke([], { ...options, method: n
 export const run = (prompt, options = {}) => method("run", { ...options, params: { ...(options.params ?? {}), prompt } });
 export const sessionInspect = (session, options = {}) => method("session.inspect", { ...options, params: { ...(options.params ?? {}), session } });
 export const sessionTree = (options = {}) => method("session.tree", options);
+export const sessionList = (options = {}) => method("session.list", options);
 export const sessionOpen = (options = {}) => method("session.open", options);
 export const sessionStatus = (session, options = {}) => method("session.status", { ...options, params: { ...(options.params ?? {}), session } });
 export const sessionResult = (session, options = {}) => method("session.result", { ...options, params: { ...(options.params ?? {}), session } });

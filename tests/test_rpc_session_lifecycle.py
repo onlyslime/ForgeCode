@@ -42,6 +42,17 @@ def test_rpc_config_profiles_is_programmatically_discoverable(tmp_path):
     assert payload["command"] == "config profiles"
 
 
+def test_rpc_session_list_supports_state_filter(tmp_path):
+    sessions = tmp_path / ".forgecode" / "sessions"
+    sessions.mkdir(parents=True)
+    from forgecode.storage.session import SessionStore
+    SessionStore(sessions / "done.jsonl", run_id="done").append("run_finished", {"state": "completed"}, outcome="completed")
+    payload = _call({"id": "list", "method": "session.list", "params": {"workspace": str(tmp_path), "state": "completed", "limit": 10}})
+    assert payload["ok"] is True
+    assert payload["command"] == "sessions"
+    assert payload["data"]["count"] == 1
+
+
 def test_rpc_config_profiles_honors_workspace_parameter(tmp_path):
     payload = _call({"method": "config.profiles", "params": {"workspace": str(tmp_path)}})
     assert payload["ok"] is True

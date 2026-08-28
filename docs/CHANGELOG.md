@@ -5,6 +5,12 @@ and metadata-only commits remain under the current version and are not listed as
 new releases. Verification notes identify the evidence used for each feature
 slice.
 
+## v0.0.30 — 2026-08-29
+
+- Added `session.list` RPC and Node `sessionList` helper with bounded workspace,
+  lifecycle-state filtering, and consistent machine envelopes.
+- Verification: RPC lifecycle and CLI machine-contract tests.
+
 ## v0.0.29 — 2026-08-29
 
 - Added bounded `sessions --state` filtering for scriptable background-session
