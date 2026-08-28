@@ -32,8 +32,8 @@ export function invoke(argv = [], { cwd, executable = "forgecode", method, param
     let out = "";
     let err = "";
     let settled = false;
-    const onAbort = () => { if (!settled) { child.kill(); settled = true; clearTimeout(timer); reject(new ForgeCodeError("request cancelled", { code: "cancelled" })); } };
-    const timer = setTimeout(() => { if (!settled) { child.kill(); settled = true; reject(new ForgeCodeError("request timed out", { code: "timeout" })); } }, Math.max(1, timeoutMs));
+    const onAbort = () => { if (!settled) { child.kill(); settled = true; clearTimeout(timer); signal?.removeEventListener?.("abort", onAbort); reject(new ForgeCodeError("request cancelled", { code: "cancelled" })); } };
+    const timer = setTimeout(() => { if (!settled) { child.kill(); settled = true; signal?.removeEventListener?.("abort", onAbort); reject(new ForgeCodeError("request timed out", { code: "timeout" })); } }, Math.max(1, timeoutMs));
     if (signal !== undefined) { if (signal.aborted) return onAbort(); signal.addEventListener("abort", onAbort, { once: true }); }
     if (rpc) child.stdin.write(JSON.stringify({ argv: [], method, params, ...(id === undefined ? {} : { id }) }) + "\n");
     child.stdin.end();
@@ -67,8 +67,8 @@ export function invokeStream(argv = [], options = {}) {
     const child = spawn(options.executable ?? "forgecode", rpc ? ["rpc"] : [...argv, "--jsonl"], { cwd: options.cwd, stdio: ["pipe", "pipe", "pipe"] });
     if (rpc) { child.stdin.write(JSON.stringify({ argv: [], method: options.method, params: options.params ?? {}, ...(options.id === undefined ? {} : { id: options.id }) }) + "\n"); child.stdin.end(); }
     let buffer = ""; const events = []; let err = ""; let bytes = 0; let settled = false;
-    const onAbort = () => { if (!settled) { child.kill(); settled = true; clearTimeout(timer); reject(new ForgeCodeError("request cancelled", { code: "cancelled" })); } };
-    const timer = setTimeout(() => { if (!settled) { child.kill(); settled = true; reject(new ForgeCodeError("request timed out", { code: "timeout" })); } }, Math.max(1, options.timeoutMs ?? 30000));
+    const onAbort = () => { if (!settled) { child.kill(); settled = true; clearTimeout(timer); options.signal?.removeEventListener?.("abort", onAbort); reject(new ForgeCodeError("request cancelled", { code: "cancelled" })); } };
+    const timer = setTimeout(() => { if (!settled) { child.kill(); settled = true; options.signal?.removeEventListener?.("abort", onAbort); reject(new ForgeCodeError("request timed out", { code: "timeout" })); } }, Math.max(1, options.timeoutMs ?? 30000));
     if (options.signal !== undefined) { if (options.signal.aborted) return onAbort(); options.signal.addEventListener("abort", onAbort, { once: true }); }
     child.stdout.on("data", (chunk) => {
       bytes += chunk.byteLength;

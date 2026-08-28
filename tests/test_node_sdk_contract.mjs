@@ -10,6 +10,13 @@ assert.throws(() => invoke([], { signal: {} }), TypeError);
   await assert.rejects(invoke([], { executable: process.execPath, signal: controller.signal }), (error) => error.code === "cancelled");
   await assert.rejects(invokeStream([], { executable: process.execPath, signal: controller.signal }), (error) => error.code === "cancelled");
 }
+{
+  const controller = new AbortController();
+  const request = invoke([], { executable: process.execPath, method: "doctor", signal: controller.signal });
+  controller.abort();
+  await assert.rejects(request, (error) => error.code === "cancelled");
+  controller.abort();
+}
 assert.throws(() => invoke([], { method: "doctor", params: "bad" }), TypeError);
 assert.throws(() => invoke([], { method: "doctor", params: { value: "x".repeat(1_000_001) } }), TypeError);
 assert.throws(() => invokeStream([], { maxItems: 0 }), TypeError);
