@@ -10,6 +10,8 @@ Handle metadata is persisted under the workspace's ignored
 `.forgecode/rpc-sessions/` directory without prompts or credentials. A new
 daemon may explicitly reopen a handle after canonical workspace and mode
 validation.
+Recovery also rechecks persisted creation time against the eight-hour TTL and
+requires current workspace trust for Act handles before returning success.
 The persisted record includes only the bounded recent event window and its
 sequence, allowing cursor-based event recovery after daemon restart.
 Each handle retains only the most recent 512 control/run events. Clients must
