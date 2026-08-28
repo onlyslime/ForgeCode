@@ -151,7 +151,14 @@ class EmbeddedSession:
                 self.send("/quit")
                 self.process.wait(timeout=3)
             except (OSError, subprocess.TimeoutExpired):
-                self.process.terminate()
+                try:
+                    self.process.terminate()
+                    self.process.wait(timeout=2)
+                except (OSError, subprocess.TimeoutExpired):
+                    try:
+                        self.process.kill()
+                    finally:
+                        self.process.wait(timeout=2)
 
 
 __all__.append("EmbeddedSession")
