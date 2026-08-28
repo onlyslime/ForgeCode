@@ -37,8 +37,18 @@ def _persist_session(handle: str, info: dict[str, Any]) -> None:
     payload = {key: info.get(key) for key in ("workspace", "mode", "session_path", "state", "sequence", "created_at")}
     payload["events"] = list(info.get("events", []))[-_MAX_SESSION_EVENTS:]
     tmp = path.with_suffix(".tmp")
-    tmp.write_text(json.dumps(payload, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+    encoded = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+    with tmp.open("w", encoding="utf-8") as stream:
+        stream.write(encoded)
+        stream.flush()
+        os.fsync(stream.fileno())
     tmp.replace(path)
+    try:
+        directory_fd = os.open(str(path.parent), os.O_RDONLY)
+        try: os.fsync(directory_fd)
+        finally: os.close(directory_fd)
+    except OSError:
+        pass
 
 
 def _remove_session_record(handle: str, info: dict[str, Any]) -> None:

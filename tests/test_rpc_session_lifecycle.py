@@ -159,3 +159,11 @@ def test_rpc_session_close_removes_recovery_record(tmp_path):
     reopened = _call({"method": "session.open", "params": {"workspace": str(tmp_path), "session": handle}})
     assert reopened["ok"] is False
     assert "not recoverable" in reopened["error"]["message"]
+
+
+def test_rpc_persisted_record_is_valid_json_and_contains_no_prompt(tmp_path):
+    handle = _call({"method": "session.open", "params": {"workspace": str(tmp_path)}})["data"]["session"]
+    record_path = tmp_path / ".forgecode" / "rpc-sessions" / f"{handle}.json"
+    payload = json.loads(record_path.read_text(encoding="utf-8"))
+    assert payload["workspace"] == str(tmp_path)
+    assert "prompt" not in payload and "credential" not in payload
