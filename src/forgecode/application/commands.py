@@ -27,17 +27,35 @@ from ..references import ReferenceResolver, parse_references
 from ..rules import RuleEngine
 from ..plan import PlanItem, TaskPlan
 from ..storage import TransactionError, TransactionStore
-from ..models import CancellationToken, DemoProvider, OpenAICompatibleProvider, ProviderError
+from ..models import CancellationToken, DemoProvider, OpenAICompatibleProvider, ProviderError, create_provider
 from ..testing import TestProfileError, TestProfileLoader, TestProfileRunner
 from ..review import ReviewArtifactError, ReviewError
 from ..evaluation import evaluate_session
 from ..security.redaction import redact_text, redact_value
 from ..security.json import bounded_json_loads
 from ..security.workspace import WorkspaceGuard
+from ..security.trust import TrustError, TrustStore
+from ..telemetry import Telemetry
 from ..storage import Checkpoint, CheckpointStore, RecoveryConflict, SessionFormatError, SessionStore
 from ..tools import AgentMode, AllowAllApproval, DenyAllApproval, InteractiveApproval, ToolContext, build_default_registry
 from ..hooks import Hook, HookRegistry
 from .review_service import ReviewService
+
+
+def _build_provider(effective):
+    """Construct the selected provider while preserving legacy injection."""
+    provider_name = effective.provider if effective else "openai-compatible"
+    kwargs = dict(
+        api_key=os.getenv(effective.api_key_env if effective else "FORGECODE_API_KEY", ""),
+        base_url=effective.base_url if effective else os.getenv("FORGECODE_BASE_URL", "https://api.openai.com/v1"),
+        model=effective.model if effective and effective.model else os.getenv("FORGECODE_MODEL", ""),
+        streaming=bool(effective and effective.streaming in {"on", "required"}),
+        stream_required=bool(effective and effective.streaming == "required"),
+        timeout=effective.provider_timeout_seconds if effective else 60.0,
+    )
+    if provider_name == "openai-compatible":
+        return OpenAICompatibleProvider(**kwargs)
+    return create_provider(provider=provider_name, **kwargs)
 
 
 def _approval_output(json_mode: bool):
@@ -338,6 +356,18 @@ def _parser() -> argparse.ArgumentParser:
     provider_health = provider_sub.add_parser("health", help="show bounded provider capabilities and configuration")
     provider_health.add_argument("--json", action="store_true", default=argparse.SUPPRESS, dest="json")
     provider_health.add_argument("--jsonl", action="store_true", default=argparse.SUPPRESS, dest="jsonl")
+    login_parser = subparsers.add_parser("login", help="show secure environment-based credential setup")
+    login_parser.add_argument("--provider", default="openai-compatible")
+    login_parser.add_argument("--api-key-env", default="FORGECODE_API_KEY")
+    login_parser.add_argument("--json", action="store_true", default=argparse.SUPPRESS, dest="json")
+    login_parser.add_argument("--jsonl", action="store_true", default=argparse.SUPPRESS, dest="jsonl")
+    trust_parser = subparsers.add_parser("trust", help="inspect or change workspace trust")
+    trust_parser.add_argument("action", choices=("status", "grant", "revoke"), nargs="?", default="status")
+    trust_parser.add_argument("--json", action="store_true", default=argparse.SUPPRESS, dest="json")
+    trust_parser.add_argument("--jsonl", action="store_true", default=argparse.SUPPRESS, dest="jsonl")
+    rpc_parser = subparsers.add_parser("rpc", help="serve JSONL requests on stdin")
+    rpc_parser.add_argument("--json", action="store_true", default=argparse.SUPPRESS, dest="json")
+    rpc_parser.add_argument("--jsonl", action="store_true", default=argparse.SUPPRESS, dest="jsonl")
     # ``transaction``/``rollback`` retain the original ledger-oriented
     # interface.  ``review`` is a first-class evidence report command (rather
     # than an alias) so it can select a session, export/import a signed
@@ -511,6 +541,7 @@ def _parser() -> argparse.ArgumentParser:
     run_parser.add_argument("--demo", action="store_true", help="run the deterministic offline demonstration")
     run_parser.add_argument("--demo-task", choices=("calculator", "json"), default="calculator", help="offline demo scenario")
     run_parser.add_argument("--mode", choices=[mode.value for mode in AgentMode], help="execution mode: plan is read-only; act permits approved side effects")
+    run_parser.add_argument("--require-trust", action="store_true", help="refuse act-mode execution until workspace trust is granted")
     run_parser.add_argument("--profile", help="named model/config profile")
     run_parser.add_argument("--resume", type=Path, help="resume safely from a session id or JSONL path")
     run_parser.add_argument("--fork", action="store_true", help="fork a completed/paused session into a new run id")
@@ -555,8 +586,8 @@ def _raw_command_name(argv: list[str]) -> str:
     and its immediate nested action, while deliberately ignoring option
     values (which may contain arbitrary prompt text).
     """
-    commands = {"doctor", "tools", "skills", "skill", "rules", "config", "provider", "transaction", "rollback", "review", "chat", "start", "inspect", "map", "context", "test", "tests", "sessions", "diff", "status", "session", "plan", "run", "eval", "benchmark"}
-    actions = {"skills": {"list", "check", "show", "run"}, "skill": {"list", "check", "show", "run"}, "rules": {"show", "check"}, "config": {"show", "validate", "profiles"}, "provider": {"health"}, "context": {"show", "index", "search", "complete", "explain", "diagnostics", "clear"}, "test": {"list", "show", "run"}, "tests": {"list", "show", "run"}, "session": {"show", "export", "inspect", "compact", "fork", "tree", "clone", "import"}}
+    commands = {"doctor", "tools", "skills", "skill", "rules", "config", "provider", "login", "trust", "rpc", "transaction", "rollback", "review", "chat", "start", "inspect", "map", "context", "test", "tests", "sessions", "diff", "status", "session", "plan", "run", "eval", "benchmark"}
+    actions = {"skills": {"list", "check", "show", "run"}, "skill": {"list", "check", "show", "run"}, "rules": {"show", "check"}, "config": {"show", "validate", "profiles"}, "provider": {"health"}, "trust": {"status", "grant", "revoke"}, "context": {"show", "index", "search", "complete", "explain", "diagnostics", "clear"}, "test": {"list", "show", "run"}, "tests": {"list", "show", "run"}, "session": {"show", "export", "inspect", "compact", "fork", "tree", "clone", "import"}}
     command = "doctor"
     command_index = -1
     options_with_values = {
@@ -654,6 +685,15 @@ def main(argv: list[str] | None = None) -> int:
             print(f"configuration invalid: {message}", file=sys.stderr)
         return 2
     guard = WorkspaceGuard(workspace)
+    # Telemetry is deliberately metadata-only and policy-gated.  No prompt,
+    # credential, path, or tool output is ever passed to this recorder.
+    if settings.effective is not None:
+        try:
+            Telemetry(workspace, mode=settings.effective.telemetry, offline=settings.effective.offline).record("cli_command", command=command, profile=settings.profile)
+        except (ValueError, OSError):
+            # Diagnostics must never make an otherwise safe CLI invocation
+            # fail; the policy itself remains visible in doctor/config output.
+            pass
     base_registry = build_default_registry(guard)
     try:
         cli_tool_policy = parse_tool_policy_options(
@@ -683,6 +723,60 @@ def main(argv: list[str] | None = None) -> int:
         "enabled": list(registry.names()),
         "unavailable": list(registry.unavailable_names()),
     }
+    if command == "trust":
+        machine_json = bool(getattr(args, "json", False) or getattr(args, "jsonl", False))
+        command_name = "trust " + getattr(args, "action", "status")
+        try:
+            store = TrustStore(workspace)
+            action = getattr(args, "action", "status")
+            payload = store.status() if action == "status" else (store.grant() if action == "grant" else store.revoke())
+        except TrustError as exc:
+            if machine_json:
+                _emit_machine(_machine_error(command_name, "trust_error", str(exc), exit_code=2))
+            else:
+                print(str(exc), file=sys.stderr)
+            return 2
+        if machine_json:
+            _emit_machine(_machine_envelope(command_name, "trust", True, data=payload, exit_code=0))
+        else:
+            print("trusted" if payload.get("trusted") else "not trusted")
+        return 0
+    if command == "login":
+        machine_json = bool(getattr(args, "json", False) or getattr(args, "jsonl", False))
+        payload = {"provider": args.provider, "api_key_env": args.api_key_env, "configured": bool(os.getenv(args.api_key_env, "")), "storage": "environment-only", "message": f"Set {args.api_key_env} in the environment; ForgeCode never stores credential values."}
+        if machine_json:
+            _emit_machine(_machine_envelope("login", "login", True, data=payload, exit_code=0))
+        else:
+            print(payload["message"])
+            print(f"configured: {payload['configured']}")
+        return 0
+    if command == "rpc":
+        from ..rpc import serve_lines
+        for response in serve_lines(sys.stdin):
+            print(response)
+        return 0
+    # Act-mode executions require an explicit, persisted workspace trust
+    # decision. Deterministic offline demos remain available in fresh folders
+    # without trust so assessment smoke tests stay self-contained.
+    effective_mode = getattr(args, "mode", None) or (settings.effective.default_mode if settings.effective else None)
+    provider_configured = bool(settings.model and settings.api_key_env and os.getenv(settings.api_key_env, ""))
+    if command in {"run", "chat", "start"} and effective_mode == "act" and (getattr(args, "require_trust", False) or provider_configured) and not getattr(args, "demo", False):
+        try:
+            trust = TrustStore(workspace).status()
+        except TrustError as exc:
+            message = str(exc)
+            if machine_json:
+                _emit_machine(_machine_error(command, "trust_error", message, exit_code=2))
+            else:
+                print(message, file=sys.stderr)
+            return 2
+        if not trust.get("trusted"):
+            message = "workspace is not trusted; run `forgecode trust grant` before act-mode execution"
+            if machine_json:
+                _emit_machine(_machine_error(command, "trust_required", message, exit_code=2))
+            else:
+                print(message, file=sys.stderr)
+            return 2
     if command == "run":
         args.mode = args.mode or (settings.effective.default_mode if settings.effective else AgentMode.ACT.value)
         args.max_steps = args.max_steps if args.max_steps is not None else (settings.effective.max_steps if settings.effective else 12)
@@ -1587,7 +1681,7 @@ def main(argv: list[str] | None = None) -> int:
                     provider = DemoProvider(args.demo_task)
                 else:
                     effective = settings.effective
-                    provider = OpenAICompatibleProvider(api_key=os.getenv(effective.api_key_env if effective else "FORGECODE_API_KEY", ""), base_url=effective.base_url if effective else os.getenv("FORGECODE_BASE_URL", "https://api.openai.com/v1"), model=effective.model if effective and effective.model else os.getenv("FORGECODE_MODEL", ""), streaming=bool(effective and effective.streaming in {"on", "required"}), stream_required=bool(effective and effective.streaming == "required"), timeout=effective.provider_timeout_seconds if effective else 60.0)
+                    provider = _build_provider(effective)
                 enriched = message
                 if rules.text:
                     enriched += "\n\nProject rules (untrusted context):\n" + rules.render(20_000)
@@ -1949,6 +2043,10 @@ def main(argv: list[str] | None = None) -> int:
             controller = controller_holder["value"]
             return {"mode": state["mode"], "run_id": session.run_id, "transactions": len(manifests), "last_state": getattr(state["last"], "state", None), "latest_verification": state["last_verification"], "worker": controller.snapshot() if controller is not None else {"active": False}}
 
+        def login_command() -> Any:
+            effective = settings.effective
+            return {"provider": effective.provider if effective else "openai-compatible", "profile": settings.profile, "api_key_env": effective.api_key_env if effective else "FORGECODE_API_KEY", "configured": bool(effective and os.getenv(effective.api_key_env, "")), "storage": "environment-only"}
+
         def plan_command(_args: list[str]) -> Any:
             state["mode"] = "plan"
             return {"mode": "plan", "plan": state["plan"].to_dict() if state["plan"] else None, "message": "planning mode; side effects are disabled"}
@@ -2125,6 +2223,7 @@ def main(argv: list[str] | None = None) -> int:
             plan=plan_command,
             set_mode=set_mode,
             model=model_command,
+            login=login_command,
             review=review,
             test=test_command,
             compact=compact,
@@ -2203,7 +2302,7 @@ def main(argv: list[str] | None = None) -> int:
             # A model name alone is not a usable provider configuration; the
             # configured flag must agree with the offline health probe and
             # include the selected credential environment variable.
-            data = {"version": __version__, "workspace": ".", "profile": settings.profile, "model": settings.model, "configured": provider_health["configured"], "config_sources": list(effective.sources) if effective else ["environment"], "streaming": effective.streaming if effective else "auto", "tools": list(registry.names()), "provider_health": provider_health, "status": "ready"}
+            data = {"version": __version__, "workspace": ".", "profile": settings.profile, "model": settings.model, "configured": provider_health["configured"], "config_sources": list(effective.sources) if effective else ["environment"], "streaming": effective.streaming if effective else "auto", "offline": bool(effective.offline) if effective else False, "telemetry": effective.telemetry if effective else "off", "tools": list(registry.names()), "provider_health": provider_health, "status": "ready"}
             envelope = _machine_envelope(command_name, "doctor", True, data=data, exit_code=0, **_compat_aliases(data))
             if machine_json:
                 envelope["type"] = "doctor"
@@ -2216,6 +2315,7 @@ def main(argv: list[str] | None = None) -> int:
         print("config sources: " + ", ".join(effective.sources if effective else ("environment",)))
         print("tools: " + ", ".join(registry.names()))
         print(f"provider health: {'configured' if provider_health['configured'] else 'offline/unconfigured'}")
+        print(f"offline: {bool(effective.offline) if effective else False} telemetry: {effective.telemetry if effective else 'off'}")
         print("status: ready")
         return 0
 
@@ -2902,7 +3002,7 @@ def main(argv: list[str] | None = None) -> int:
                 provider = DemoProvider(args.demo_task)
             else:
                 effective = settings.effective
-                provider = OpenAICompatibleProvider(api_key=os.getenv(effective.api_key_env if effective else "FORGECODE_API_KEY", ""), base_url=effective.base_url if effective else os.getenv("FORGECODE_BASE_URL", "https://api.openai.com/v1"), model=effective.model if effective and effective.model else os.getenv("FORGECODE_MODEL", ""), streaming=bool(effective and effective.streaming in {"on", "required"}), stream_required=bool(effective and effective.streaming == "required"), timeout=effective.provider_timeout_seconds if effective else 60.0)
+                provider = _build_provider(effective)
             expected_rule_fingerprint = rule_set.fingerprint if rule_set else ""
             expected_reference_fingerprint = reference_set.fingerprint if reference_set else ""
             demo_verification = "python -B -m pytest -q test_demo_calculator.py" if args.demo_task == "calculator" else "python -B -m pytest -q test_demo_config.py"

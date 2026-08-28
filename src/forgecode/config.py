@@ -28,6 +28,7 @@ class ConfigError(ValueError):
 
 MAX_CONFIG_BYTES = 1_000_000
 MAX_TOOL_POLICY_OPTION_CHARS = 4_000
+SUPPORTED_PROVIDERS = ("openai-compatible", "anthropic", "google", "ollama")
 
 
 @dataclass(frozen=True)
@@ -42,7 +43,7 @@ class ModelProfile:
     def validate(self) -> None:
         _bounded_text(self.name, "profile.name", 64)
         _bounded_text(self.provider, "profile.provider", 64)
-        if self.provider not in {"openai-compatible"}:
+        if self.provider not in SUPPORTED_PROVIDERS:
             raise ConfigError("profile.provider is unsupported")
         _validate_base_url(self.base_url, "profile.base_url")
         if self.model is not None:
@@ -158,6 +159,8 @@ class EffectiveConfig:
     repair_attempts: int = 2
     session_max_chars: int = 100_000
     transaction_max_bytes: int = 50_000_000
+    offline: bool = False
+    telemetry: str = "off"
     tool_policy: ToolPolicy = field(default_factory=ToolPolicy)
     sources: tuple[str, ...] = ()
 
@@ -166,7 +169,7 @@ class EffectiveConfig:
             raise ConfigError("workspace must be an existing directory")
         _bounded_text(self.profile, "profile", 64)
         _bounded_text(self.provider, "provider", 64)
-        if self.provider not in {"openai-compatible"}:
+        if self.provider not in SUPPORTED_PROVIDERS:
             raise ConfigError("provider is unsupported")
         _validate_base_url(self.base_url, "base_url")
         if not re.match(r"^[A-Z_][A-Z0-9_]*$", self.api_key_env):
@@ -175,6 +178,10 @@ class EffectiveConfig:
             raise ConfigError("default_mode must be plan or act")
         if self.approval not in {"interactive", "auto", "deny"}:
             raise ConfigError("approval must be interactive, auto, or deny")
+        if not isinstance(self.offline, bool):
+            raise ConfigError("offline must be a boolean")
+        if self.telemetry not in {"off", "local", "on"}:
+            raise ConfigError("telemetry must be off, local, or on")
         if self.streaming not in {"auto", "on", "off", "required"}:
             raise ConfigError("streaming must be auto, on, off, or required")
         for name, value, lower, upper in (
@@ -255,11 +262,13 @@ def _env_overlay() -> dict[str, Any]:
     mapping = {
         "FORGECODE_MODEL": "model", "FORGECODE_BASE_URL": "base_url", "FORGECODE_PROVIDER": "provider",
         "FORGECODE_MODE": "default_mode", "FORGECODE_STREAMING": "streaming", "FORGECODE_APPROVAL": "approval",
-        "FORGECODE_VERIFICATION": "verification_command", "FORGECODE_PROFILE": "profile",
+        "FORGECODE_VERIFICATION": "verification_command", "FORGECODE_PROFILE": "profile", "FORGECODE_TELEMETRY": "telemetry",
     }
     for env_name, key in mapping.items():
         if os.getenv(env_name):
             values[key] = os.environ[env_name]
+    if os.getenv("FORGECODE_OFFLINE"):
+        values["offline"] = os.environ["FORGECODE_OFFLINE"].lower() in {"1", "true", "yes", "on"}
     numeric = (
         ("FORGECODE_MAX_STEPS", "max_steps", int),
         ("FORGECODE_MAX_TOOL_CALLS", "max_tool_calls", int),
@@ -347,7 +356,7 @@ class ConfigLoader:
 
     def load(self, overrides: Mapping[str, Any] | None = None, *, profile: str | None = None) -> EffectiveConfig:
         raw = self._read_file()
-        allowed = {"profile", "provider", "base_url", "model", "api_key_env", "default_mode", "approval", "streaming", "max_steps", "max_tool_calls", "context_budget_chars", "compact_threshold_chars", "provider_timeout_seconds", "run_timeout_seconds", "verification_command", "repair_attempts", "session_max_chars", "transaction_max_bytes", "tool_policy", "profiles"}
+        allowed = {"profile", "provider", "base_url", "model", "api_key_env", "default_mode", "approval", "streaming", "max_steps", "max_tool_calls", "context_budget_chars", "compact_threshold_chars", "provider_timeout_seconds", "run_timeout_seconds", "verification_command", "repair_attempts", "session_max_chars", "transaction_max_bytes", "offline", "telemetry", "tool_policy", "profiles"}
         unknown = set(raw) - allowed
         if unknown:
             raise ConfigError("unknown config fields: " + ", ".join(sorted(unknown)))
@@ -356,7 +365,7 @@ class ConfigLoader:
             "workspace": self.workspace, "profile": "default", "provider": "openai-compatible", "base_url": "https://api.openai.com/v1", "model": None,
             "api_key_env": "FORGECODE_API_KEY", "default_mode": "act", "approval": "interactive", "streaming": "auto", "max_steps": 12,
             "max_tool_calls": 512, "context_budget_chars": 60_000, "compact_threshold_chars": 48_000, "provider_timeout_seconds": 90.0,
-            "run_timeout_seconds": 600.0, "verification_command": None, "repair_attempts": 2, "session_max_chars": 100_000, "transaction_max_bytes": 50_000_000,
+            "run_timeout_seconds": 600.0, "verification_command": None, "repair_attempts": 2, "session_max_chars": 100_000, "transaction_max_bytes": 50_000_000, "offline": False, "telemetry": "off",
             "tool_policy": ToolPolicy(), "sources": ("defaults",),
         }
         env = _env_overlay()
@@ -472,4 +481,4 @@ def _reject_secret_fields(value: Any, *, _path: str = "config") -> None:
     walk(value, _path, 0)
 
 
-__all__ = ["MAX_CONFIG_BYTES", "MAX_TOOL_POLICY_OPTION_CHARS", "ConfigError", "ConfigLoader", "EffectiveConfig", "ModelProfile", "Settings", "ToolPolicy", "load_effective_config", "parse_tool_policy_options"]
+__all__ = ["MAX_CONFIG_BYTES", "MAX_TOOL_POLICY_OPTION_CHARS", "SUPPORTED_PROVIDERS", "ConfigError", "ConfigLoader", "EffectiveConfig", "ModelProfile", "Settings", "ToolPolicy", "load_effective_config", "parse_tool_policy_options"]

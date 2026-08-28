@@ -11,6 +11,7 @@ from ..agent import AgentConfig, AgentLoop, ContextBuilder, LoopResult
 from ..config import EffectiveConfig
 from ..models import CancellationToken, ModelProvider
 from ..security.workspace import WorkspaceGuard
+from ..telemetry import Telemetry
 from ..storage import CheckpointStore, SessionFormatError, SessionStore, TransactionStore
 from ..tools import ToolContext, ToolRegistry
 from ..hooks import HookRegistry
@@ -183,7 +184,18 @@ class RunService:
         elif pending_pause:
             loop.pause()
         try:
-            return await loop.run(prompt)
+            result = await loop.run(prompt)
+            if self.effective_config is not None:
+                # Record only bounded outcome metadata; prompt, tool payloads,
+                # credentials, and workspace paths never enter telemetry.
+                try:
+                    Telemetry(self.guard.root, mode=self.effective_config.telemetry, offline=self.effective_config.offline).record(
+                        "run_finished", stopped_reason=result.stopped_reason, state=result.state,
+                        succeeded=bool(result.succeeded), verification_ok=result.verification_ok,
+                    )
+                except (OSError, ValueError):
+                    pass
+            return result
         finally:
             with self._active_lock:
                 if self._active_loop is loop:

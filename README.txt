@@ -17,6 +17,8 @@ v0.0.11 增加 Pi-inspired `!<command>`/`!!<command>`：单 `!` 结果进入模�
 v0.0.12 增加 `chat/start/run` 的 `--tools`、`--exclude-tools`、`--no-tools`，配置与 CLI 只做单调收窄，
 均复用审批、风险、超时、取消和脱敏边界，暂停恢复校验 checkpoint/规则/计划/配置指纹；
 stdout 每行是 envelope，进度/审批只去 stderr。Plan 不执行副作用，取消或未决不会误报成功。
+v0.0.13 增加 `trust` 工作区信任、`login` 环境凭据提示、`rpc` JSONL 服务与 Node SDK，
+并提供 offline/telemetry 隐私策略和 Escape 即时取消。
 
 暂不含 IDE、浏览器、云执行、远程 MCP、worktree、并行子代理、后台调度、自动 push 或
 操作系统级 sandbox。审批和风险分类是防线，不是 OS 隔离。

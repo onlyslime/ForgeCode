@@ -31,8 +31,15 @@ Chat Completions 返回结构化 tool calls，ForgeCode 在用户指定工作区
 - **真实离线演示**：DemoProvider 在隔离工作区读取有 bug 的 calculator，先跑
   出失败测试，再走 patch 和审批，最后取得真实通过结果；不需要网络或 API key。
 
-当前版本：`v0.0.12`（版本号与 `VERSION`、`pyproject.toml` 和
+当前版本：`v0.0.13`（版本号与 `VERSION`、`pyproject.toml` 和
 `src/forgecode/__init__.py` 保持同步）。
+
+### v0.0.13 CLI harness
+
+- `trust status|grant|revoke` 建立可撤销的工作区信任记录；`login` 仅引用环境变量凭据。
+- `rpc` 接受 JSONL 请求并复用 CLI envelope；Node 客户端位于 `sdk/node/index.mjs`。
+- 配置支持 `offline` 与 `telemetry = off|local|on`；offline 强制禁止外发，local 仅写入本地审计 JSONL。
+- 交互输入中的 Escape 控制字节会立即请求取消，并复用既有 cancel/pause 边界。
 
 ### v0.0.9 扩展能力
 

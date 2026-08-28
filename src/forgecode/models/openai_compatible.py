@@ -534,6 +534,7 @@ def assemble_chat_stream(events: Iterable[dict[str, Any]], *, max_content_chars:
 
 
 class OpenAICompatibleProvider:
+    provider_name = "openai-compatible"
     def __init__(self, *, api_key: str, base_url: str, model: str, transport: JsonTransport | None = None, timeout: float = 60.0, max_response_bytes: int = 4_000_000, max_request_bytes: int = 4_000_000, max_retries: int = 2, retry_base_delay: float = 0.25, streaming: bool = False, stream_required: bool = False):
         if not api_key:
             raise ProviderError("FORGECODE_API_KEY is not configured", category="configuration_error")
@@ -583,7 +584,7 @@ class OpenAICompatibleProvider:
     def health(self) -> dict[str, Any]:
         """Return offline configuration diagnostics; never performs a request."""
         return {
-            "provider": "openai-compatible",
+            "provider": self.provider_name,
             "model": self.model,
             "base_url": self.base_url,
             "configured": bool(self.api_key and self.model and self.base_url),

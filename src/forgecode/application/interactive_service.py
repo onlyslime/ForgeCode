@@ -316,6 +316,7 @@ class InteractiveSession:
     files: Callable[..., object] = lambda *_args: {}
     skills: Callable[[list[str]], object] = lambda _args: {}
     model: Callable[[list[str]], object] = lambda _args: {}
+    login: Callable[[], object] = lambda: {"provider": "openai-compatible", "storage": "environment-only"}
     tree: Callable[[list[str]], object] = lambda _args: {}
     cancel: Callable[[], object] = lambda: {"cancelled": True}
     pause: Callable[[], object] = lambda: {"paused": True}
@@ -334,13 +335,13 @@ class InteractiveSession:
     stopped: bool = False
     controller: InteractiveRunController | None = None
 
-    COMMANDS = ("help", "status", "plan", "mode", "model", "rules", "files", "skills", "skill", "tree", "review", "test", "compact", "undo", "cancel", "pause", "resume", "quit")
+    COMMANDS = ("help", "status", "plan", "mode", "model", "login", "rules", "files", "skills", "skill", "tree", "review", "test", "compact", "undo", "cancel", "pause", "resume", "quit")
 
     def header(self, *, run_id: str = "", mode: str = "plan", profile: str = "default", rules_count: int = 0, budget: int = 60_000) -> str:
         return f"ForgeCode session run={run_id or '<new>'} workspace=. mode={mode} profile={profile} rules={rules_count} budget={budget}"
 
     def help_text(self) -> str:
-        return "/help /status /plan [show|refresh] /mode plan|act /model [list|show|select <name>] /rules /files [prefix] /skills [id] /tree /review /test [command] /compact /undo [id|latest] /pause /resume /cancel /quit; !<command> sends a bounded result to the model; !!<command> stays local"
+        return "/help /status /plan [show|refresh] /mode plan|act /model [list|show|select <name>] /login /rules /files [prefix] /skills [id] /tree /review /test [command] /compact /undo [id|latest] /pause /resume /cancel /quit; !<command> sends a bounded result to the model; !!<command> stays local"
 
     def dispatch(self, line: str) -> object | None:
         line = line.rstrip("\r\n")
@@ -383,6 +384,10 @@ class InteractiveSession:
             if args and args[0] == "select" and len(args) != 2:
                 raise SlashCommandError("usage: /model select <name>")
             return self.model(args)
+        if command == "login":
+            if args:
+                raise SlashCommandError("usage: /login")
+            return self.login()
         if command == "rules":
             if args: raise SlashCommandError("usage: /rules")
             return self.rules()
@@ -440,6 +445,18 @@ class InteractiveSession:
         for line in stream:
             if self.stopped:
                 break
+            # Terminals commonly deliver Escape as a standalone control byte
+            # (``\x1b``). Treat it as an immediate cancellation request rather
+            # than waiting for a slash command or a completed prompt.
+            if "\x1b" in line:
+                value = self.cancel()
+                if self.jsonl_mode:
+                    record = {"schema_version": 1, "kind": "interactive_result", "ok": True, "command": "chat", "data": value, "type": "interactive_result", "payload": value}
+                    self.output(json.dumps(record, ensure_ascii=False, default=str, allow_nan=False))
+                elif value is not None:
+                    results.append(value)
+                    self.output(json.dumps({"type": "interactive_result", "payload": value}, ensure_ascii=False, default=str) if self.json_mode else str(value))
+                continue
             # Preserve the historical sequential semantics for stateful slash
             # commands while leaving control commands responsive during an
             # active run.  A bounded wait prevents EOF/REPL shutdown from

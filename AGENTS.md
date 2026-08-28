@@ -96,3 +96,8 @@ small change into an unbounded repository-wide activity.
 - Use `apply_patch` for source and documentation edits. Never use destructive Git commands to discard user work.
 - Run `uv run pytest`, `uv run forgecode doctor`, and relevant CLI checks before a release commit.
 - Keep credentials in environment variables or ignored local files. Never print or commit real credentials.
+
+## Push policy
+
+- After a requested implementation is verified and the release commit is ready, commit the complete intended change set and push it to the configured upstream remote automatically. Use the required `vA.B.C: short description` subject and inspect `git status` before pushing.
+- Future implementation updates in this repository are authorized to follow the same verified commit-and-push flow without asking again, unless the owner explicitly says to keep changes local.
