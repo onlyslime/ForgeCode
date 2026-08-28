@@ -155,6 +155,20 @@ def test_rpc_background_run_persists_structured_result(tmp_path, monkeypatch):
     assert recovered["data"]["recovered"] is True
 
 
+def test_rpc_isolated_background_run_can_be_terminated(tmp_path):
+    import time
+    handle = _call({"method": "session.open", "params": {"workspace": str(tmp_path)}})["data"]["session"]
+    accepted = _call({"method": "session.run", "params": {"session": handle, "prompt": "wait", "background": True, "isolate": True, "demo": True}})
+    assert accepted["data"]["accepted"] is True
+    cancelled = _call({"method": "session.cancel", "params": {"session": handle}})
+    assert cancelled["data"]["cancel_requested"] is True
+    for _ in range(100):
+        status = _call({"method": "session.status", "params": {"session": handle}})
+        if status["data"]["state"] == "cancelled": break
+        time.sleep(0.01)
+    assert status["data"]["state"] == "cancelled"
+
+
 def test_rpc_session_run_rejects_denied_approval(tmp_path):
     handle = _call({"method": "session.open", "params": {"workspace": str(tmp_path)}})["data"]["session"]
     _call({"method": "session.approval", "params": {"session": handle, "approved": False}})

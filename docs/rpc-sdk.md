@@ -41,6 +41,10 @@ Clients may pass `background: true` to `session.run` to receive an immediate
 `accepted` envelope while the shared handle remains `running`; status/events
 then expose the terminal `run_finished` event and controls can be sent during
 execution. The default synchronous response remains unchanged.
+For providers that may block, `isolate: true` runs the request in a killable
+child process; `session.cancel` performs a bounded terminate request and the
+result is recorded as cancelled. Isolation is opt-in because it has higher
+startup cost and still uses the same CLI safety checks.
 Completed background runs retain a bounded list of structured CLI envelopes in
 `session.status` and in recovered `session.open` responses; oversized output
 is represented by a redacted truncation marker.

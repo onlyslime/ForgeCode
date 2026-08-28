@@ -16,6 +16,8 @@ slice.
   restart event when explicitly reclaimed by a new run.
 - Background run envelopes are now retained with a bounded result payload and
   survive session recovery.
+- Added opt-in isolated background workers so cancellation can terminate a
+  non-cooperative provider process without changing synchronous runs.
 - Verification: full regression `442 passed, 8 skipped, 2 warnings`, RPC
   lifecycle suite, compile, and CLI/doctor checks.
 

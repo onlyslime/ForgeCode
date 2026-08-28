@@ -10,6 +10,8 @@ import contextlib
 import io
 import json
 import os
+import subprocess
+import sys
 import threading
 import uuid
 import time
@@ -29,6 +31,46 @@ _MAX_RPC_SESSIONS = 256
 _MAX_SESSION_EVENTS = 512
 _MAX_REQUEST_LINE_BYTES = 1_048_576
 _MAX_SESSION_RESULT_BYTES = 262_144
+
+
+def _isolated_session_run(handle: str, argv: list[str]) -> None:
+    """Execute a background request in a killable child process."""
+    process = subprocess.Popen([sys.executable, "-m", "forgecode", *argv], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    with _SESSION_LOCK:
+        info = _RPC_SESSIONS.get(handle)
+        if info is not None:
+            info["process"] = process
+            _persist_session(handle, info)
+    output, _ = process.communicate()
+    _finish_background_session(handle, process.returncode or 0, output)
+
+
+def _finish_background_session(handle: str, code: int, output: str, error_code: str | None = None) -> None:
+    """Persist a bounded result and terminal state for any worker type."""
+    captured = io.StringIO(output)
+    with _SESSION_LOCK:
+        info = _RPC_SESSIONS.get(handle)
+        if info is None:
+            return
+        state = "cancelled" if info.get("cancel_requested") or code == 130 else ("failed" if error_code else ("completed" if code == 0 else "failed"))
+        info["state"] = state
+        info["sequence"] = int(info.get("sequence", 0)) + 1
+        results = []
+        for raw in captured.getvalue().splitlines():
+            try:
+                value = json.loads(raw)
+            except (TypeError, ValueError):
+                continue
+            if isinstance(value, dict): results.append(value)
+        encoded_result = json.dumps(results[-16:], ensure_ascii=False, separators=(",", ":"))
+        info["result"] = results[-16:] if len(encoded_result.encode("utf-8")) <= _MAX_SESSION_RESULT_BYTES else {"truncated": True, "count": len(results)}
+        event = {"sequence": info["sequence"], "type": "run_finished", "state": state, "exit_code": code}
+        if error_code: event["error_code"] = error_code
+        info.setdefault("events", []).append(event)
+        if len(info["events"]) > _MAX_SESSION_EVENTS: del info["events"][:-_MAX_SESSION_EVENTS]
+        info.pop("process", None)
+        try: _persist_session(handle, info)
+        except OSError: pass
 
 
 def _background_session_run(handle: str, argv: list[str]) -> None:
@@ -290,6 +332,9 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                         if method == "session.cancel":
                             info["state"] = "cancelled"
                             info["cancel_requested"] = True
+                            process = info.get("process")
+                            if process is not None and process.poll() is None:
+                                process.terminate()
                         elif method == "session.pause": info["state"] = "paused"
                         elif method == "session.resume": info["state"] = "running"
                         elif method == "session.approval":
@@ -382,6 +427,9 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                     background = params.get("background", False)
                     if not isinstance(background, bool):
                         raise ValueError("run.background must be boolean")
+                    isolate = params.get("isolate", False)
+                    if not isinstance(isolate, bool):
+                        raise ValueError("run.isolate must be boolean")
                     argv_value = global_args + argv_value
                 elif method == "login":
                     provider = params.get("provider")
@@ -417,7 +465,8 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                     info = _RPC_SESSIONS.get(handle)
                     if info is None or info.get("state") != "running":
                         raise ValueError("session is not running")
-                    worker = threading.Thread(target=_background_session_run, args=(handle, argv), name=f"forgecode-rpc-{handle[:8]}", daemon=True)
+                    target = _isolated_session_run if isolate else _background_session_run
+                    worker = threading.Thread(target=target, args=(handle, argv), name=f"forgecode-rpc-{handle[:8]}", daemon=True)
                     info["worker"] = worker
                     worker.start()
                     _persist_session(handle, info)
