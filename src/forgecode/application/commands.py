@@ -13,6 +13,8 @@ import re
 import threading
 import uuid
 import hashlib as hashlib_lib
+import urllib.request
+import urllib.error
 from typing import Any
 
 from .. import __version__
@@ -61,6 +63,18 @@ def _build_provider(effective):
 def _approval_output(json_mode: bool):
     """Keep interactive approval prompts off machine-readable stdout."""
     return (lambda message: print(message, file=sys.stderr)) if json_mode else print
+
+
+def _provider_probe(base_url: str, *, timeout: float = 3.0) -> dict[str, Any]:
+    """Perform a minimal opt-in, credential-free reachability probe."""
+    request = urllib.request.Request(base_url.rstrip("/") + "/", method="HEAD")
+    try:
+        with urllib.request.urlopen(request, timeout=max(0.5, min(timeout, 5.0))) as response:
+            return {"performed": True, "reachable": True, "status": int(response.status)}
+    except urllib.error.HTTPError as exc:
+        return {"performed": True, "reachable": True, "status": int(exc.code), "category": "http_error"}
+    except (urllib.error.URLError, TimeoutError, OSError) as exc:
+        return {"performed": True, "reachable": False, "category": "network_error", "error": str(exc)[:200]}
 
 
 # Machine-facing command output is deliberately kept independent from the
@@ -903,10 +917,10 @@ def main(argv: list[str] | None = None) -> int:
         if getattr(args, "probe", False):
             if effective and effective.offline:
                 payload["probe"] = {"requested": True, "performed": False, "reason": "offline policy blocks network"}
+            elif not payload["configured"]:
+                payload["probe"] = {"requested": True, "performed": False, "reason": "provider is not configured"}
             else:
-                # The health command remains side-effect free until a provider
-                # adapter exposes a bounded probe; report this explicitly.
-                payload["probe"] = {"requested": True, "performed": False, "reason": "provider probe adapter unavailable"}
+                payload["probe"] = _provider_probe(settings.base_url, timeout=effective.provider_timeout_seconds if effective else 3.0)
         else:
             payload["probe"] = {"requested": False, "performed": False, "reason": "offline by default"}
         payload["credential"] = "required" if provider_requires_credential(payload["provider"]) else "optional"
