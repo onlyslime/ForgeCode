@@ -27,6 +27,8 @@ retained only as bounded metadata and include an `audit_warning` marker so
 privacy reviews can identify producers that have not been classified.
 Writes and retention trimming are serialized within the process so concurrent
 workers cannot interleave JSONL records or race an atomic trim.
+Telemetry export reports both total `count` and `returned_count`; `truncated`
+explicitly indicates when only the bounded tail was exported.
 
 Session and checkpoint records are local execution evidence, not telemetry.
 They may contain bounded tool metadata needed for recovery, but use the shared

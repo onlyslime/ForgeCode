@@ -23,6 +23,8 @@ def test_telemetry_cli_status_and_export(capsys, tmp_path):
     assert main(["--workspace", str(tmp_path), "telemetry", "export", "--jsonl"]) == 0
     export = json.loads(capsys.readouterr().out)
     assert export["data"]["records"] == []
+    assert export["data"]["returned_count"] == 0
+    assert export["data"]["truncated"] is False
 
 
 def test_local_telemetry_retention_is_bounded(tmp_path):

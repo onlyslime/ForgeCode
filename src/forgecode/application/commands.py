@@ -813,7 +813,8 @@ def main(argv: list[str] | None = None) -> int:
                 else: print(str(exc), file=sys.stderr)
                 return 2
             records = content.splitlines()[-1000:]
-            payload = {"mode": mode, "offline": bool(effective.offline) if effective else False, "records": records, "count": len(content.splitlines()), "sha256": hashlib_lib.sha256("\n".join(records).encode("utf-8")).hexdigest()}
+            total_count = len(content.splitlines())
+            payload = {"mode": mode, "offline": bool(effective.offline) if effective else False, "records": records, "count": total_count, "returned_count": len(records), "truncated": total_count > len(records), "sha256": hashlib_lib.sha256("\n".join(records).encode("utf-8")).hexdigest()}
         else:
             payload = {"mode": mode, "offline": bool(effective.offline) if effective else False, "local_path": ".forgecode/telemetry.jsonl", "exists": path.exists()}
         if machine_json: _emit_machine(_machine_envelope("telemetry " + args.action, "telemetry", True, data=payload, exit_code=0))
