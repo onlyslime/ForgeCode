@@ -65,6 +65,8 @@ is represented by a redacted truncation marker.
 `session.close` rejects active running handles; clients must cancel or await
 completion before revocation so an in-flight worker cannot lose its recovery
 metadata.
+Paused handles are also considered active and cannot be closed until resumed
+or cancelled, preventing an orphaned suspended worker.
 `session.events` accepts bounded `after` and `limit` cursors and returns
 `next_sequence`, so a disconnected client can resume event consumption without
 replaying already acknowledged records. Responses also include

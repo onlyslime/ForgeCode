@@ -196,6 +196,15 @@ def test_rpc_close_rejects_active_run(tmp_path):
     assert closed["error"]["code"] == "session_busy"
 
 
+def test_rpc_close_rejects_paused_worker(tmp_path):
+    handle = _call({"method": "session.open", "params": {"workspace": str(tmp_path)}})["data"]["session"]
+    from forgecode import rpc
+    rpc._RPC_SESSIONS[handle]["state"] = "paused"
+    closed = _call({"method": "session.close", "params": {"session": handle}})
+    assert closed["ok"] is False
+    assert closed["error"]["code"] == "session_busy"
+
+
 def test_rpc_session_run_rejects_cancelled_handle(tmp_path):
     handle = _call({"method": "session.open", "params": {"workspace": str(tmp_path)}})["data"]["session"]
     _call({"method": "session.cancel", "params": {"session": handle}})

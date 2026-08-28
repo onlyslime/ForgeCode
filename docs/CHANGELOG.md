@@ -28,6 +28,8 @@ slice.
   cleanup with terminate fallback.
 - Isolated RPC pause/resume now attempt OS-level suspension signals where
   supported and record the applied control mechanism in session events.
+- Prevented closing paused RPC handles while their worker may still be alive;
+  callers must resume or cancel first.
 - Verification: full regression `444 passed, 8 skipped, 2 warnings`, RPC
   lifecycle suite, compile, and CLI/doctor checks.
 
