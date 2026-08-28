@@ -1,4 +1,4 @@
-# ForgeCode v0.0.8 assessment demo (within 2 minutes)
+# ForgeCode v0.0.9 assessment demo (within 2 minutes)
 
 The demo is deterministic and offline. It needs Python 3.11+, `uv`, and no
 API key. Always use a fresh temporary directory: the CLI refuses to overwrite
@@ -11,6 +11,7 @@ uv run forgecode doctor
 uv run forgecode tools
 uv run forgecode provider health
 uv run forgecode skills list
+uv run forgecode config profiles
 $demo = Join-Path ([System.IO.Path]::GetTempPath()) ('forgecode-demo-' + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $demo | Out-Null
 uv run forgecode --workspace $demo run --demo --auto-approve
@@ -31,6 +32,9 @@ For the v0.0.8 context path, build and query the ignored incremental index:
 uv run forgecode --workspace $demo context index --json
 uv run forgecode --workspace $demo context search "calculator" --json
 uv run forgecode --workspace $demo context show --json
+uv run forgecode --workspace $demo context complete demo --jsonl
+uv run forgecode --workspace $demo session tree --jsonl
+uv run forgecode --workspace $demo eval latest --jsonl
 ```
 
 If the workspace contains an explicitly declared `skills/*.md`,
@@ -63,6 +67,10 @@ executor and never bypass Plan/Act or WorkspaceGuard.
    runs four deterministic checks (secrets, forbidden paths, suspicious commands,
    Python syntax), and emits a bounded report. Export/verify binds it to this
    workspace and detects changed files or tampering.
+
+The v0.0.9 evaluator summarizes the complete trajectory rather than trusting
+the final model sentence. A successful demo should show `status=completed`,
+`verification_passed=true`, `audit_complete=true` and score `1.0`.
 
 If time permits, demonstrate the hash-checked undo (it intentionally makes the
 original failing test fail again):

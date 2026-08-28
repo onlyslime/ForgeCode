@@ -31,8 +31,15 @@ Chat Completions 返回结构化 tool calls，ForgeCode 在用户指定工作区
 - **真实离线演示**：DemoProvider 在隔离工作区读取有 bug 的 calculator，先跑
   出失败测试，再走 patch 和审批，最后取得真实通过结果；不需要网络或 API key。
 
-当前版本：`v0.0.8`（版本号与 `VERSION`、`pyproject.toml` 和
+当前版本：`v0.0.9`（版本号与 `VERSION`、`pyproject.toml` 和
 `src/forgecode/__init__.py` 保持同步）。
+
+### v0.0.9 扩展能力
+
+- **滚动有界上下文**：AgentLoop 按序列化消息/工具参数大小自动触发有界压缩；摘要保留目标、安全规则、计划、验证和最近完整 tool pairing，并追加带 source sequence/fingerprint 的 `context_compacted` 证据。达到硬上限时明确报告退化，不假设无限上下文。
+- **整条轨迹评估**：`forgecode eval`（别名 `benchmark`）只读取持久化事件，计算完成、真实验证、失败/修复、审批拒绝、重复调用、压缩、冲突、取消、未决和审计指标；模型自评不能制造成功。
+- **会话树与路径建议**：`session tree|clone|import` 提供不重放副作用的父子证据；`context complete` 和交互 `/files <prefix>` 返回稳定相对路径及排除原因，结果仅供建议。
+- **模型 profile**：`config profiles` 和交互 `/model list|show|select` 展示/切换经过严格校验的 provider 配置，只显示 API key 环境变量名和是否配置，并记录切换事件。
 
 ### v0.0.8 扩展能力
 
@@ -95,9 +102,10 @@ prompt -> bounded context -> model response/tool calls -> local tools
 `https://api.openai.com/v1`), and `FORGECODE_MODEL` from the environment. The
 offline `DemoProvider` follows the same `AgentLoop` and `ToolRegistry` path.
 
-The v0.0.8 release adds strict named test profiles, evidence-driven review and
-deterministic security checks, provider cancellation/deadline propagation,
-unresolved-attempt recovery evidence, and a stable machine-output envelope.
+The v0.0.9 release adds automatic rolling compaction, durable trajectory
+evaluation, safe path completion, profile inspection/switch auditing and a
+non-replaying session tree on top of the v0.0.8 strict named test profiles,
+evidence-driven review and provider cancellation/deadline propagation.
 `test list|show|run` accepts only bounded argv profiles; `review` joins the
 session/plan/context/transaction/test/hook ledger and can export or verify a
 workspace-bound digest artifact. `--jsonl` keeps one parseable envelope per
@@ -118,6 +126,10 @@ uv run forgecode rules show
 uv run forgecode config validate
 uv run forgecode provider health
 uv run forgecode skills list
+uv run forgecode config profiles
+uv run forgecode context complete src
+uv run forgecode session tree --jsonl
+uv run forgecode eval latest --jsonl
 uv run forgecode context index
 uv run forgecode context search "AgentLoop"
 uv run forgecode test list

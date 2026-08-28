@@ -29,8 +29,13 @@ class InteractiveSession:
     compact: Callable[[], object] = lambda: {}
     undo: Callable[[list[str]], object] = lambda _args: {}
     rules: Callable[[], object] = lambda: {}
-    files: Callable[[], object] = lambda: {}
+    files: Callable[..., object] = lambda *_args: {}
     skills: Callable[[list[str]], object] = lambda _args: {}
+    model: Callable[[list[str]], object] = lambda _args: {}
+    tree: Callable[[list[str]], object] = lambda _args: {}
+    cancel: Callable[[], object] = lambda: {"cancelled": True}
+    pause: Callable[[], object] = lambda: {"paused": True}
+    resume: Callable[[], object] = lambda: {"resumed": True}
     quit: Callable[[], object] = lambda: {"stopped": True}
     output: Callable[[str], None] = print
     json_mode: bool = False
@@ -44,13 +49,13 @@ class InteractiveSession:
     _queue_chars: int = 0
     stopped: bool = False
 
-    COMMANDS = ("help", "status", "plan", "mode", "rules", "files", "skills", "skill", "review", "test", "compact", "undo", "quit")
+    COMMANDS = ("help", "status", "plan", "mode", "model", "rules", "files", "skills", "skill", "tree", "review", "test", "compact", "undo", "cancel", "pause", "resume", "quit")
 
     def header(self, *, run_id: str = "", mode: str = "plan", profile: str = "default", rules_count: int = 0, budget: int = 60_000) -> str:
         return f"ForgeCode session run={run_id or '<new>'} workspace=. mode={mode} profile={profile} rules={rules_count} budget={budget}"
 
     def help_text(self) -> str:
-        return "/help /status /plan [show|refresh] /mode plan|act /rules /files /skills [id] /review /test [command] /compact /undo [id|latest] /quit"
+        return "/help /status /plan [show|refresh] /mode plan|act /model [list|show|select <name>] /rules /files [prefix] /skills [id] /tree /review /test [command] /compact /undo [id|latest] /pause /resume /cancel /quit"
 
     def dispatch(self, line: str) -> object | None:
         line = line.rstrip("\r\n")
@@ -79,18 +84,27 @@ class InteractiveSession:
             if len(args) != 1 or args[0] not in {"plan", "act"}:
                 raise SlashCommandError("usage: /mode plan|act")
             return self.set_mode(args[0])
+        if command == "model":
+            if len(args) > 2 or (args and args[0] not in {"list", "show", "select"}):
+                raise SlashCommandError("usage: /model [list|show|select <name>]")
+            if args and args[0] == "select" and len(args) != 2:
+                raise SlashCommandError("usage: /model select <name>")
+            return self.model(args)
         if command == "rules":
             if args: raise SlashCommandError("usage: /rules")
             return self.rules()
         if command == "files":
-            if args: raise SlashCommandError("usage: /files")
-            return self.files()
+            if len(args) > 1: raise SlashCommandError("usage: /files [prefix]")
+            return self.files(args[0]) if args else self.files()
         if command in {"skills", "skill"}:
             if len(args) > 2 or (len(args) == 2 and args[1] != "--approve"): raise SlashCommandError("usage: /skills [id] [--approve]")
             return self.skills(args)
         if command == "review":
             if args: raise SlashCommandError("usage: /review")
             return self.review()
+        if command == "tree":
+            if args: raise SlashCommandError("usage: /tree")
+            return self.tree([])
         if command == "test": return self.test(args)
         if command == "compact":
             if args: raise SlashCommandError("usage: /compact")
@@ -98,6 +112,15 @@ class InteractiveSession:
         if command == "undo":
             if len(args) > 1: raise SlashCommandError("usage: /undo [id|latest]")
             return self.undo(args or ["latest"])
+        if command == "cancel":
+            if args: raise SlashCommandError("usage: /cancel")
+            return self.cancel()
+        if command == "pause":
+            if args: raise SlashCommandError("usage: /pause")
+            return self.pause()
+        if command == "resume":
+            if args: raise SlashCommandError("usage: /resume")
+            return self.resume()
         if command == "quit":
             if args: raise SlashCommandError("usage: /quit")
             result = self.quit()

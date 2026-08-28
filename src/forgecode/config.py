@@ -51,6 +51,18 @@ class ModelProfile:
         if self.streaming not in {"auto", "on", "off", "required"}:
             raise ConfigError("profile.streaming must be auto, on, off, or required")
 
+    def to_dict(self) -> dict[str, Any]:
+        self.validate()
+        return {
+            "name": self.name,
+            "provider": self.provider,
+            "base_url": self.base_url,
+            "model": self.model,
+            "api_key_env": self.api_key_env,
+            "api_key_configured": bool(os.getenv(self.api_key_env, "")),
+            "streaming": self.streaming,
+        }
+
 
 @dataclass(frozen=True)
 class ToolPolicy:
@@ -360,6 +372,25 @@ class ConfigLoader:
             raise ConfigError(f"invalid config fields: {exc}") from exc
         config.validate()
         return config
+
+    def profiles(self) -> tuple[ModelProfile, ...]:
+        """Return validated named profiles without exposing credential values."""
+        raw = self._read_file()
+        profiles = raw.get("profiles", {})
+        if profiles is not None and not isinstance(profiles, dict):
+            raise ConfigError("profiles must be a table")
+        values: list[ModelProfile] = [ModelProfile("default", provider=str(raw.get("provider", "openai-compatible")), base_url=str(raw.get("base_url", "https://api.openai.com/v1")), model=raw.get("model"), api_key_env=str(raw.get("api_key_env", "FORGECODE_API_KEY")), streaming=str(raw.get("streaming", "auto")))]
+        for name, data in (profiles or {}).items():
+            if not isinstance(data, dict):
+                raise ConfigError(f"profile {name} must be a table")
+            _reject_secret_fields(data, _path=f"profiles.{name}")
+            unknown = set(data) - {"provider", "base_url", "model", "api_key_env", "streaming"}
+            if unknown:
+                raise ConfigError(f"unknown fields in profile {name}: " + ", ".join(sorted(unknown)))
+            values.append(ModelProfile(str(name), provider=str(data.get("provider", raw.get("provider", "openai-compatible"))), base_url=str(data.get("base_url", raw.get("base_url", "https://api.openai.com/v1"))), model=data.get("model", raw.get("model")), api_key_env=str(data.get("api_key_env", raw.get("api_key_env", "FORGECODE_API_KEY"))), streaming=str(data.get("streaming", raw.get("streaming", "auto")))))
+        for item in values:
+            item.validate()
+        return tuple(sorted(values, key=lambda item: item.name))
 
 
 def load_effective_config(workspace: Path, overrides: Mapping[str, Any] | None = None, *, profile: str | None = None) -> EffectiveConfig:

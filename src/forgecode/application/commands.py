@@ -28,6 +28,7 @@ from ..storage import TransactionError, TransactionStore
 from ..models import DemoProvider, OpenAICompatibleProvider, ProviderError
 from ..testing import TestProfileError, TestProfileLoader, TestProfileRunner
 from ..review import ReviewArtifactError, ReviewError
+from ..evaluation import evaluate_session
 from ..security.redaction import redact_text
 from ..security.json import bounded_json_loads
 from ..security.workspace import WorkspaceGuard
@@ -307,6 +308,10 @@ def _parser() -> argparse.ArgumentParser:
     config_validate.add_argument("--profile")
     config_validate.add_argument("--json", action="store_true", default=argparse.SUPPRESS, dest="json")
     config_validate.add_argument("--jsonl", action="store_true", default=argparse.SUPPRESS, dest="jsonl")
+    config_profiles = config_sub.add_parser("profiles", help="list validated model profiles without secrets")
+    config_profiles.add_argument("--show", dest="profile_name")
+    config_profiles.add_argument("--json", action="store_true", default=argparse.SUPPRESS, dest="json")
+    config_profiles.add_argument("--jsonl", action="store_true", default=argparse.SUPPRESS, dest="jsonl")
     provider_parser = subparsers.add_parser("provider", help="inspect provider configuration without making a request")
     provider_parser.add_argument("--json", action="store_true", default=argparse.SUPPRESS, dest="json")
     provider_parser.add_argument("--jsonl", action="store_true", default=argparse.SUPPRESS, dest="jsonl")
@@ -370,6 +375,11 @@ def _parser() -> argparse.ArgumentParser:
     context_search_parser.add_argument("--context-lines", type=int, default=1)
     context_search_parser.add_argument("--json", action="store_true", default=argparse.SUPPRESS, dest="json")
     context_search_parser.add_argument("--jsonl", action="store_true", default=argparse.SUPPRESS, dest="jsonl")
+    context_complete_parser = context_sub.add_parser("complete", help="suggest safe relative paths (advisory only)")
+    context_complete_parser.add_argument("prefix", nargs="?", default="")
+    context_complete_parser.add_argument("--max-results", type=int, default=50)
+    context_complete_parser.add_argument("--json", action="store_true", default=argparse.SUPPRESS, dest="json")
+    context_complete_parser.add_argument("--jsonl", action="store_true", default=argparse.SUPPRESS, dest="jsonl")
     context_show_parser = context_sub.add_parser("show", help="show index metadata and bounded entries")
     context_show_parser.add_argument("--json", action="store_true", default=argparse.SUPPRESS, dest="json")
     context_show_parser.add_argument("--jsonl", action="store_true", default=argparse.SUPPRESS, dest="jsonl")
@@ -411,6 +421,10 @@ def _parser() -> argparse.ArgumentParser:
     test_run_parser.add_argument("--session", type=Path, default=argparse.SUPPRESS, dest="session")
     test_run_parser.add_argument("--timeout", "--timeout-seconds", type=float, default=argparse.SUPPRESS, dest="timeout_seconds")
     test_run_parser.add_argument("--profile", "--name", default=argparse.SUPPRESS, dest="test_profile_name")
+    eval_parser = subparsers.add_parser("eval", aliases=["benchmark"], help="score a durable session trajectory")
+    eval_parser.add_argument("session_id", type=Path, nargs="?", default=Path("latest"), help="session id/path, default latest")
+    eval_parser.add_argument("--json", action="store_true", default=argparse.SUPPRESS, dest="json")
+    eval_parser.add_argument("--jsonl", action="store_true", default=argparse.SUPPRESS, dest="jsonl")
     sessions_parser = subparsers.add_parser("sessions", help="list bounded local session records")
     sessions_parser.add_argument("--limit", type=int, default=50)
     sessions_parser.add_argument("--json", action="store_true", default=argparse.SUPPRESS, dest="json")
@@ -449,6 +463,19 @@ def _parser() -> argparse.ArgumentParser:
     fork_session_parser.add_argument("session_id", type=Path)
     fork_session_parser.add_argument("--json", action="store_true", default=argparse.SUPPRESS, dest="json")
     fork_session_parser.add_argument("--jsonl", action="store_true", default=argparse.SUPPRESS, dest="jsonl")
+    tree_session_parser = session_sub.add_parser("tree", help="show bounded parent/child session metadata")
+    tree_session_parser.add_argument("--limit", type=int, default=200)
+    tree_session_parser.add_argument("--json", action="store_true", default=argparse.SUPPRESS, dest="json")
+    tree_session_parser.add_argument("--jsonl", action="store_true", default=argparse.SUPPRESS, dest="jsonl")
+    clone_session_parser = session_sub.add_parser("clone", help="clone a session as an inspect-only child without replaying effects")
+    clone_session_parser.add_argument("session_id", type=Path)
+    clone_session_parser.add_argument("--sequence", type=int, default=None)
+    clone_session_parser.add_argument("--json", action="store_true", default=argparse.SUPPRESS, dest="json")
+    clone_session_parser.add_argument("--jsonl", action="store_true", default=argparse.SUPPRESS, dest="jsonl")
+    import_session_parser = session_sub.add_parser("import", help="import a validated JSONL session as evidence")
+    import_session_parser.add_argument("artifact_path", type=Path)
+    import_session_parser.add_argument("--json", action="store_true", default=argparse.SUPPRESS, dest="json")
+    import_session_parser.add_argument("--jsonl", action="store_true", default=argparse.SUPPRESS, dest="jsonl")
     plan_parser = subparsers.add_parser("plan", help="create a bounded structured plan without side effects")
     plan_parser.add_argument("prompt", nargs="*", help="task to plan; omit with --session to inspect a stored plan")
     plan_parser.add_argument("--session", type=Path, help="show the latest structured plan event from a session")
@@ -507,8 +534,8 @@ def _raw_command_name(argv: list[str]) -> str:
     and its immediate nested action, while deliberately ignoring option
     values (which may contain arbitrary prompt text).
     """
-    commands = {"doctor", "tools", "skills", "skill", "rules", "config", "provider", "transaction", "rollback", "review", "chat", "start", "inspect", "map", "context", "test", "tests", "sessions", "diff", "status", "session", "plan", "run"}
-    actions = {"skills": {"list", "check", "show", "run"}, "skill": {"list", "check", "show", "run"}, "rules": {"show", "check"}, "config": {"show", "validate"}, "provider": {"health"}, "context": {"show", "index", "search", "explain", "diagnostics", "clear"}, "test": {"list", "show", "run"}, "tests": {"list", "show", "run"}, "session": {"show", "export", "inspect", "compact", "fork"}}
+    commands = {"doctor", "tools", "skills", "skill", "rules", "config", "provider", "transaction", "rollback", "review", "chat", "start", "inspect", "map", "context", "test", "tests", "sessions", "diff", "status", "session", "plan", "run", "eval", "benchmark"}
+    actions = {"skills": {"list", "check", "show", "run"}, "skill": {"list", "check", "show", "run"}, "rules": {"show", "check"}, "config": {"show", "validate", "profiles"}, "provider": {"health"}, "context": {"show", "index", "search", "complete", "explain", "diagnostics", "clear"}, "test": {"list", "show", "run"}, "tests": {"list", "show", "run"}, "session": {"show", "export", "inspect", "compact", "fork", "tree", "clone", "import"}}
     command = "doctor"
     command_index = -1
     options_with_values = {
@@ -528,7 +555,7 @@ def _raw_command_name(argv: list[str]) -> str:
             command = token
             command_index = index
             break
-    canonical = {"skill": "skills", "tests": "test", "start": "chat", "rollback": "transaction", "map": "inspect"}.get(command, command)
+    canonical = {"skill": "skills", "tests": "test", "start": "chat", "rollback": "transaction", "map": "inspect", "benchmark": "eval"}.get(command, command)
     if command in actions:
         for token in argv[command_index + 1:]:
             if token in actions[command]:
@@ -623,8 +650,19 @@ def main(argv: list[str] | None = None) -> int:
         machine_json = bool(getattr(args, "json", False) or getattr(args, "jsonl", False))
         command_name = f"config {getattr(args, 'config_action', 'show')}"
         try:
-            config = ConfigLoader(workspace).load(profile=getattr(args, "profile", None))
-            payload = {"valid": True, "config": config.to_dict(), "sources": list(config.sources)}
+            if args.config_action == "profiles":
+                profiles = ConfigLoader(workspace).profiles()
+                selected = getattr(args, "profile_name", None)
+                if selected:
+                    profile = next((item for item in profiles if item.name == selected), None)
+                    if profile is None:
+                        raise ConfigError(f"profile not found: {selected}")
+                    payload = {"valid": True, "profiles": [profile.to_dict()]}
+                else:
+                    payload = {"valid": True, "profiles": [item.to_dict() for item in profiles]}
+            else:
+                config = ConfigLoader(workspace).load(profile=getattr(args, "profile", None))
+                payload = {"valid": True, "config": config.to_dict(), "sources": list(config.sources)}
         except ConfigError as exc:
             safe_message = _redact_display(str(exc))
             if machine_json:
@@ -644,9 +682,13 @@ def main(argv: list[str] | None = None) -> int:
                 envelope["type"] = "config"
             _emit_machine(envelope)
         else:
-            print("configuration: valid")
-            for key, value in config.to_dict().items():
-                print(f"{key}: {value}")
+            if args.config_action == "profiles":
+                for item in payload["profiles"]:
+                    print(f"{item['name']} provider={item['provider']} model={item['model'] or '<unset>'} streaming={item['streaming']} key={item['api_key_env']} configured={item['api_key_configured']}")
+            else:
+                print("configuration: valid")
+                for key, value in config.to_dict().items():
+                    print(f"{key}: {value}")
         return 0
 
     if command == "provider":
@@ -685,6 +727,31 @@ def main(argv: list[str] | None = None) -> int:
             print(f"provider={payload['provider']} model={payload['model'] or '<unset>'} configured={payload['configured']}")
             print(f"streaming={payload['streaming']} network_request=false")
         return 0
+
+    if command in {"eval", "benchmark"}:
+        machine_json = bool(getattr(args, "json", False) or getattr(args, "jsonl", False))
+        command_name = "eval"
+        try:
+            session_path = _resolve_session_reference(guard, workspace, args.session_id, must_exist=True)
+            score = evaluate_session(SessionStore(session_path))
+            payload = {"session": guard.relative(session_path), "score": score.to_dict()}
+            code = 0 if score.status == "completed" else (130 if score.cancelled else (3 if score.status == "recovery_required" else 1))
+            if machine_json:
+                if code == 0:
+                    _emit_command_payload(args, command_name, "trajectory_score", payload, aliases=True, type_label="trajectory_score")
+                else:
+                    envelope = _machine_error(command_name, "trajectory_incomplete", "trajectory did not meet completion criteria", exit_code=code, details=payload)
+                    envelope.update(_compat_aliases(payload)); envelope["type"] = "trajectory_score"; _emit_machine(envelope)
+            else:
+                print(f"trajectory session={payload['session']} status={score.status} score={score.score:.3f} tools={score.tool_calls} failures={score.failures} compactions={score.compactions}")
+            return code
+        except (OSError, ValueError, SessionFormatError) as exc:
+            message = _redact_display(str(exc))
+            if machine_json:
+                _emit_machine(_machine_error(command_name, "invalid_session", message, exit_code=2))
+            else:
+                print(f"evaluation failed: {message}", file=sys.stderr)
+            return 2
 
     if command == "rules":
         action = args.rules_action or "show"
@@ -844,6 +911,10 @@ def main(argv: list[str] | None = None) -> int:
                     line_range = None if line_start is None and line_end is None else (1 if line_start is None else line_start, 10_000_000 if line_end is None else line_end)
                 matches = index.search(args.query, glob=args.glob, regex=args.regex, symbol=args.symbol, path=args.path, language=getattr(args, "language", None), line_range=line_range, max_results=args.max_results, context_lines=args.context_lines)
                 payload = {"query": args.query, "count": len(matches), "results": [item.to_dict() for item in matches], "stale": list(index.last_search_issues), "index": index.show(), "filters": {"language": getattr(args, "language", None), "line_range": list(line_range) if line_range else None}}
+            elif action == "complete":
+                index.ensure()
+                suggestions = index.complete(args.prefix, max_results=args.max_results)
+                payload = {"prefix": args.prefix, "count": len(suggestions), "results": list(suggestions), "advisory": True}
             elif action == "explain":
                 index.ensure()
                 payload = index.explain()
@@ -874,6 +945,7 @@ def main(argv: list[str] | None = None) -> int:
                     "explain": "context_explain",
                     "diagnostics": "context_diagnostics",
                     "clear": "context_clear",
+                    "complete": "context_complete",
                 }.get(action, "context")
                 # Additive aliases preserve the pre-v0.0.8 context JSON shape
                 # while exposing the stable envelope for new integrations.
@@ -892,6 +964,11 @@ def main(argv: list[str] | None = None) -> int:
                 for item in payload.get("results", []):
                     print(f"{item['path']}:{item['line']} [{item['reason']}]\n{item['snippet']}")
                 print(f"matches={payload['count']}")
+            elif action == "complete":
+                for item in payload.get("results", []):
+                    suffix = f" (excluded: {item.get('exclusion_reason')})" if item.get("excluded") else ""
+                    print(f"{item['path']}{suffix}")
+                print(f"suggestions={payload['count']} advisory=true")
             elif action == "index":
                 print(f"index={payload['path']} files={payload['files']} added={payload['added']} updated={payload['updated']} removed={payload['removed']} omitted={payload['omitted']}")
                 for error_message in payload.get("errors", []):
@@ -1465,7 +1542,11 @@ def main(argv: list[str] | None = None) -> int:
                 except (ContextIndexError, OSError, ValueError) as exc:
                     session.append("context_index_error", {"error": type(exc).__name__}, mode=state["mode"], error_code="context_index_error")
                 demo_verify = "python -B -m pytest -q test_demo_calculator.py" if args.demo_task == "calculator" else "python -B -m pytest -q test_demo_config.py"
-                service_config = AgentConfig(verification_command=demo_verify if args.demo and state["mode"] == "act" else None, max_verification_attempts=1)
+                service_config = AgentConfig(
+                    verification_command=demo_verify if args.demo and state["mode"] == "act" else None,
+                    max_verification_attempts=1,
+                    compact_threshold_chars=settings.effective.compact_threshold_chars if settings.effective else None,
+                )
                 expected_config_fingerprint = _config_fingerprint(settings.effective)
 
                 def revalidate_context() -> bool | str:
@@ -1497,6 +1578,30 @@ def main(argv: list[str] | None = None) -> int:
                         pass
                 return {"stopped_reason": result.stopped_reason, "state": result.state, "succeeded": result.succeeded, "verification_ok": result.verification_ok, "run_id": result.run_id}
             except (ProviderError, ValueError, OSError) as exc:
+                return {"error": _redact_display(str(exc), [api_key])}
+
+        def model_command(model_args: list[str]) -> Any:
+            nonlocal settings
+            action = model_args[0] if model_args else "list"
+            try:
+                raw = ConfigLoader(workspace)._read_file()
+                profiles = raw.get("profiles", {}) if isinstance(raw, dict) else {}
+                names = ["default", *sorted(name for name in profiles if isinstance(name, str) and name != "default")]
+                if action == "list":
+                    return {"profiles": [{"name": name, "selected": name == settings.profile} for name in names]}
+                if action == "show":
+                    selected = settings.profile
+                    config = ConfigLoader(workspace).load(profile=selected)
+                    return {"profile": selected, "config": config.to_dict()}
+                if action == "select":
+                    selected = model_args[1]
+                    config = ConfigLoader(workspace).load(profile=selected)
+                    previous = settings.profile
+                    settings = Settings(workspace=workspace, model=config.model, api_key_env=config.api_key_env, base_url=config.base_url, profile=config.profile, effective=config)
+                    session.append("profile_switch", {"from": previous, "to": selected, "capabilities": {"streaming": config.streaming, "provider": config.provider}, "reason": "interactive selection"}, mode=state["mode"])
+                    return {"profile": selected, "previous_profile": previous, "streaming": config.streaming, "provider": config.provider}
+                return {"error": "usage: /model [list|show|select <name>]"}
+            except (ConfigError, OSError, ValueError) as exc:
                 return {"error": _redact_display(str(exc), [api_key])}
 
         def status() -> Any:
@@ -1632,7 +1737,22 @@ def main(argv: list[str] | None = None) -> int:
             except Exception as exc:
                 return {"stopped": True, "checkpointed": False, "error": f"checkpoint failed: {type(exc).__name__}"}
 
-        interactive = InteractiveSession(run_message, status=status, plan=plan_command, set_mode=set_mode, review=review, test=test_command, compact=compact, undo=undo_command, rules=lambda: RuleEngine(guard).discover().to_dict(), files=lambda: RepositoryMapBuilder(guard).build().to_dict(), skills=skills_command, quit=quit_session, output=print, json_mode=False, jsonl_mode=machine_json)
+        def files_command(prefix: str = "") -> Any:
+            try:
+                index = ContextIndex(guard)
+                index.ensure()
+                return {"prefix": prefix, "results": list(index.complete(prefix)), "advisory": True}
+            except (ContextIndexError, OSError, ValueError) as exc:
+                return {"error": _redact_display(str(exc), [api_key])}
+
+        def tree_command(_args: list[str]) -> Any:
+            try:
+                from .session_service import SessionService
+                return SessionService(guard).tree()
+            except (OSError, ValueError) as exc:
+                return {"error": _redact_display(str(exc), [api_key])}
+
+        interactive = InteractiveSession(run_message, status=status, plan=plan_command, set_mode=set_mode, model=model_command, review=review, test=test_command, compact=compact, undo=undo_command, rules=lambda: RuleEngine(guard).discover().to_dict(), files=files_command, skills=skills_command, tree=tree_command, cancel=lambda: {"cancelled": False, "message": "no active worker; use Ctrl-C during a run"}, pause=lambda: {"paused": False, "message": "no active worker; pause is available to API callers"}, resume=lambda: {"resumed": False, "message": "start a new run or fork a checkpoint"}, quit=quit_session, output=print, json_mode=False, jsonl_mode=machine_json)
         if machine_json:
             header_data = {"run_id": session.run_id, "workspace": ".", "mode": state["mode"], "profile": settings.profile, "rules": rules_count, "budget": settings.effective.context_budget_chars if settings.effective else 60_000}
             _emit_machine(_machine_envelope("chat", "interactive_header", True, data=header_data, exit_code=0, type="interactive_header", **_compat_aliases(header_data)))
@@ -1848,6 +1968,48 @@ def main(argv: list[str] | None = None) -> int:
         machine_json = bool(getattr(args, "json", False) or getattr(args, "jsonl", False))
         command_name = f"session {args.session_action}"
         try:
+            if args.session_action == "tree":
+                from .session_service import SessionService
+                payload = SessionService(guard).tree(limit=max(1, min(200, args.limit)))
+                if machine_json:
+                    _emit_command_payload(args, command_name, "session_tree", payload, aliases=True, type_label="session_tree")
+                else:
+                    print(f"session tree nodes={len(payload['nodes'])} edges={len(payload['edges'])}")
+                    for node in payload["nodes"]:
+                        parent = node.get("parent_run_id") or "-"
+                        print(f"{node['run_id']} parent={parent} state={node['state']} seq={node['sequence']} inspect_only={node['inspect_only']}")
+                return 0
+            if args.session_action == "import":
+                try:
+                    source = guard.resolve(args.artifact_path, must_exist=True)
+                except (OSError, ValueError):
+                    reference = args.artifact_path
+                    if reference.suffix.lower() == ".jsonl" and not (workspace / reference).exists():
+                        reference = Path(".forgecode") / "sessions" / reference.name
+                    source = _resolve_session_reference(guard, workspace, reference, must_exist=True)
+                if source.suffix.lower() != ".jsonl":
+                    raise SessionFormatError("import requires a JSONL session artifact")
+                source_store = SessionStore(source)
+                read_result = source_store.read_with_issues()
+                if read_result.issues or not read_result.events:
+                    raise SessionFormatError("session artifact is invalid or empty")
+                run_ids = {event.run_id for event in read_result.events if event.run_id}
+                sequences = [event.sequence for event in read_result.events]
+                if len(run_ids) != 1 or sequences != sorted(set(sequences)):
+                    raise SessionFormatError("session artifact has mixed run ids or duplicate sequences")
+                child_id = uuid.uuid4().hex
+                target = _new_session_path(guard, child_id)
+                child = SessionStore(target, run_id=child_id, mode="plan")
+                import hashlib
+                digest = hashlib.sha256(source.read_bytes()).hexdigest()
+                source_run_id = next(iter(run_ids))
+                child.append("imported", {"source_digest": digest, "source_run_id": source_run_id, "source_sequence_start": min(sequences), "source_sequence_end": max(sequences), "parent_run_id": source_run_id, "parent_sequence": max(sequences), "parent_session": guard.relative(source), "event_count": len(read_result.events), "replay": False}, mode="plan")
+                payload = {"run_id": child_id, "path": guard.relative(target), "source_digest": digest, "event_count": len(read_result.events), "replay": False}
+                if machine_json:
+                    _emit_command_payload(args, command_name, "session_import", payload, aliases=True, type_label="session_import")
+                else:
+                    print(f"imported run={child_id} source_digest={digest[:16]} replay=false")
+                return 0
             session_path = _resolve_session_reference(guard, workspace, args.session_id, must_exist=True)
             store = SessionStore(session_path)
             if args.session_action == "export":
@@ -1911,6 +2073,24 @@ def main(argv: list[str] | None = None) -> int:
                     _emit_command_payload(args, command_name, "session_fork", payload, aliases=True, type_label="session_fork")
                 else:
                     print(f"forked run={child_id} parent={parent_run} session={guard.relative(child_path)}")
+                return 0
+            if args.session_action == "clone":
+                read_result = store.read_with_issues()
+                if read_result.issues or not read_result.events:
+                    raise SessionFormatError("cannot clone an inconsistent or empty session")
+                parent_run = read_result.events[0].run_id or store.run_id
+                parent_sequence = args.sequence if args.sequence is not None else max(event.sequence for event in read_result.events)
+                if parent_sequence < 0 or parent_sequence > max(event.sequence for event in read_result.events):
+                    raise SessionFormatError("clone sequence is outside the session range")
+                child_id = uuid.uuid4().hex
+                child_path = _new_session_path(guard, child_id)
+                child = SessionStore(child_path, run_id=child_id, mode="plan")
+                child.append("cloned", {"parent_run_id": parent_run, "parent_sequence": parent_sequence, "parent_session": guard.relative(session_path), "replay": False}, mode="plan")
+                payload = {"run_id": child_id, "path": guard.relative(child_path), "parent_run_id": parent_run, "parent_sequence": parent_sequence, "replay": False}
+                if machine_json:
+                    _emit_command_payload(args, command_name, "session_clone", payload, aliases=True, type_label="session_clone")
+                else:
+                    print(f"cloned run={child_id} parent={parent_run} sequence={parent_sequence} replay=false")
                 return 0
             result = store.read_with_issues()
             last_state = _last_session_state(result.events)
@@ -2321,7 +2501,15 @@ def main(argv: list[str] | None = None) -> int:
             demo_verification = "python -B -m pytest -q test_demo_calculator.py" if args.demo_task == "calculator" else "python -B -m pytest -q test_demo_config.py"
             verification_command = None if args.no_verify else (args.verify or (demo_verification if args.demo else _default_verification_command(workspace)))
             effective = settings.effective
-            service_config = AgentConfig(max_steps=args.max_steps, verification_command=verification_command, max_verification_attempts=(effective.repair_attempts if effective and effective.repair_attempts > 0 else 1), total_timeout_seconds=effective.run_timeout_seconds if effective else 600.0, provider_timeout_seconds=effective.provider_timeout_seconds if effective else 90.0, max_tool_calls_total=effective.max_tool_calls if effective else 512)
+            service_config = AgentConfig(
+                max_steps=args.max_steps,
+                verification_command=verification_command,
+                max_verification_attempts=(effective.repair_attempts if effective and effective.repair_attempts > 0 else 1),
+                total_timeout_seconds=effective.run_timeout_seconds if effective else 600.0,
+                provider_timeout_seconds=effective.provider_timeout_seconds if effective else 90.0,
+                max_tool_calls_total=effective.max_tool_calls if effective else 512,
+                compact_threshold_chars=effective.compact_threshold_chars if effective else None,
+            )
             expected_config_fingerprint = _config_fingerprint(settings.effective)
 
             def revalidate_context() -> bool | str:

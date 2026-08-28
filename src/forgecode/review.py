@@ -29,6 +29,7 @@ from .security.json import bounded_json_loads
 from .security.redaction import redact_text, redact_value
 from .security.workspace import WorkspaceGuard, WorkspaceViolation, assert_no_path_alias
 from .storage.session import SessionEvent, SessionFormatError, SessionStore
+from .evaluation import evaluate_events
 from .storage.transaction import (
     MAX_PREVIEW_CHARS,
     TransactionError,
@@ -300,7 +301,7 @@ class ReviewReport:
         if not isinstance(self.session, dict) or len(self.session) > 32:
             raise ReviewError("session evidence is invalid")
         for label, value, allowed in (
-            ("session", self.session, {"id", "run_id", "events", "sequence", "digest", "issues", "state"}),
+            ("session", self.session, {"id", "run_id", "events", "sequence", "digest", "issues", "state", "trajectory"}),
             ("rollback", self.rollback, {"available", "transaction_id", "conflicts", "preview"}),
         ):
             if not isinstance(value, dict) or any(not isinstance(key, str) or key not in allowed for key in value):
@@ -434,6 +435,7 @@ def _safe_session_summary(store: SessionStore, result_events: Sequence[SessionEv
         "digest": _session_digest(store.path),
         "issues": [{"line": getattr(issue, "line", 0), "message": str(getattr(issue, "message", issue))[:500]} for issue in issues[:100]],
         "state": str(state)[:128] if state is not None else None,
+        "trajectory": evaluate_events(result_events).to_dict(),
     }
 
 

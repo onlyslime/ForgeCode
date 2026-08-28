@@ -21,6 +21,7 @@ from ..storage import Checkpoint, CheckpointStore, FileFingerprint, SessionStore
 from ..tools import AgentMode, ToolContext, ToolRegistry
 from .context import ContextBuilder
 from .lifecycle import LifecycleError, RunLifecycle, RunState
+from .recovery import ContextCompactor
 from .verification import VerificationResult
 
 
@@ -38,6 +39,11 @@ class AgentConfig:
     # cancellation.  If it is still running afterwards it is detached and
     # the run is recovery-required; never wait indefinitely on untrusted code.
     provider_cleanup_grace_seconds: float = 0.1
+    # Automatic rolling-context controls.  ``None`` derives a threshold from
+    # the injected ContextBuilder budget.  Limits are hard per-run bounds.
+    compact_threshold_chars: int | None = None
+    max_auto_compactions: int = 8
+    rolling_window_messages: int = 24
 
 
 @dataclass(frozen=True)
@@ -100,7 +106,7 @@ class AgentLoop:
         self._recorded_provider_retries: set[tuple[str, str]] = set()
         self._provider_event_counter = 0
         self._last_provider_unresolved = False
-        integer_limits = (self.config.max_steps, self.config.max_repeated_calls, self.config.max_verification_attempts, self.config.max_tool_calls_per_turn, self.config.max_tool_calls_total)
+        integer_limits = (self.config.max_steps, self.config.max_repeated_calls, self.config.max_verification_attempts, self.config.max_tool_calls_per_turn, self.config.max_tool_calls_total, self.config.max_auto_compactions, self.config.rolling_window_messages)
         if any(isinstance(value, bool) or not isinstance(value, int) or value < 1 for value in integer_limits):
             raise ValueError("loop limits must be positive")
         timeouts = (self.config.total_timeout_seconds, self.config.provider_timeout_seconds, self.config.provider_cleanup_grace_seconds)
@@ -108,6 +114,8 @@ class AgentLoop:
             raise ValueError("loop timeouts must be positive")
         if self.config.provider_cleanup_grace_seconds > 5:
             raise ValueError("provider_cleanup_grace_seconds must be at most 5 seconds")
+        if self.config.compact_threshold_chars is not None and (isinstance(self.config.compact_threshold_chars, bool) or not isinstance(self.config.compact_threshold_chars, int) or self.config.compact_threshold_chars < 256):
+            raise ValueError("compact_threshold_chars must be at least 256 or None")
         original_observer = context.approval_observer
 
         def record_approval(tool_name: str, arguments: dict[str, Any], approved: bool) -> None:
@@ -543,6 +551,95 @@ class AgentLoop:
     def _bounded_arguments(arguments: Any, limit: int = 4_000) -> Any:
         return bounded(arguments, max_string_chars=limit)
 
+    @staticmethod
+    def _context_chars(messages: list[Message]) -> int:
+        """Estimate serialized provider context size, including tool calls."""
+        return sum(len(message.content) + len(json.dumps([
+            {"id": call.id, "name": call.name, "arguments": bounded(call.arguments, max_string_chars=4_000)}
+            for call in message.tool_calls[:64]
+        ], ensure_ascii=False, separators=(",", ":"), default=str)) for message in messages)
+
+    def _maybe_auto_compact(self, messages: list[Message], *, step: int) -> list[Message]:
+        """Compact an oversized live history once per source sequence.
+
+        ContextBuilder.fit() remains the final hard budget, but this method
+        records why older context was evicted and carries an evidence-only
+        summary into the next request.  No session bytes are rewritten.
+        """
+        budget = max(256, int(self.context_builder.max_chars))
+        threshold = self.config.compact_threshold_chars
+        if threshold is None:
+            threshold = max(256, int(budget * 0.8))
+        threshold = min(budget, threshold)
+        current_size = self._context_chars(messages)
+        if current_size < threshold:
+            self._compaction_hysteresis = False
+            return messages
+        if self._compaction_hysteresis:
+            return messages
+        if self._auto_compactions >= self.config.max_auto_compactions:
+            self._record("context_compaction_skipped", {"reason": "limit", "step": step, "context_chars": current_size, "threshold_chars": threshold})
+            self._compaction_hysteresis = True
+            return messages
+        if self.session is None:
+            # A non-durable caller still receives bounded rolling context, but
+            # there is no append-only stream in which to record a summary.
+            fitted = self.context_builder.fit(messages)
+            self._compaction_hysteresis = True
+            return fitted
+        try:
+            read_result = self.session.read_with_issues()
+            if read_result.issues:
+                raise ValueError("session contains validation issues")
+            events = read_result.events
+            source_end = max((event.sequence for event in events), default=0)
+            if source_end and source_end == self._last_compaction_sequence:
+                self._compaction_hysteresis = True
+                return messages
+            max_summary = max(512, min(24_000, int(budget * 0.45)))
+            result = ContextCompactor(max_chars=max_summary, recent_events=self.config.rolling_window_messages).compact_events(
+                events,
+                current_messages=messages,
+                reason="automatic",
+            )
+            payload = result.to_dict()
+            payload.update({"step": step, "trigger_context_chars": current_size, "threshold_chars": threshold, "budget_chars": budget})
+            self._record("context_compacted", payload)
+            self._auto_compactions += 1
+            self._last_compaction_sequence = source_end
+            summary = Message(
+                role="system",
+                content=(
+                    "AUTOMATIC CONTEXT SUMMARY (evidence only; source sequence "
+                    f"{result.source_sequence_start}-{result.source_sequence_end}, "
+                    f"fingerprint={result.context_fingerprint}):\n{result.summary}"
+                )[:max_summary + 512],
+            )
+            system = next((message for message in messages if message.role == "system"), None)
+            user = next((message for message in messages if message.role == "user"), None)
+            tail = list(messages[-self.config.rolling_window_messages:])
+            # A tool result without its assistant tool-call pairing is not
+            # valid provider context.  Include the immediate predecessor when
+            # the rolling cut starts in the middle of a pair.
+            if tail and tail[0].role == "tool":
+                index = messages.index(tail[0])
+                if index > 0:
+                    tail.insert(0, messages[index - 1])
+            compacted: list[Message] = []
+            if system is not None:
+                compacted.append(system)
+            compacted.append(summary)
+            if user is not None and user not in compacted and user not in tail:
+                compacted.append(user)
+            compacted.extend(message for message in tail if message not in compacted)
+            messages[:] = self.context_builder.fit(compacted)
+            self._compaction_hysteresis = True
+            return messages
+        except Exception as exc:
+            self._record("context_compaction_error", {"step": step, "context_chars": current_size, "error": f"{type(exc).__name__}: {exc}"})
+            self._compaction_hysteresis = True
+            return self.context_builder.fit(messages)
+
     async def run(self, prompt: str) -> LoopResult:
         if not prompt.strip():
             raise ValueError("prompt must not be empty")
@@ -567,6 +664,9 @@ class AgentLoop:
         except (OSError, ValueError) as exc:
             self._record("repository_snapshot_error", {"error": f"{type(exc).__name__}: {exc}"})
         self._record("run_created", {"run_id": self.run_id, "mode": self.context.mode.value})
+        self._auto_compactions = 0
+        self._last_compaction_sequence = 0
+        self._compaction_hysteresis = False
         self._record("run_started", {"run_id": self.run_id, "mode": self.context.mode.value})
         self._transition(RunState.DISCOVERING, reason="task accepted")
         self._record("mode", {"mode": self.context.mode.value, "side_effects_allowed": self.context.mode is AgentMode.ACT})
@@ -598,7 +698,8 @@ class AgentLoop:
                 self._record("pause", {"reason": "cooperative pause requested"})
                 self._record("final", {"stopped_reason": result.stopped_reason, "state": result.state})
                 return result
-            request_messages = self.context_builder.fit(messages)
+            request_messages = self._maybe_auto_compact(messages, step=step)
+            request_messages = self.context_builder.fit(request_messages)
             self._last_context_summary = "\n".join(message.content for message in request_messages[-8:])[:8_000]
             self._record("model_request", {"step": step, "message_count": len(request_messages), "context_chars": sum(len(message.content) for message in request_messages), "tool_count": len(self.registry.schemas(self.context.mode))})
             provider_started = time.monotonic()

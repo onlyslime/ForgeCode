@@ -1,4 +1,4 @@
-# ForgeCode v0.0.8 capability trace
+# ForgeCode v0.0.9 capability trace
 
 This document is the implementation trace for the v0.0.8 release (building on
 v0.0.7). It is intentionally evidence-oriented: a capability is considered
@@ -24,6 +24,8 @@ scenario agree. Runtime records remain bounded and are not committed.
 | Evidence-driven review/security | transaction review baseline | Stable report joining session/plan/context/transaction/test/hook/diff plus four deterministic checks and signed artifacts | `review.py`, review/CLI tests |
 | CLI machine contract | mixed legacy JSON output | Strict JSONL envelope with mutually exclusive `data`/`error`, stderr diagnostics and exit-code mapping | `test_cli_machine_contract.py` |
 | F23-F27 research extensions | intentionally out of scope | IDE/autocomplete, browser/computer control, cloud/worktrees, multi-agent/background orchestration, enterprise governance | explicit post-release boundary |
+| Rolling context and trajectory | new v0.0.9 slice | automatic serialized-budget compaction, source fingerprints, holistic event scoring and bounded repair evidence | `agent/loop.py`, `evaluation.py`, v0.0.9 feature tests |
+| Profiles, session tree and completion | new v0.0.9 slice | validated profile catalog/switch audit, non-replaying clone/import/tree, advisory path suggestions | config/CLI/context/session services and v0.0.9 feature tests |
 
 ## Trust and data boundaries
 

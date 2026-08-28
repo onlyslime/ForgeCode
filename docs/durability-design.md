@@ -1,9 +1,11 @@
-# ForgeCode durability design (v0.0.8)
+# ForgeCode durability design (v0.0.9)
 
 This document records the v0.0.5 reliability baseline, v0.0.6 durable
-extensions, and v0.0.7 context/extension work. Version 0.0.8 adds strict test
-profiles, evidence-driven review, cancellation propagation and machine-output
-contracts. This is a design contract for the v0.0.8 release and its tests,
+extensions, and v0.0.7 context/extension work. Version 0.0.9 adds automatic
+rolling compaction, durable trajectory evaluation and non-replaying session
+branches on top of strict test profiles, evidence-driven review, cancellation
+propagation and machine-output contracts. This is a design contract for the
+release and its tests,
 with runtime evidence recorded in the capability trace and acceptance report;
 it is not a claim that a feature exists before its acceptance test passes.
 
@@ -25,6 +27,16 @@ any active state -> failed | cancelled | recovery_required
 planning/verifying -> completed
 paused/recovery_required -> discovering (only after explicit safe resume)
 ```
+
+## Rolling compaction and trajectory evidence
+
+The live loop measures serialized context before every provider request. A
+threshold with hysteresis triggers one bounded automatic compaction per source
+sequence; the append-only event records reason, omitted counts, source range
+and summary fingerprint. Rebuilt context keeps the original goal and safety
+policy plus recent complete assistant/tool pairings. `evaluate_events` scores
+the complete trajectory from durable events, including verification and
+unresolved/conflict outcomes; model prose cannot mark a run successful.
 
 `LoopResult` carries both the lifecycle state and a stable outcome code. The
 CLI derives its exit status from that structured result.

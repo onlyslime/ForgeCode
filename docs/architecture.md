@@ -1,4 +1,4 @@
-# ForgeCode Architecture (v0.0.8)
+# ForgeCode Architecture (v0.0.9)
 
 ForgeCode is a small provider-neutral local coding agent. The repository owns
 the protocol conversion, conversation history, tool execution, loop
@@ -260,9 +260,22 @@ an existing fixture is rejected rather than overwritten.
 
 ## Current scope and limitations
 
-The project intentionally does not implement IDE UI, autocomplete, browser or
+The project intentionally does not implement IDE inline completion (the
+read-only `context complete` path suggestion is bounded and advisory), browser or
 computer control, voice, MCP marketplace, cloud execution, worktrees,
 parallel subagents, background scheduling or enterprise governance. Model
 providers, registry and safety contracts leave room for later extensions, but
 the current assessment deliverable focuses on one auditable local agent and a
 repeatable offline coding task.
+
+## v0.0.9 long-run services
+
+Before each provider request the loop measures serialized message and tool
+argument size. Near the configured budget it appends an automatic
+`context_compacted` event and rebuilds context from safety policy, user intent,
+plan/verification evidence and a bounded recent window. The event carries the
+source sequence range and summary fingerprint; it is evidence, never tool
+authorization. `evaluation.py` computes a holistic trajectory score from the
+same durable events. `session tree|clone|import` expose parent metadata while
+explicitly avoiding side-effect replay. `context complete` is advisory and
+every selected path still re-enters `WorkspaceGuard`.

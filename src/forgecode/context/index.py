@@ -658,6 +658,56 @@ class ContextIndex:
         results.sort(key=lambda result: (result.path, result.line, result.snippet))
         return tuple(results[:max_results])
 
+    def complete(self, prefix: str = "", *, max_results: int = 50) -> tuple[dict[str, Any], ...]:
+        """Return deterministic, read-only path suggestions.
+
+        Suggestions are advisory only: callers must still pass the selected
+        path through ``WorkspaceGuard`` and the relevant tool policy.
+        Sensitive, binary and ignored entries are represented with an
+        exclusion reason rather than being silently treated as authorized.
+        """
+        if not isinstance(prefix, str) or len(prefix) > MAX_FILTER_CHARS or "\x00" in prefix:
+            raise ValueError("prefix must be bounded text")
+        if isinstance(max_results, bool) or not isinstance(max_results, int) or not 1 <= max_results <= MAX_RESULTS:
+            raise ValueError("max_results must be between 1 and 200")
+        # Normalize only an explicit leading ``./``.  Do not use ``lstrip``
+        # here: it would turn ``../secret`` and absolute paths into broad,
+        # seemingly safe prefixes and could also hide dot-files.
+        normalized = prefix.replace("\\", "/")
+        if normalized.startswith("/") or (len(normalized) >= 2 and normalized[1] == ":"):
+            raise ValueError("prefix must be workspace-relative")
+        while normalized.startswith("./"):
+            normalized = normalized[2:]
+        if any(part == ".." for part in normalized.split("/")):
+            raise ValueError("prefix must not contain parent traversal")
+        suggestions: list[dict[str, Any]] = []
+        try:
+            entries = self.entries()
+        except (ContextIndexError, OSError, ValueError):
+            entries = ()
+        for item in entries:
+            if normalized and not item.path.lower().startswith(normalized.lower()):
+                continue
+            reason = item.exclusion_reason
+            if not reason:
+                if item.sensitive:
+                    reason = "sensitive"
+                elif item.binary:
+                    reason = "binary"
+                elif item.ignored:
+                    reason = "ignored"
+            suggestions.append({"path": item.path, "type": "file", "excluded": bool(reason), "exclusion_reason": reason, "truncated": False})
+        for item in self.last_exclusions:
+            path = str(item.get("path", ""))
+            if path and (not normalized or path.lower().startswith(normalized.lower())) and not any(entry["path"] == path for entry in suggestions):
+                suggestions.append({"path": path, "type": "file", "excluded": True, "exclusion_reason": str(item.get("reason", "excluded"))[:64], "truncated": False})
+        suggestions.sort(key=lambda entry: (entry["path"], entry["excluded"], entry.get("exclusion_reason") or ""))
+        truncated = len(suggestions) > max_results
+        values = suggestions[:max_results]
+        if values and truncated:
+            values[-1] = {**values[-1], "truncated": True}
+        return tuple(values)
+
     def diagnostics(self) -> dict[str, Any]:
         """Return bounded, digest-aware diagnostics for the current index.
 

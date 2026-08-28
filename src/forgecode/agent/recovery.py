@@ -21,6 +21,11 @@ class CompactionResult:
     source_sequence_end: int | None
     retained_sections: tuple[str, ...]
     summary: str
+    # ``reason`` and ``context_fingerprint`` are additive fields used by the
+    # automatic rolling-window path.  Defaults preserve the v0.0.8 API for
+    # callers that construct/compare results positionally.
+    reason: str = "manual"
+    context_fingerprint: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -32,6 +37,8 @@ class CompactionResult:
             "source_sequence_end": self.source_sequence_end,
             "retained_sections": list(self.retained_sections),
             "summary": self.summary,
+            "reason": self.reason,
+            "context_fingerprint": self.context_fingerprint,
         }
 
 
@@ -48,7 +55,7 @@ class ContextCompactor:
         self.max_chars = max_chars
         self.recent_events = recent_events
 
-    def compact_events(self, events: Sequence[SessionEvent], *, current_messages: Sequence[Message] = (), rules: str = "", plan: dict[str, Any] | None = None, checkpoint: Checkpoint | None = None, references: str = "") -> CompactionResult:
+    def compact_events(self, events: Sequence[SessionEvent], *, current_messages: Sequence[Message] = (), rules: str = "", plan: dict[str, Any] | None = None, checkpoint: Checkpoint | None = None, references: str = "", reason: str = "manual") -> CompactionResult:
         before = sum(len(json.dumps(event.payload, ensure_ascii=False, default=str)) for event in events) + sum(len(message.content) for message in current_messages)
         sections: list[tuple[str, str]] = []
         sections.append(("system_safety", "Safety boundary: WorkspaceGuard, approval, mode restrictions, hard blocks and hash conflicts remain authoritative."))
@@ -82,14 +89,15 @@ class ContextCompactor:
             rendered.append(chunk); retained.append(name); used += len(chunk) + 2
         summary = "\n\n".join(rendered)
         sequences = [event.sequence for event in events if event.sequence]
-        return CompactionResult(before, len(summary), max(0, len(current_messages) - self.recent_events), max(0, len(events) - self.recent_events), min(sequences) if sequences else None, max(sequences) if sequences else None, tuple(retained), summary)
+        fingerprint = hashlib.sha256(summary.encode("utf-8")).hexdigest()
+        return CompactionResult(before, len(summary), max(0, len(current_messages) - self.recent_events), max(0, len(events) - self.recent_events), min(sequences) if sequences else None, max(sequences) if sequences else None, tuple(retained), summary, str(reason or "manual")[:64], fingerprint)
 
-    def compact_store(self, store: SessionStore, *, current_messages: Sequence[Message] = (), rules: str = "", plan: dict[str, Any] | None = None, checkpoint: Checkpoint | None = None, references: str = "") -> CompactionResult:
+    def compact_store(self, store: SessionStore, *, current_messages: Sequence[Message] = (), rules: str = "", plan: dict[str, Any] | None = None, checkpoint: Checkpoint | None = None, references: str = "", reason: str = "manual") -> CompactionResult:
         read_result = store.read_with_issues()
         if read_result.issues:
             issue = read_result.issues[0]
             raise SessionFormatError(f"cannot compact an inconsistent session (line {issue.line}: {issue.message})")
-        result = self.compact_events(read_result.events, current_messages=current_messages, rules=rules, plan=plan, checkpoint=checkpoint, references=references)
+        result = self.compact_events(read_result.events, current_messages=current_messages, rules=rules, plan=plan, checkpoint=checkpoint, references=references, reason=reason)
         store.append("context_compacted", result.to_dict(), mode=store.mode)
         return result
 
