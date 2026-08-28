@@ -7,6 +7,7 @@ assert.throws(() => invoke(["x".repeat(1001)]), TypeError);
 assert.throws(() => invoke([], { method: "doctor", params: "bad" }), TypeError);
 assert.throws(() => invoke([], { method: "doctor", params: { value: "x".repeat(1_000_001) } }), TypeError);
 assert.throws(() => invokeStream([], { maxItems: 0 }), TypeError);
+assert.throws(() => invokeStream(["x".repeat(1001)]), TypeError);
 try {
   await invoke([], { executable: process.execPath, method: "bad method", timeoutMs: 1000 });
   assert.fail("expected RPC failure");

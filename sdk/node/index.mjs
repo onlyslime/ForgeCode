@@ -52,6 +52,7 @@ export function invoke(argv = [], { cwd, executable = "forgecode", method, param
 }
 
 export function invokeStream(argv = [], options = {}) {
+    validateArgv(argv);
     if (options.method !== undefined) validateParams(options.params ?? {});
     boundedNumber(options.timeoutMs ?? 30000, "timeoutMs");
     boundedNumber(options.maxOutputBytes ?? 2_000_000, "maxOutputBytes", { integer: true });
