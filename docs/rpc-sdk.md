@@ -151,6 +151,8 @@ response, process spawn failures, invalid JSON (including malformed stream lines
 RPC transport for programmatic callers.
 Both helpers accept a standard `AbortSignal`; aborting terminates the child
 immediately and rejects with `ForgeCodeError` code `cancelled`.
+Abort listeners are removed on cancellation, timeout, or normal completion so
+long-lived hosts can safely reuse controllers without retaining requests.
 The Node `login({ profile, provider, apiKeyEnv })` helper forwards the same
 bounded selectors as the CLI and RPC login methods.
 

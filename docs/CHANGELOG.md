@@ -32,6 +32,8 @@ slice.
   backpressure deadlocks; the retained diagnostic tail is exposed read-only.
 - Added `AbortSignal` cancellation to Node `invoke`/`invokeStream` with typed
   `cancelled` errors and immediate child termination.
+- Cleaned Node abort listeners on every terminal path to prevent long-lived SDK
+  hosts from accumulating request references.
 - Added Python `session_result()` convenience API to match the Node SDK result
   retrieval contract.
 - Exported the Python result helper through the package-level
