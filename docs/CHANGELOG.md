@@ -26,6 +26,7 @@ slice.
 - Prevented closing active RPC handles before cancellation or completion.
 - Restricted provider error parsing to safe scalar messages, preventing nested
   credential fields from entering diagnostics.
+- Added stable RPC lifecycle error codes for busy, terminal, and denied states.
 - Canonicalized persisted RPC workspaces and bounded request identifiers.
 - Normalized Node/Python SDK limits and process/JSON error contracts.
 - Verification: targeted RPC/embed/provider/telemetry gate (43 passed), Node

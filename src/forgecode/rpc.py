@@ -361,7 +361,16 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
             yield from responses
         except Exception as exc:
             message = str(exc)[:2000]
-            code = "trust_revoked" if "workspace trust" in message else "invalid_request"
+            if "workspace trust" in message:
+                code = "trust_revoked"
+            elif "busy" in message:
+                code = "session_busy"
+            elif "approval was denied" in message:
+                code = "approval_denied"
+            elif "session is " in message and "open a new session" in message:
+                code = "session_terminal"
+            else:
+                code = "invalid_request"
             if method in {"run", "session.run"} and handle:
                 with _SESSION_LOCK:
                     info = _RPC_SESSIONS.get(handle)

@@ -119,6 +119,7 @@ def test_rpc_close_rejects_active_run(tmp_path):
     closed = _call({"method": "session.close", "params": {"session": handle}})
     assert closed["ok"] is False
     assert "busy" in closed["error"]["message"]
+    assert closed["error"]["code"] == "session_busy"
 
 
 def test_rpc_session_run_rejects_cancelled_handle(tmp_path):
@@ -127,6 +128,7 @@ def test_rpc_session_run_rejects_cancelled_handle(tmp_path):
     result = _call({"method": "session.run", "params": {"session": handle, "prompt": "hello", "demo": True}})
     assert result["ok"] is False
     assert "cancelled" in result["error"]["message"]
+    assert result["error"]["code"] == "session_terminal"
 
 
 def test_rpc_failed_run_releases_busy_state(tmp_path):

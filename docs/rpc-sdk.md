@@ -43,6 +43,9 @@ predates the bounded retention window, so clients must treat the event history
 as incomplete and reacquire a status/review snapshot.
 Terminal states are monotonic: a completed, failed, cancelled, or denied
 session rejects later pause/resume/cancel/approval requests.
+Lifecycle violations use stable error codes: `session_busy` is retryable after
+the active run ends, while `session_terminal` and `approval_denied` require a
+new handle.
 Cancellation responses expose `cancel_requested` so clients can distinguish a
 recorded cancellation request from a worker completion event.
 
