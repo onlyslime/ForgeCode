@@ -4,7 +4,7 @@ import { ForgeCodeError, invoke, invokeStream, interactive } from "../sdk/node/i
 assert.equal(typeof ForgeCodeError, "function");
 assert.throws(() => invoke([], { timeoutMs: NaN }), TypeError);
 assert.throws(() => invoke(["x".repeat(1001)]), TypeError);
-await assert.rejects(invoke([], { signal: {} }), TypeError);
+assert.throws(() => invoke([], { signal: {} }), TypeError);
 {
   const controller = new AbortController(); controller.abort();
   await assert.rejects(invoke([], { executable: process.execPath, signal: controller.signal }), (error) => error.code === "cancelled");

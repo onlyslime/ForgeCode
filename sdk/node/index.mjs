@@ -23,6 +23,7 @@ export class ForgeCodeError extends Error {
 
 export function invoke(argv = [], { cwd, executable = "forgecode", method, params = {}, id, timeoutMs = 30000, maxOutputBytes = 2_000_000, signal } = {}) {
   validateArgv(argv);
+  if (signal !== undefined && (typeof signal.addEventListener !== "function" || typeof signal.removeEventListener !== "function")) throw new TypeError("signal must be an AbortSignal");
   if (method !== undefined) validateParams(params);
   boundedNumber(timeoutMs, "timeoutMs"); boundedNumber(maxOutputBytes, "maxOutputBytes", { integer: true });
   return new Promise((resolve, reject) => {
@@ -33,7 +34,7 @@ export function invoke(argv = [], { cwd, executable = "forgecode", method, param
     let settled = false;
     const onAbort = () => { if (!settled) { child.kill(); settled = true; clearTimeout(timer); reject(new ForgeCodeError("request cancelled", { code: "cancelled" })); } };
     const timer = setTimeout(() => { if (!settled) { child.kill(); settled = true; reject(new ForgeCodeError("request timed out", { code: "timeout" })); } }, Math.max(1, timeoutMs));
-    if (signal !== undefined) { if (typeof signal.addEventListener !== "function") throw new TypeError("signal must be an AbortSignal"); if (signal.aborted) return onAbort(); signal.addEventListener("abort", onAbort, { once: true }); }
+    if (signal !== undefined) { if (signal.aborted) return onAbort(); signal.addEventListener("abort", onAbort, { once: true }); }
     if (rpc) child.stdin.write(JSON.stringify({ argv: [], method, params, ...(id === undefined ? {} : { id }) }) + "\n");
     child.stdin.end();
     child.stdout.on("data", (chunk) => { out += chunk; if (Buffer.byteLength(out) > maxOutputBytes && !settled) { child.kill(); settled = true; clearTimeout(timer); reject(new ForgeCodeError("response exceeds output limit", { code: "output_limit" })); } });
@@ -55,6 +56,7 @@ export function invoke(argv = [], { cwd, executable = "forgecode", method, param
 
 export function invokeStream(argv = [], options = {}) {
     validateArgv(argv);
+    if (options.signal !== undefined && (typeof options.signal.addEventListener !== "function" || typeof options.signal.removeEventListener !== "function")) throw new TypeError("signal must be an AbortSignal");
     if (options.method !== undefined) validateParams(options.params ?? {});
     boundedNumber(options.timeoutMs ?? 30000, "timeoutMs");
     boundedNumber(options.maxOutputBytes ?? 2_000_000, "maxOutputBytes", { integer: true });
@@ -67,7 +69,7 @@ export function invokeStream(argv = [], options = {}) {
     let buffer = ""; const events = []; let err = ""; let bytes = 0; let settled = false;
     const onAbort = () => { if (!settled) { child.kill(); settled = true; clearTimeout(timer); reject(new ForgeCodeError("request cancelled", { code: "cancelled" })); } };
     const timer = setTimeout(() => { if (!settled) { child.kill(); settled = true; reject(new ForgeCodeError("request timed out", { code: "timeout" })); } }, Math.max(1, options.timeoutMs ?? 30000));
-    if (options.signal !== undefined) { if (typeof options.signal.addEventListener !== "function") throw new TypeError("signal must be an AbortSignal"); if (options.signal.aborted) return onAbort(); options.signal.addEventListener("abort", onAbort, { once: true }); }
+    if (options.signal !== undefined) { if (options.signal.aborted) return onAbort(); options.signal.addEventListener("abort", onAbort, { once: true }); }
     child.stdout.on("data", (chunk) => {
       bytes += chunk.byteLength;
       if (bytes > (options.maxOutputBytes ?? 2_000_000) && !settled) { child.kill(); settled = true; clearTimeout(timer); reject(new ForgeCodeError("response exceeds output limit", { code: "output_limit" })); return; }
