@@ -42,6 +42,12 @@ def test_rpc_config_profiles_is_programmatically_discoverable(tmp_path):
     assert payload["command"] == "config profiles"
 
 
+def test_rpc_config_profiles_honors_workspace_parameter(tmp_path):
+    payload = _call({"method": "config.profiles", "params": {"workspace": str(tmp_path)}})
+    assert payload["ok"] is True
+    assert payload.get("workspace") == str(tmp_path)
+
+
 def test_rpc_request_line_is_bounded():
     response = json.loads(next(iter(serve_lines(["{" + "x" * 1_048_576]))))
     assert response["ok"] is False

@@ -254,6 +254,11 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                     if not isinstance(workspace, str) or len(workspace) > 1_000 or any(ch in workspace for ch in "\r\n"):
                         raise ValueError("trust.workspace is invalid")
                     argv_value = ["--workspace", workspace, *argv_value]
+                if method in {"config.show", "config.profiles", "provider.health", "provider.list", "doctor"} and params.get("workspace") is not None:
+                    workspace = params.get("workspace")
+                    if not isinstance(workspace, str) or len(workspace) > 1_000 or any(ch in workspace for ch in "\r\n"):
+                        raise ValueError("workspace is invalid")
+                    argv_value = ["--workspace", workspace, *argv_value]
                 if method == "session.open":
                     workspace = params.get("workspace", ".")
                     mode = params.get("mode", "plan")
@@ -526,6 +531,8 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                 envelope: Any = json.loads(raw)
                 if isinstance(envelope, dict):
                     envelope.setdefault("exit_code", code if index == len(output) - 1 else 0)
+                    if isinstance(request.get("params"), dict) and isinstance(request["params"].get("workspace"), str):
+                        envelope.setdefault("workspace", str(Path(request["params"]["workspace"]).expanduser().resolve()))
                     if request_id is not None: envelope["id"] = request_id
                     if method is not None: envelope["method"] = method
                 responses.append(json.dumps(envelope, ensure_ascii=False, separators=(",", ":")))

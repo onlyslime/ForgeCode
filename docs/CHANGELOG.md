@@ -34,6 +34,8 @@ slice.
   closed until an explicit recovery run reclaims them.
 - Exposed validated model profile discovery through the `config.profiles` RPC
   method and Node `configProfiles` helper.
+- Made config/provider/doctor RPC workspace selection explicit and canonical,
+  with the selected workspace echoed for auditability.
 - Verification: full regression `444 passed, 8 skipped, 2 warnings`, RPC
   lifecycle suite, compile, and CLI/doctor checks.
 
