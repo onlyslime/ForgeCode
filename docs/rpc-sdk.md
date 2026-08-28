@@ -38,6 +38,11 @@ Python embedding mirrors this contract with `forgecode.embed.ForgeCodeError`.
 raise typed failures while preserving the original envelope; responses are
 bounded by `max_response_bytes`.
 
+`EmbeddedSession.reconnect()` is an explicit bounded recovery operation: it
+only starts a replacement worker after the prior process exits, preserves the
+workspace/mode binding, and emits `process_reconnected`. It never loops or
+silently retries side effects.
+
 ## Safety and compatibility
 
 Prompts, paths, provider names and environment-variable names are bounded and
