@@ -80,6 +80,7 @@ def test_cli_eval_and_config_profiles_machine_contract(capsys, tmp_path: Path):
 
 
 def test_config_policy_explains_trust_and_runtime_narrowing(capsys, tmp_path: Path):
+    (tmp_path / "AGENTS.md").write_text("# local rules\n", encoding="utf-8")
     assert main(["--workspace", str(tmp_path), "config", "policy", "--tools", "read_file", "--jsonl"]) == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["ok"] is True
@@ -88,6 +89,8 @@ def test_config_policy_explains_trust_and_runtime_narrowing(capsys, tmp_path: Pa
     assert rows["read_file"]["enabled"] is True
     assert rows["write_file"]["enabled"] is False
     assert "runtime_not_allowlisted" in rows["write_file"]["reasons"]
+    assert payload["data"]["rules"]["sources"][0]["path"] == "AGENTS.md"
+    assert "text" not in payload["data"]["rules"]["sources"][0]
 
 
 def test_session_tree_clone_and_import_are_non_replaying(capsys, tmp_path: Path):

@@ -11,6 +11,8 @@ slice.
   including per-tool runtime narrowing, mode, approval, and trust reasons.
 - Added Node `configPolicy()` and Python `config_policy_embedded()` helpers.
 - Verification: CLI policy contract, RPC, Node, and Python embedding tests.
+- Policy output now includes redacted rule source metadata (fingerprint, path,
+  scope, priority, digest, diagnostics) without including rule text.
 
 ## v0.0.33 — 2026-08-29
 

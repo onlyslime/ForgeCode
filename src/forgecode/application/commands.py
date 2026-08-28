@@ -871,6 +871,7 @@ def main(argv: list[str] | None = None) -> int:
         try:
             if args.config_action == "policy":
                 config = ConfigLoader(workspace).load(profile=getattr(args, "profile", None))
+                rules = RuleEngine(guard, compatible=True).discover(())
                 available = set(base_registry.names())
                 effective_policy = config.tool_policy
                 runtime_policy = parse_tool_policy_options(getattr(args, "tools", None), getattr(args, "exclude_tools", None), no_tools=bool(getattr(args, "no_tools", False)), available=tuple(sorted(available)))
@@ -888,7 +889,7 @@ def main(argv: list[str] | None = None) -> int:
                     if config.default_mode == "plan" and name in {"write_file", "apply_patch", "run_command"}: reasons.append("plan_mode_read_only"); enabled = False
                     if not trusted and config.default_mode == "act" and name in {"write_file", "apply_patch", "run_command"}: reasons.append("workspace_trust_required"); enabled = False
                     rows.append({"tool": name, "enabled": enabled, "reasons": reasons or ["permitted_by_current_policy"], "approval": config.approval, "mode": config.default_mode, "trust": trusted})
-                payload = {"profile": config.profile, "provider": config.provider, "mode": config.default_mode, "approval": config.approval, "trust": trusted, "config_policy": {"allow": list(effective_policy.allow), "deny": list(effective_policy.deny)}, "runtime_policy": None if runtime_policy is None else {"allow": list(runtime_policy.allow), "deny": list(runtime_policy.deny)}, "tools": rows}
+                payload = {"profile": config.profile, "provider": config.provider, "mode": config.default_mode, "approval": config.approval, "trust": trusted, "rules": {"fingerprint": rules.fingerprint, "sources": [{"path": item.path, "scope": item.scope, "priority": item.priority, "digest": item.digest} for item in rules.sources], "diagnostics": [item.to_dict() for item in rules.diagnostics]}, "config_policy": {"allow": list(effective_policy.allow), "deny": list(effective_policy.deny)}, "runtime_policy": None if runtime_policy is None else {"allow": list(runtime_policy.allow), "deny": list(runtime_policy.deny)}, "tools": rows}
             elif args.config_action == "profiles":
                 profiles = ConfigLoader(workspace).profiles()
                 selected = getattr(args, "profile_name", None)
