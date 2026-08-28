@@ -1,28 +1,44 @@
 /** Minimal Node SDK for ForgeCode's JSONL RPC/CLI envelope. */
 import { spawn } from "node:child_process";
 
-export function invoke(argv = [], { cwd, executable = "forgecode" } = {}) {
+export class ForgeCodeError extends Error {
+  constructor(message, { code = "sdk_error", envelope = null, exitCode = null } = {}) {
+    super(message); this.name = "ForgeCodeError"; this.code = code; this.envelope = envelope; this.exitCode = exitCode;
+  }
+}
+
+export function invoke(argv = [], { cwd, executable = "forgecode", method, params = {}, id, timeoutMs = 30000, maxOutputBytes = 2_000_000 } = {}) {
   return new Promise((resolve, reject) => {
-    const child = spawn(executable, [...argv, "--jsonl"], { cwd, stdio: ["ignore", "pipe", "pipe"] });
+    const rpc = method !== undefined;
+    const child = spawn(executable, rpc ? ["rpc"] : [...argv, "--jsonl"], { cwd, stdio: ["pipe", "pipe", "pipe"] });
     let out = "";
     let err = "";
-    child.stdout.on("data", (chunk) => { out += chunk; });
+    let settled = false;
+    const timer = setTimeout(() => { if (!settled) { child.kill(); settled = true; reject(new ForgeCodeError("request timed out", { code: "timeout" })); } }, Math.max(1, timeoutMs));
+    if (rpc) child.stdin.write(JSON.stringify({ argv: [], method, params, ...(id === undefined ? {} : { id }) }) + "\n");
+    child.stdin.end();
+    child.stdout.on("data", (chunk) => { out += chunk; if (Buffer.byteLength(out) > maxOutputBytes && !settled) { child.kill(); settled = true; clearTimeout(timer); reject(new ForgeCodeError("response exceeds output limit", { code: "output_limit" })); } });
     child.stderr.on("data", (chunk) => { err += chunk; });
-    child.on("error", reject);
+    child.on("error", (error) => { if (!settled) { settled = true; clearTimeout(timer); reject(error); } });
     child.on("close", (code) => {
+      if (settled) return;
+      settled = true; clearTimeout(timer);
       const line = out.trim().split(/\r?\n/).filter(Boolean).pop();
-      if (!line) return reject(new Error(err.trim() || `forgecode exited ${code}`));
+      if (!line) return reject(new ForgeCodeError(err.trim() || `forgecode exited ${code}`, { code: "empty_response", exitCode: code }));
       try {
         const envelope = JSON.parse(line);
+        if (envelope.ok === false) return reject(new ForgeCodeError(envelope.error?.message || "ForgeCode request failed", { code: envelope.error?.code || "request_failed", envelope, exitCode: code }));
         resolve({ ...envelope, process_exit_code: code });
-      } catch (error) { reject(error); }
+      } catch (error) { reject(new ForgeCodeError(error.message, { code: "invalid_json", exitCode: code })); }
     });
   });
 }
 
 export function invokeStream(argv = [], options = {}) {
   return new Promise((resolve, reject) => {
-    const child = spawn(options.executable ?? "forgecode", [...argv, "--jsonl"], { cwd: options.cwd, stdio: ["ignore", "pipe", "pipe"] });
+    const rpc = options.method !== undefined;
+    const child = spawn(options.executable ?? "forgecode", rpc ? ["rpc"] : [...argv, "--jsonl"], { cwd: options.cwd, stdio: ["pipe", "pipe", "pipe"] });
+    if (rpc) { child.stdin.write(JSON.stringify({ argv: [], method: options.method, params: options.params ?? {}, ...(options.id === undefined ? {} : { id: options.id }) }) + "\n"); child.stdin.end(); }
     let buffer = ""; const events = []; let err = "";
     child.stdout.on("data", (chunk) => { buffer += chunk; const lines = buffer.split(/\r?\n/); buffer = lines.pop(); for (const line of lines) if (line.trim()) events.push(JSON.parse(line)); });
     child.stderr.on("data", (chunk) => { err += chunk; });
