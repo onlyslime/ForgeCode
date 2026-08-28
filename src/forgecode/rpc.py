@@ -54,6 +54,17 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                     if params.get("require_trust") is True: argv_value.append("--require-trust")
                     if params.get("demo") is True: argv_value.append("--demo")
                     argv_value = global_args + argv_value
+                elif method == "login":
+                    provider = params.get("provider")
+                    api_key_env = params.get("api_key_env")
+                    if provider is not None:
+                        if not isinstance(provider, str) or not provider.strip() or len(provider) > 64:
+                            raise ValueError("login.provider is invalid")
+                        argv_value.extend(["--provider", provider])
+                    if api_key_env is not None:
+                        if not isinstance(api_key_env, str) or not api_key_env.strip() or len(api_key_env) > 128 or any(ch in api_key_env for ch in "\r\n"):
+                            raise ValueError("login.api_key_env is invalid")
+                        argv_value.extend(["--api-key-env", api_key_env])
                 elif method.startswith("session."):
                     session_id = params.get("session") or params.get("session_id")
                     if method == "session.tree":
