@@ -52,6 +52,9 @@ Clients may pass `background: true` to `session.run` to receive an immediate
 `accepted` envelope while the shared handle remains `running`; status/events
 then expose the terminal `run_finished` event and controls can be sent during
 execution. The default synchronous response remains unchanged.
+For isolated workers, pause/resume also attempt OS-level `SIGSTOP`/`SIGCONT`
+when the platform exposes them; the control event records whether a signal or
+cooperative fallback was used.
 For providers that may block, `isolate: true` runs the request in a killable
 child process; `session.cancel` performs a bounded terminate request and the
 result is recorded as cancelled. Isolation is opt-in because it has higher

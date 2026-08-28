@@ -26,6 +26,8 @@ slice.
   explicit `maxStderrBytes`/`maxEvents` limits.
 - Added typed closed-session writes and bounded `interactive.closeAndWait()`
   cleanup with terminate fallback.
+- Isolated RPC pause/resume now attempt OS-level suspension signals where
+  supported and record the applied control mechanism in session events.
 - Verification: full regression `444 passed, 8 skipped, 2 warnings`, RPC
   lifecycle suite, compile, and CLI/doctor checks.
 

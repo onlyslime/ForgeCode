@@ -12,6 +12,7 @@ import json
 import os
 import subprocess
 import sys
+import signal
 import threading
 import uuid
 import time
@@ -335,15 +336,30 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                             process = info.get("process")
                             if process is not None and process.poll() is None:
                                 process.terminate()
-                        elif method == "session.pause": info["state"] = "paused"
-                        elif method == "session.resume": info["state"] = "running"
+                        elif method == "session.pause":
+                            info["state"] = "paused"
+                            process = info.get("process")
+                            if process is not None and process.poll() is None and hasattr(signal, "SIGSTOP"):
+                                try: process.send_signal(signal.SIGSTOP)
+                                except (OSError, ValueError): info["pause_signal"] = "unavailable"
+                                else: info["pause_signal"] = "SIGSTOP"
+                        elif method == "session.resume":
+                            info["state"] = "running"
+                            process = info.get("process")
+                            if process is not None and process.poll() is None and hasattr(signal, "SIGCONT"):
+                                try: process.send_signal(signal.SIGCONT)
+                                except (OSError, ValueError): info["resume_signal"] = "unavailable"
+                                else: info["resume_signal"] = "SIGCONT"
                         elif method == "session.approval":
                             decision = params.get("approved")
                             if not isinstance(decision, bool): raise ValueError("session.approval.approved must be boolean")
                             info["state"] = "running" if decision else "approval_denied"
                         if method in {"session.cancel", "session.pause", "session.resume", "session.approval"}:
                             info["sequence"] = int(info.get("sequence", 0)) + 1
-                            info.setdefault("events", []).append({"sequence": info["sequence"], "type": method.rsplit(".", 1)[-1], "state": info.get("state")})
+                            event = {"sequence": info["sequence"], "type": method.rsplit(".", 1)[-1], "state": info.get("state")}
+                            if method == "session.pause": event["signal"] = info.get("pause_signal", "cooperative")
+                            if method == "session.resume": event["signal"] = info.get("resume_signal", "cooperative")
+                            info.setdefault("events", []).append(event)
                             if len(info["events"]) > _MAX_SESSION_EVENTS:
                                 del info["events"][:-_MAX_SESSION_EVENTS]
                         if method == "session.close":
