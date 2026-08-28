@@ -11,6 +11,7 @@ import io
 import json
 import threading
 import uuid
+import time
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -20,6 +21,17 @@ from .security.trust import TrustStore, TrustError
 _SESSION_LOCK = threading.RLock()
 _RPC_SESSIONS: dict[str, dict[str, Any]] = {}
 _RPC_REPLAYS: dict[str | int, tuple[str, ...]] = {}
+_SESSION_TTL_SECONDS = 8 * 60 * 60
+_MAX_RPC_SESSIONS = 256
+
+
+def _prune_sessions() -> None:
+    now = time.monotonic()
+    stale = [key for key, value in _RPC_SESSIONS.items() if now - float(value.get("created_monotonic", now)) > _SESSION_TTL_SECONDS]
+    for key in stale: _RPC_SESSIONS.pop(key, None)
+    while len(_RPC_SESSIONS) >= _MAX_RPC_SESSIONS:
+        oldest = min(_RPC_SESSIONS, key=lambda key: float(_RPC_SESSIONS[key].get("created_monotonic", now)))
+        _RPC_SESSIONS.pop(oldest, None)
 
 
 def serve_lines(lines: Iterable[str]) -> Iterable[str]:
@@ -67,7 +79,8 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                         raise ValueError("session.open.mode must be plan or act")
                     handle = uuid.uuid4().hex
                     with _SESSION_LOCK:
-                        _RPC_SESSIONS[handle] = {"workspace": workspace, "mode": mode, "session_path": f".forgecode/sessions/{handle}.jsonl", "state": "idle", "sequence": 0, "events": []}
+                        _prune_sessions()
+                        _RPC_SESSIONS[handle] = {"workspace": workspace, "mode": mode, "session_path": f".forgecode/sessions/{handle}.jsonl", "state": "idle", "sequence": 0, "events": [], "created_monotonic": time.monotonic()}
                     payload = {"schema_version": 1, "kind": "session", "ok": True, "command": "session.open", "data": {"session": handle, "workspace": workspace, "mode": mode}, "exit_code": 0}
                     if request_id is not None: payload["id"] = request_id
                     encoded = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
@@ -79,6 +92,7 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                     continue
                 if method in {"session.close", "session.status", "session.events", "session.cancel", "session.pause", "session.resume", "session.approval"}:
                     handle = params.get("session") or params.get("session_id")
+                    with _SESSION_LOCK: _prune_sessions()
                     if not isinstance(handle, str) or handle not in _RPC_SESSIONS:
                         raise ValueError("session handle is unknown")
                     with _SESSION_LOCK:

@@ -96,3 +96,10 @@ def test_rpc_act_handle_fails_closed_after_trust_revoke(tmp_path):
     assert denied["ok"] is False
     assert denied["error"]["code"] == "trust_revoked"
     assert "trust" in denied["error"]["message"]
+
+
+def test_rpc_session_status_exposes_bounded_lifecycle_metadata(tmp_path):
+    handle = _call({"method": "session.open", "params": {"workspace": str(tmp_path)}})["data"]["session"]
+    status = _call({"method": "session.status", "params": {"session": handle}})
+    assert status["data"]["workspace"] == str(tmp_path)
+    assert "created_monotonic" not in status["data"]
