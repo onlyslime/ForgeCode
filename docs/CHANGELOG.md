@@ -8,6 +8,10 @@ slice.
 ## v0.0.27 — 2026-08-28
 
 - Synchronized release metadata after the v0.0.26 telemetry retention work.
+- Added profile-aware `/login --profile` diagnostics so credential references,
+  provider, and model selection are consistent across CLI, RPC, and chat.
+- Added RPC event-cursor truncation metadata (`oldest_sequence` and
+  `truncated`) for safe disconnect recovery.
 - Verification: version/import consistency and targeted telemetry checks.
 
 ## v0.0.26 — 2026-08-28
