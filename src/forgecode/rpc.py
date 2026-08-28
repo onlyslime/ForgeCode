@@ -76,6 +76,8 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                         raise ValueError("session handle is unknown")
                     with _SESSION_LOCK:
                         info = _RPC_SESSIONS.get(handle, {})
+                        if method in {"session.pause", "session.resume", "session.cancel", "session.approval"} and info.get("state") in {"completed", "failed", "cancelled", "approval_denied"}:
+                            raise ValueError("session is terminal and cannot be controlled")
                         if method == "session.cancel": info["state"] = "cancelled"
                         elif method == "session.pause": info["state"] = "paused"
                         elif method == "session.resume": info["state"] = "running"
@@ -83,7 +85,7 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                             decision = params.get("approved")
                             if not isinstance(decision, bool): raise ValueError("session.approval.approved must be boolean")
                             info["state"] = "running" if decision else "approval_denied"
-                        if method in {"session.cancel", "session.pause", "session.resume"}:
+                        if method in {"session.cancel", "session.pause", "session.resume", "session.approval"}:
                             info["sequence"] = int(info.get("sequence", 0)) + 1
                             info.setdefault("events", []).append({"sequence": info["sequence"], "type": method.rsplit(".", 1)[-1], "state": info.get("state")})
                         if method == "session.close": _RPC_SESSIONS.pop(handle, None)

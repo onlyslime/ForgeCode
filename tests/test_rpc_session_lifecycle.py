@@ -66,6 +66,7 @@ def test_rpc_session_approval_requires_boolean_and_updates_state(tmp_path):
     handle = _call({"method": "session.open", "params": {"workspace": str(tmp_path)}})["data"]["session"]
     denied = _call({"method": "session.approval", "params": {"session": handle, "approved": False}})
     assert denied["data"]["state"] == "approval_denied"
+    assert denied["data"]["sequence"] == 1
     invalid = _call({"method": "session.approval", "params": {"session": handle, "approved": "no"}})
     assert invalid["ok"] is False
 
