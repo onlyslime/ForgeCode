@@ -58,7 +58,18 @@ def stream(requests: Iterable[dict[str, Any]], *, raise_for_status: bool = False
         raise ValueError("max_response_bytes must be positive")
     total = 0
     count = 0
-    for line in serve_lines(json.dumps(item, ensure_ascii=False) for item in requests):
+    def encoded_requests() -> Iterable[str]:
+        for item in requests:
+            if not isinstance(item, dict):
+                raise ValueError("stream requests must be objects")
+            try:
+                encoded = json.dumps(item, ensure_ascii=False)
+            except (TypeError, ValueError) as exc:
+                raise ValueError("stream request must be JSON-serializable") from exc
+            if len(encoded.encode("utf-8")) > 1_000_000:
+                raise ValueError("stream request exceeds 1 MiB")
+            yield encoded
+    for line in serve_lines(encoded_requests()):
         count += 1
         total += len(line.encode("utf-8"))
         if count > max_items or total > max_response_bytes:

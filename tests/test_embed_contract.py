@@ -35,6 +35,13 @@ def test_embed_invoke_validates_argv_bounds():
         invoke(["x" * 1_001])
 
 
+def test_embed_stream_validates_request_objects_and_size():
+    with pytest.raises(ValueError):
+        list(stream(["not-an-object"]))
+    with pytest.raises(ValueError):
+        list(stream([{"payload": "x" * 1_000_001}]))
+
+
 def test_embed_stream_strict_mode_raises_on_failed_rpc():
     with pytest.raises(ForgeCodeError):
         list(stream([{"method": "not-supported"}], raise_for_status=True))
