@@ -163,15 +163,26 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
             if not output:
                 payload = {"schema_version": 1, "kind": "result", "ok": code == 0, "command": "rpc", "data": {}, "exit_code": code}
                 if request_id is not None: payload["id"] = request_id
-                yield json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+                encoded = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+                if request_id is not None:
+                    with _SESSION_LOCK:
+                        _RPC_REPLAYS[request_id] = (encoded,)
+                        while len(_RPC_REPLAYS) > 1024: _RPC_REPLAYS.pop(next(iter(_RPC_REPLAYS)))
+                yield encoded
                 continue
+            responses: list[str] = []
             for index, raw in enumerate(output):
                 envelope: Any = json.loads(raw)
                 if isinstance(envelope, dict):
                     envelope.setdefault("exit_code", code if index == len(output) - 1 else 0)
                     if request_id is not None: envelope["id"] = request_id
                     if method is not None: envelope["method"] = method
-                yield json.dumps(envelope, ensure_ascii=False, separators=(",", ":"))
+                responses.append(json.dumps(envelope, ensure_ascii=False, separators=(",", ":")))
+            if request_id is not None:
+                with _SESSION_LOCK:
+                    _RPC_REPLAYS[request_id] = tuple(responses)
+                    while len(_RPC_REPLAYS) > 1024: _RPC_REPLAYS.pop(next(iter(_RPC_REPLAYS)))
+            yield from responses
         except Exception as exc:
             yield json.dumps({"schema_version": 1, "kind": "error", "ok": False, "command": "rpc", "error": {"code": "invalid_request", "message": str(exc)[:2000]}, "exit_code": 2}, ensure_ascii=False)
 

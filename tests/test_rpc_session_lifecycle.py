@@ -77,3 +77,11 @@ def test_rpc_session_run_updates_handle_state(tmp_path):
     assert result["method"] == "session.run"
     status = _call({"method": "session.status", "params": {"session": handle}})
     assert status["data"]["state"] in {"completed", "failed", "cancelled"}
+
+
+def test_rpc_idempotency_caches_multi_event_response(tmp_path):
+    request = {"id": "doctor-replay", "method": "doctor", "params": {}}
+    first = list(serve_lines([json.dumps(request)]))
+    second = list(serve_lines([json.dumps(request)]))
+    assert first == second
+    assert json.loads(second[-1])["id"] == "doctor-replay"
