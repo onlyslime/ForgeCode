@@ -138,3 +138,15 @@ def test_rpc_recovery_restores_event_cursor(tmp_path):
     _call({"method": "session.open", "params": {"workspace": str(tmp_path), "session": handle}})
     events = _call({"method": "session.events", "params": {"session": handle, "after": 0}})
     assert events["data"]["events"][0]["type"] == "pause"
+
+
+def test_rpc_act_recovery_rejects_revoked_workspace(tmp_path):
+    _call({"method": "trust.grant", "params": {"workspace": str(tmp_path)}})
+    opened = _call({"method": "session.open", "params": {"workspace": str(tmp_path), "mode": "act"}})
+    handle = opened["data"]["session"]
+    from forgecode import rpc
+    rpc._RPC_SESSIONS.pop(handle, None)
+    _call({"method": "trust.revoke", "params": {"workspace": str(tmp_path)}})
+    recovered = _call({"method": "session.open", "params": {"workspace": str(tmp_path), "session": handle}})
+    assert recovered["ok"] is False
+    assert recovered["error"]["code"] == "trust_revoked"

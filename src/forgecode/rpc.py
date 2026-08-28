@@ -59,6 +59,9 @@ def _load_session(handle: str, workspace_hint: str | None = None) -> dict[str, A
             if not isinstance(events, list): events = []
             info = {"workspace": str(workspace), "mode": raw["mode"], "session_path": raw["session_path"], "state": raw.get("state", "idle"), "sequence": int(raw.get("sequence", 0)), "events": events[-_MAX_SESSION_EVENTS:], "created_monotonic": time.monotonic(), "created_at": raw.get("created_at")}
             if info["mode"] not in {"plan", "act"}: continue
+            created_at = info.get("created_at")
+            if isinstance(created_at, (int, float)) and time.time() - float(created_at) > _SESSION_TTL_SECONDS:
+                continue
             return info
         except (OSError, ValueError, KeyError, TypeError):
             continue
@@ -129,6 +132,12 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                             raise ValueError("session.open.session handle is invalid")
                         restored = _load_session(requested_handle, workspace)
                         if restored is None: raise ValueError("session handle is not recoverable")
+                        if restored["mode"] == "act":
+                            try:
+                                if not TrustStore(Path(restored["workspace"])).status().get("trusted", False):
+                                    raise ValueError("workspace trust is not granted")
+                            except TrustError:
+                                raise ValueError("workspace trust is not granted")
                         handle = requested_handle
                         with _SESSION_LOCK: _RPC_SESSIONS[handle] = restored
                         payload = {"schema_version": 1, "kind": "session", "ok": True, "command": "session.open", "data": {"session": handle, "workspace": restored["workspace"], "mode": restored["mode"], "recovered": True}, "exit_code": 0}
