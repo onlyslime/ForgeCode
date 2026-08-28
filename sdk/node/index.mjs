@@ -43,6 +43,7 @@ export const sessionEvents = (session, options = {}) => method("session.events",
 export const sessionRun = (session, prompt, options = {}) => method("session.run", { ...options, params: { ...(options.params ?? {}), session, prompt } });
 export const sessionControl = (session, action, options = {}) => method(`session.${action}`, { ...options, params: { ...(options.params ?? {}), session } });
 export const sessionClose = (session, options = {}) => sessionControl(session, "close", options);
+export const sessionApproval = (session, approved, options = {}) => method("session.approval", { ...options, params: { ...(options.params ?? {}), session, approved } });
 
 export function interactive(workspace, { mode = "plan", executable = "forgecode" } = {}) {
   const child = spawn(executable, ["--workspace", workspace, "chat", "--mode", mode, "--jsonl"], { stdio: ["pipe", "pipe", "pipe"] });
