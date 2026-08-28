@@ -792,7 +792,8 @@ def main(argv: list[str] | None = None) -> int:
                 if machine_json: _emit_machine(_machine_error("telemetry export", "telemetry_error", str(exc), exit_code=2))
                 else: print(str(exc), file=sys.stderr)
                 return 2
-            payload = {"mode": mode, "offline": bool(effective.offline) if effective else False, "records": content.splitlines()[-1000:], "count": len(content.splitlines())}
+            records = content.splitlines()[-1000:]
+            payload = {"mode": mode, "offline": bool(effective.offline) if effective else False, "records": records, "count": len(content.splitlines()), "sha256": hashlib_lib.sha256("\n".join(records).encode("utf-8")).hexdigest()}
         else:
             payload = {"mode": mode, "offline": bool(effective.offline) if effective else False, "local_path": ".forgecode/telemetry.jsonl", "exists": path.exists()}
         if machine_json: _emit_machine(_machine_envelope("telemetry " + args.action, "telemetry", True, data=payload, exit_code=0))
