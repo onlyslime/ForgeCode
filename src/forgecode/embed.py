@@ -64,10 +64,16 @@ def session_result(session: str, *, workspace: str | None = None, request_id: st
     return list(stream([request], raise_for_status=raise_for_status, max_response_bytes=max_response_bytes))
 
 
-def session_wait(session: str, *, timeout: float = 30.0, request_id: str | int | None = None, raise_for_status: bool = False) -> list[dict[str, Any]]:
+def session_wait(session: str, *, workspace: str | None = None, timeout: float = 30.0, request_id: str | int | None = None, raise_for_status: bool = False) -> list[dict[str, Any]]:
+    if not isinstance(session, str) or not session or len(session) > 512 or any(ch in session for ch in "\r\n"):
+        raise ValueError("session must be bounded newline-safe text")
     if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or timeout < 0 or timeout > 60:
         raise ValueError("timeout must be between 0 and 60 seconds")
-    params = {"session": session, "timeout": timeout}
+    params: dict[str, Any] = {"session": session, "timeout": timeout}
+    if workspace is not None:
+        if not isinstance(workspace, str) or not workspace or len(workspace) > 1_000 or any(ch in workspace for ch in "\r\n"):
+            raise ValueError("workspace must be bounded newline-safe text")
+        params["workspace"] = workspace
     request = {"method": "session.wait", "params": params}
     if request_id is not None: request["id"] = request_id
     return list(stream([request], raise_for_status=raise_for_status))

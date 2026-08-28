@@ -72,3 +72,5 @@ def test_embed_session_result_validates_handle():
     assert forgecode.session_wait_embedded is session_wait
     with pytest.raises(ValueError):
         session_wait("x", timeout=61)
+    with pytest.raises(ValueError):
+        session_wait("x", workspace="bad\npath")

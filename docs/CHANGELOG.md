@@ -38,6 +38,8 @@ slice.
   runs without polling.
 - Exported the Python wait helper through the package-level
   `session_wait_embedded` API for discoverable embedding use.
+- Aligned Python `session_wait()` workspace validation with the result helper
+  for cross-workspace daemon clients.
 - Isolated RPC pause/resume now attempt OS-level suspension signals where
   supported and record the applied control mechanism in session events.
 - Prevented closing paused RPC handles while their worker may still be alive;
