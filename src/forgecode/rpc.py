@@ -26,6 +26,7 @@ _RPC_FINGERPRINTS: dict[str | int, str] = {}
 _SESSION_TTL_SECONDS = 8 * 60 * 60
 _MAX_RPC_SESSIONS = 256
 _MAX_SESSION_EVENTS = 512
+_MAX_REQUEST_LINE_BYTES = 1_048_576
 
 
 def _session_record_path(info: dict[str, Any], handle: str) -> Path:
@@ -101,6 +102,8 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
         method = None
         request_id = None
         try:
+            if not isinstance(line, str) or len(line.encode("utf-8", errors="replace")) > _MAX_REQUEST_LINE_BYTES:
+                raise ValueError("request_too_large: JSONL request exceeds 1 MiB")
             request = json.loads(line)
             if not isinstance(request, dict) or not isinstance(request.get("argv", []), list):
                 raise ValueError("request must be an object with argv array")

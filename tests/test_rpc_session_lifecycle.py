@@ -36,6 +36,12 @@ def test_rpc_request_id_is_bounded_and_newline_safe():
     assert response["error"]["code"] == "invalid_request"
 
 
+def test_rpc_request_line_is_bounded():
+    response = json.loads(next(iter(serve_lines(["{" + "x" * 1_048_576]))))
+    assert response["ok"] is False
+    assert "request_too_large" in response["error"]["message"]
+
+
 def test_rpc_session_open_validates_bounds():
     payload = _call({"method": "session.open", "params": {"mode": "unsafe"}})
     assert payload["ok"] is False
