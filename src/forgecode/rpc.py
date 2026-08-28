@@ -78,7 +78,7 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                         if method == "session.cancel": info["state"] = "cancelled"
                         elif method == "session.pause": info["state"] = "paused"
                         elif method == "session.resume": info["state"] = "running"
-                        if method != "session.events":
+                        if method in {"session.cancel", "session.pause", "session.resume"}:
                             info["sequence"] = int(info.get("sequence", 0)) + 1
                             info.setdefault("events", []).append({"sequence": info["sequence"], "type": method.rsplit(".", 1)[-1], "state": info.get("state")})
                         if method == "session.close": _RPC_SESSIONS.pop(handle, None)
