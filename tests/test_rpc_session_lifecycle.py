@@ -347,6 +347,8 @@ def test_rpc_act_result_remains_readable_after_trust_revoke(tmp_path):
     result = _call({"method": "session.result", "params": {"session": handle}})
     assert result["ok"] is True
     assert result["data"]["result"][0]["data"]["audit"] == "safe"
+    waited = _call({"method": "session.wait", "params": {"session": handle, "timeout": 0}})
+    assert waited["ok"] is True
 
 
 def test_rpc_untrusted_act_run_does_not_poison_handle_state(tmp_path):

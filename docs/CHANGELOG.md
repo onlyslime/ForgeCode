@@ -60,6 +60,8 @@ slice.
   method metadata for isolated RPC workers.
 - Included execution mode and explicit `worker_alive=false` in recovered open
   responses for deterministic client recovery decisions.
+- Allowed read-only `session.wait` on trust-revoked/recovery handles so clients
+  can observe terminal state without re-enabling execution.
 - Finalized isolated RPC handles on child-process startup failure with a
   structured process error instead of leaving them stuck in `running`.
 - Added read-only `session.result` RPC and Node helper for retrieving bounded
