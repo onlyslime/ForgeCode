@@ -2,20 +2,21 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
+import threading
 from typing import Any, Callable
 
 from ..agent import AgentConfig, AgentLoop, ContextBuilder, LoopResult
 from ..config import EffectiveConfig
 from ..models import CancellationToken, ModelProvider
 from ..security.workspace import WorkspaceGuard
-from ..storage import SessionStore, TransactionStore
+from ..storage import CheckpointStore, SessionFormatError, SessionStore, TransactionStore
 from ..tools import ToolContext, ToolRegistry
 from ..hooks import HookRegistry
 
 
-@dataclass(frozen=True)
+@dataclass
 class RunService:
     """Construct an AgentLoop without printing or owning CLI policy."""
 
@@ -35,6 +36,107 @@ class RunService:
     pre_side_effect_check: Callable[[], bool | str] | None = None
     hooks: HookRegistry | None = None
     cancellation_token: CancellationToken | None = None
+    interactive_controls: bool = False
+    _active_loop: AgentLoop | None = field(default=None, init=False, repr=False)
+    _active_lock: threading.RLock = field(default_factory=threading.RLock, init=False, repr=False)
+    _pending_pause: bool = field(default=False, init=False, repr=False)
+    _pending_cancel: str | None = field(default=None, init=False, repr=False)
+    _starting: bool = field(default=False, init=False, repr=False)
+
+    def enable_interactive_controls(self) -> None:
+        self.interactive_controls = True
+        # Mark assembly as addressable before ``execute`` creates its loop so
+        # a racing /pause or /cancel is retained rather than reported as an
+        # idle no-op.
+        with self._active_lock:
+            self._starting = True
+
+    def _current_loop(self) -> AgentLoop | None:
+        with self._active_lock:
+            return self._active_loop
+
+    def pause(self) -> dict[str, Any]:
+        loop = self._current_loop()
+        if loop is None:
+            with self._active_lock:
+                if self._starting:
+                    self._pending_pause = True
+                    return {"paused": True, "pending": True, "message": "pause will apply when the worker is initialized"}
+            return {"paused": False, "error": "no active worker"}
+        if loop.lifecycle.terminal:
+            return {"paused": False, "error": "worker is already terminal", "state": loop.lifecycle.state.value}
+        loop.pause()
+        return {"paused": True, "state": loop.lifecycle.state.value, "message": "pause requested at the next safe boundary"}
+
+    def resume(self) -> dict[str, Any]:
+        loop = self._current_loop()
+        if loop is None:
+            return {"resumed": False, "error": "no active worker"}
+        if loop.lifecycle.terminal:
+            return {"resumed": False, "error": "worker is already terminal", "state": loop.lifecycle.state.value}
+        if loop.lifecycle.state.value == "paused":
+            validation_error = self._resume_validation_error(loop)
+            if validation_error is not None:
+                try:
+                    self.session.append(
+                        "resume_rejected",
+                        {"reason": validation_error[:2_000], "state": loop.lifecycle.state.value},
+                        mode=loop.context.mode.value,
+                        outcome="rejected",
+                        error_code="resume_validation_failed",
+                    )
+                except Exception:
+                    pass
+                return {"resumed": False, "error": validation_error, "code": "resume_validation_failed", "state": loop.lifecycle.state.value}
+        released = loop.resume()
+        return {"resumed": released, "state": loop.lifecycle.state.value, "message": "resume requested" if released else "worker was not paused"}
+
+    def _resume_validation_error(self, loop: AgentLoop) -> str | None:
+        """Revalidate durable session/checkpoint and planning fingerprints."""
+        try:
+            read_result = self.session.read_with_issues(strict=True)
+            if any(event.run_id != self.session.run_id for event in read_result.events if event.schema_version >= 1):
+                return "session run_id changed while paused"
+        except (OSError, SessionFormatError, ValueError) as exc:
+            return f"session validation failed: {type(exc).__name__}"
+        try:
+            checkpoint = CheckpointStore(self.session.path.with_suffix(".checkpoint.json")).load()
+        except FileNotFoundError:
+            return "paused run has no checkpoint"
+        except (OSError, ValueError) as exc:
+            return f"checkpoint validation failed: {type(exc).__name__}"
+        if checkpoint.state != "paused":
+            return "checkpoint is not in paused state"
+        conflicts = CheckpointStore(self.session.path.with_suffix(".checkpoint.json")).validate(
+            checkpoint,
+            self.guard,
+            expected_run_id=self.session.run_id,
+            rules_fingerprint=loop.context.rules_fingerprint or None,
+            plan_fingerprint=loop.context.plan_fingerprint or None,
+            config_fingerprint=loop.context.config_fingerprint or None,
+        )
+        if conflicts:
+            return "resume checkpoint conflict: " + "; ".join(item.reason for item in conflicts[:8])
+        if self.pre_side_effect_check is not None:
+            try:
+                checked = self.pre_side_effect_check()
+            except Exception as exc:
+                return f"resume context validation failed: {type(exc).__name__}"
+            if checked is not True:
+                return str(checked or "rules/config/context changed while paused")[:2_000]
+        return None
+
+    def cancel(self, reason: str = "interactive cancel") -> dict[str, Any]:
+        loop = self._current_loop()
+        if loop is None:
+            with self._active_lock:
+                if self._starting:
+                    self._pending_cancel = str(reason or "interactive cancel")[:256]
+                    return {"cancelled": True, "pending": True, "message": "cancel will apply when the worker is initialized"}
+            return {"cancelled": False, "error": "no active worker"}
+        if loop.lifecycle.terminal:
+            return {"cancelled": False, "error": "worker is already terminal", "state": loop.lifecycle.state.value}
+        return {"cancelled": loop.cancel(reason), "message": reason[:256]}
 
     async def execute(
         self,
@@ -45,12 +147,33 @@ class RunService:
         on_event: Callable[[str, dict[str, Any]], None] | None = None,
         cancellation_token: CancellationToken | None = None,
     ) -> LoopResult:
+        with self._active_lock:
+            self._starting = True
         transaction_store = self.transaction_store or TransactionStore(self.guard, max_total_bytes=self.effective_config.transaction_max_bytes if self.effective_config else 50_000_000)
         token = cancellation_token or self.cancellation_token
         context = ToolContext(self.guard, self.approval, mode=mode, secrets=secrets, cancellation_token=token, transaction_store=transaction_store, run_id=self.session.run_id, plan_id=self.plan_id, plan_item_id=self.plan_item_id, rules_fingerprint=self.rules_fingerprint, plan_fingerprint=self.plan_fingerprint, config_fingerprint=self.config_fingerprint, pre_side_effect_check=self.pre_side_effect_check, hooks=self.hooks)
         context_builder = ContextBuilder(max_chars=self.effective_config.context_budget_chars if self.effective_config else 60_000)
         loop = AgentLoop(self.provider, self.registry, context, session=self.session, config=self.config, context_builder=context_builder, on_event=on_event, cancellation_token=token)
-        return await loop.run(prompt)
+        if self.interactive_controls:
+            loop.enable_interactive_controls()
+        with self._active_lock:
+            self._active_loop = loop
+            self._starting = False
+            pending_pause = self._pending_pause
+            pending_cancel = self._pending_cancel
+            self._pending_pause = False
+            self._pending_cancel = None
+        if pending_cancel is not None:
+            loop.cancel(pending_cancel)
+        elif pending_pause:
+            loop.pause()
+        try:
+            return await loop.run(prompt)
+        finally:
+            with self._active_lock:
+                if self._active_loop is loop:
+                    self._active_loop = None
+                self._starting = False
 
 
 __all__ = ["RunService"]

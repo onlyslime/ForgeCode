@@ -31,7 +31,7 @@ Chat Completions 返回结构化 tool calls，ForgeCode 在用户指定工作区
 - **真实离线演示**：DemoProvider 在隔离工作区读取有 bug 的 calculator，先跑
   出失败测试，再走 patch 和审批，最后取得真实通过结果；不需要网络或 API key。
 
-当前版本：`v0.0.9`（版本号与 `VERSION`、`pyproject.toml` 和
+当前版本：`v0.0.10`（版本号与 `VERSION`、`pyproject.toml` 和
 `src/forgecode/__init__.py` 保持同步）。
 
 ### v0.0.9 扩展能力
@@ -40,6 +40,11 @@ Chat Completions 返回结构化 tool calls，ForgeCode 在用户指定工作区
 - **整条轨迹评估**：`forgecode eval`（别名 `benchmark`）只读取持久化事件，计算完成、真实验证、失败/修复、审批拒绝、重复调用、压缩、冲突、取消、未决和审计指标；模型自评不能制造成功。
 - **会话树与路径建议**：`session tree|clone|import` 提供不重放副作用的父子证据；`context complete` 和交互 `/files <prefix>` 返回稳定相对路径及排除原因，结果仅供建议。
 - **模型 profile**：`config profiles` 和交互 `/model list|show|select` 展示/切换经过严格校验的 provider 配置，只显示 API key 环境变量名和是否配置，并记录切换事件。
+
+### v0.0.10 交互运行时控制
+
+- **单一可控 worker**：`chat`/`start` 在同一个 AgentLoop 上支持有界 FIFO follow-up；`/pause`、`/resume`、`/cancel` 在 provider、工具、审批和验证安全边界生效。恢复会校验 session/checkpoint 与规则、计划、配置指纹；无法停止的 worker 进入 recovery-required。
+- **机器契约与模型竞态**：`chat --jsonl` 保证 stdout 每行是可解析 envelope，进度/审批只写 stderr；运行期间 `/model select` 安全拒绝且不改变 provider。旧 `InteractiveSession` 和 `--json` 入口保持兼容。
 
 ### v0.0.8 扩展能力
 
@@ -113,6 +118,11 @@ line, while progress and approval prompts stay on stderr. The v0.0.7 Markdown
 skill manifest, incremental context index, provider health diagnostics and
 lifecycle hooks remain available. None of these extensions grants implicit
 shell, write, network or secret access.
+
+The v0.0.10 release adds a single-worker interactive control surface: bounded
+FIFO follow-ups, safe `/pause`, `/resume`, `/cancel`, checkpoint/fingerprint
+resume validation, active model-switch rejection and bounded shutdown. It
+does not claim Escape-specific terminal support or an operating-system sandbox.
 
 ## Quick start
 

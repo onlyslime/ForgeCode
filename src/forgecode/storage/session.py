@@ -615,7 +615,7 @@ def _safe_run_id(value: Any) -> bool:
 
 _STATE_TRANSITIONS: dict[str, frozenset[str]] = {
     "created": frozenset({"discovering", "cancelled", "failed"}),
-    "discovering": frozenset({"planning", "failed", "cancelled", "recovery_required"}),
+    "discovering": frozenset({"planning", "paused", "failed", "cancelled", "recovery_required"}),
     "planning": frozenset({"awaiting_approval", "verifying", "completed", "failed", "cancelled", "paused"}),
     "awaiting_approval": frozenset({"acting", "paused", "cancelled", "failed", "recovery_required"}),
     "acting": frozenset({"discovering", "verifying", "completed", "paused", "failed", "cancelled", "recovery_required"}),

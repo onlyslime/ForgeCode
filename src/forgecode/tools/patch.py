@@ -16,7 +16,7 @@ import tempfile
 from typing import Any
 import hashlib
 
-from .base import ToolContext, ToolDefinition, ToolResult
+from .base import PauseRequested, ToolContext, ToolDefinition, ToolResult
 
 
 _MAX_PATCH_CHARS = 200_000
@@ -458,6 +458,16 @@ class ApplyPatchTool:
                 )
             except Exception as exc:
                 return ToolResult(False, f"transaction could not be prepared: {type(exc).__name__}", {"error": "transaction_prepare_failed", "transaction_id": transaction_id, "diff": safe_preview})
+        if context.pause_wait is not None:
+            try:
+                context.pause_wait()
+            except PauseRequested:
+                if transaction_manifest is not None:
+                    try:
+                        context.transaction_store.fail(transaction_id, "paused before write", recovery_required=False)
+                    except Exception:
+                        pass
+                return ToolResult(False, "apply_patch paused before write", {"error": "paused", "transaction_id": transaction_id, "diff": safe_preview, "operations": [asdict(op) for op in change_operations]})
         if context.cancelled:
             if transaction_manifest is not None:
                 try:
@@ -469,10 +479,28 @@ class ApplyPatchTool:
         try:
             for operation, target, _original, updated, _before_hash, _before_size, _before_mtime, _after_bytes in planned:
                 written.append((target, _original))
+                if context.pause_wait is not None:
+                    context.pause_wait()
                 if updated is None:
                     target.unlink()
                 else:
                     _atomic_write(target, updated)
+        except PauseRequested:
+            for target, original in reversed(written):
+                try:
+                    if original is None:
+                        if target.exists():
+                            target.unlink()
+                    else:
+                        _atomic_write(target, original)
+                except OSError:
+                    pass
+            if transaction_manifest is not None:
+                try:
+                    context.transaction_store.fail(transaction_id, "paused during atomic replacement", recovery_required=False)
+                except Exception:
+                    pass
+            return ToolResult(False, "apply_patch paused during atomic replacement", {"error": "paused", "transaction_id": transaction_id, "diff": safe_preview, "rolled_back": True, "operations": [asdict(op) for op in change_operations]})
         except OSError as exc:
             for target, original in reversed(written):
                 try:

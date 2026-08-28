@@ -16,6 +16,10 @@ class AgentMode(StrEnum):
     ACT = "act"
 
 
+class PauseRequested(RuntimeError):
+    """Internal signal that a non-interactive run reached a pause boundary."""
+
+
 @dataclass(frozen=True)
 class ToolDefinition:
     name: str
@@ -51,6 +55,10 @@ class ToolContext:
     config_fingerprint: str = ""
     hooks: Any | None = None
     correlation_id: str | None = None
+    # Optional synchronous gate owned by AgentLoop.  It is invoked after an
+    # approval decision and before a side-effecting tool mutates anything, so
+    # an interactive pause cannot race approval into execution.
+    pause_wait: Callable[[], None] | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "mode", AgentMode(self.mode))
@@ -84,6 +92,8 @@ class ToolContext:
         approved = self.approval is not None and self.approval.approve(tool_name, arguments)
         if self.approval_observer:
             self.approval_observer(tool_name, arguments, approved)
+        if approved and self.pause_wait is not None:
+            self.pause_wait()
         return approved
 
     def deny_if_plan(self, tool_name: str) -> ToolResult | None:
@@ -177,7 +187,7 @@ class ToolRegistry:
         # side-effecting tool is never entered after cancellation was observed.
         if context.cancelled:
             return ToolResult(False, f"{name} cancelled before execution", {"error": "cancelled", "cancellation_reason": context.cancellation_reason, "tool": name})
-        if context.mode is AgentMode.PLAN and tool.definition.side_effecting:
+        if context.mode is AgentMode.PLAN and getattr(tool.definition, "side_effecting", False):
             return ToolResult(
                 False,
                 f"{name} is unavailable in plan mode; switch to act mode to perform side effects",
@@ -194,6 +204,13 @@ class ToolRegistry:
                 return ToolResult(False, f"{name} blocked by lifecycle hook", {"error": "hook_blocked", "hook_issues": [issue.to_dict() for issue in before_hook_issues]})
             if context.cancelled:
                 return ToolResult(False, f"{name} cancelled before execution", {"error": "cancelled", "cancellation_reason": context.cancellation_reason, "tool": name})
+        if getattr(tool.definition, "side_effecting", False) and context.pause_wait is not None:
+            try:
+                context.pause_wait()
+            except PauseRequested:
+                return ToolResult(False, f"{name} paused before execution", {"error": "paused", "tool": name})
+        if context.cancelled:
+            return ToolResult(False, f"{name} cancelled before execution", {"error": "cancelled", "cancellation_reason": context.cancellation_reason, "tool": name})
         try:
             result = tool.execute(arguments, context)
             if not isinstance(result, ToolResult):
@@ -219,6 +236,8 @@ class ToolRegistry:
                     # expose the fail-closed issue for the caller's audit.
                     return ToolResult(final.ok, final.output, {**final.metadata, "error": "hook_failed_after_effect", "hook_issues": [issue.to_dict() for issue in after_hook_issues]})
             return final
+        except PauseRequested:
+            return ToolResult(False, f"{name} paused before execution", {"error": "paused", "tool": name})
         except Exception as exc:  # tool errors become model context, never process crashes
             final = ToolResult(False, redact_text(f"{type(exc).__name__}: {exc}", context.secrets), {"error": type(exc).__name__})
             if context.hooks is not None:

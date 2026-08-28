@@ -1,4 +1,4 @@
-from .base import AgentMode, ToolContext, ToolDefinition, ToolRegistry, ToolResult
+from .base import AgentMode, PauseRequested, ToolContext, ToolDefinition, ToolRegistry, ToolResult
 from .filesystem import ListFilesTool, ReadFileTool, SearchTool, WriteFileTool
 from .patch import ApplyPatchTool, ChangeOperation, ChangePlan, ChangeResult, PatchFormatError, parse_patch
 from .summary import WorkspaceSummaryTool
@@ -31,6 +31,7 @@ __all__ = [
     "WorkspaceSummaryTool",
     "RepositoryMapTool",
     "AgentMode",
+    "PauseRequested",
     "DenyAllApproval",
     "InteractiveApproval",
     "ToolContext",

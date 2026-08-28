@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from ..context_policy import is_ignored_context_path
-from .base import ToolContext, ToolDefinition, ToolResult
+from .base import PauseRequested, ToolContext, ToolDefinition, ToolResult
 
 
 _SKIP_DIRS = {".git", ".venv", "node_modules", "__pycache__", ".pytest_cache", ".forgecode", "dist", "build", "tmp", "temp"}
@@ -276,6 +276,16 @@ class WriteFileTool:
                 )
             except Exception as exc:
                 return ToolResult(False, f"transaction could not be prepared: {type(exc).__name__}", {"error": "transaction_prepare_failed", "transaction_id": transaction_id})
+        if context.pause_wait is not None:
+            try:
+                context.pause_wait()
+            except PauseRequested:
+                if transaction_manifest is not None:
+                    try:
+                        context.transaction_store.fail(transaction_id, "paused before write", recovery_required=False)
+                    except Exception:
+                        pass
+                return ToolResult(False, "write_file paused before write", {"error": "paused", "transaction_id": transaction_id, "path": path_value})
         if context.cancelled:
             if transaction_manifest is not None:
                 try:
@@ -294,6 +304,8 @@ class WriteFileTool:
                     os.fsync(stream.fileno())
                 if before_mode is not None:
                     os.chmod(temporary, before_mode)
+                if context.pause_wait is not None:
+                    context.pause_wait()
                 os.replace(temporary, path)
             finally:
                 try:
@@ -302,6 +314,13 @@ class WriteFileTool:
                     pass
                 if temporary.exists():
                     temporary.unlink()
+        except PauseRequested:
+            if transaction_manifest is not None:
+                try:
+                    context.transaction_store.fail(transaction_id, "paused before atomic replace", recovery_required=False)
+                except Exception:
+                    pass
+            return ToolResult(False, "write_file paused before atomic replace", {"error": "paused", "transaction_id": transaction_id, "path": path_value})
         except OSError as exc:
             rolled_back = False
             try:

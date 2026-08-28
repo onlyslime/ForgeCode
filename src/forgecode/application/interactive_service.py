@@ -11,11 +11,235 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 import json
 import shlex
+import threading
 from typing import Callable, Iterable, TextIO
 
 
 class SlashCommandError(ValueError):
     pass
+
+
+def _interactive_success(value: object) -> bool:
+    """Classify a result for the machine envelope without hiding failures."""
+    if not isinstance(value, dict):
+        return True
+    if value.get("error") or value.get("recovery_required") or value.get("unresolved"):
+        return False
+    if "succeeded" in value and value.get("succeeded") is not True:
+        return False
+    if value.get("state") == "recovery_required":
+        return False
+    return True
+
+
+def _interactive_error_code(value: object) -> str:
+    if isinstance(value, dict):
+        return str(value.get("code") or value.get("error") or value.get("stopped_reason") or value.get("state") or "interactive_failed")[:128]
+    return "interactive_failed"
+
+
+@dataclass
+class InteractiveRunController:
+    """Run one injected task engine while accepting bounded follow-ups.
+
+    The controller owns no agent logic: ``start`` is the production
+    ``run_message`` callback, so provider/tool/safety behavior remains in the
+    single ``AgentLoop``. A daemon worker drains FIFO follow-ups and exposes
+    thread-safe steering methods for terminal commands.
+    """
+
+    start: Callable[[str], object]
+    on_result: Callable[[object], None] = lambda _value: None
+    event_sink: Callable[[str, dict[str, object]], None] = lambda _kind, _payload: None
+    pause_active: Callable[[], object] = lambda: {"paused": False, "error": "no active worker"}
+    resume_active: Callable[[], object] = lambda: {"resumed": False, "error": "no active worker"}
+    cancel_active: Callable[[], object] = lambda: {"cancelled": False, "error": "no active worker"}
+    max_queue_items: int = 32
+    max_queue_chars: int = 32_000
+    _queue: list[str] = field(default_factory=list, init=False, repr=False)
+    _queue_chars: int = field(default=0, init=False, repr=False)
+    _active: bool = field(default=False, init=False, repr=False)
+    _stopped: bool = field(default=False, init=False, repr=False)
+    _cancel_requested: bool = field(default=False, init=False, repr=False)
+    _pending_pause: bool = field(default=False, init=False, repr=False)
+    _pending_cancel: bool = field(default=False, init=False, repr=False)
+    _thread: threading.Thread | None = field(default=None, init=False, repr=False)
+    _condition: threading.Condition = field(default_factory=threading.Condition, init=False, repr=False)
+
+    @property
+    def active(self) -> bool:
+        with self._condition:
+            return self._active
+
+    def snapshot(self) -> dict[str, object]:
+        with self._condition:
+            return {
+                "active": self._active,
+                "queue_items": len(self._queue),
+                "queue_chars": self._queue_chars,
+                "stopped": self._stopped,
+                "cancellation_requested": self._cancel_requested,
+            }
+
+    def submit(self, message: str) -> dict[str, object]:
+        text = str(message).strip()
+        if not text:
+            return {"accepted": False, "error": "message must not be empty"}
+        with self._condition:
+            if self._stopped:
+                return {"accepted": False, "error": "interactive session is stopped"}
+            if self._active:
+                if self._cancel_requested:
+                    self.event_sink("followup_rejected", {"reason": "cancellation_requested", "items": len(self._queue), "chars": self._queue_chars})
+                    return {"accepted": False, "queued": False, "error": "run cancellation is already requested"}
+                if len(self._queue) >= self.max_queue_items or self._queue_chars + len(text) > self.max_queue_chars:
+                    self.event_sink("followup_rejected", {"reason": "queue_full", "items": len(self._queue), "chars": self._queue_chars})
+                    return {"accepted": False, "queued": False, "error": "follow-up queue is full"}
+                self._queue.append(text)
+                self._queue_chars += len(text)
+                self.event_sink("followup_enqueued", {"position": len(self._queue), "chars": len(text), "queue_items": len(self._queue)})
+                self._condition.notify_all()
+                return {"accepted": True, "queued": True, "position": len(self._queue)}
+            self._active = True
+            self._cancel_requested = False
+            self._pending_pause = False
+            self._pending_cancel = False
+            self.event_sink("run_enqueued", {"chars": len(text), "queue_items": 0})
+            self._thread = threading.Thread(target=self._worker, args=(text,), name="forgecode-interactive", daemon=True)
+            self._thread.start()
+            return {"accepted": True, "queued": False, "message": "run started"}
+
+    def _worker(self, first: str) -> None:
+        message = first
+        while True:
+            value: object
+            try:
+                self.event_sink("run_dequeued", {"chars": len(message)})
+                value = self.start(message)
+            except BaseException as exc:
+                value = {"error": f"interactive worker failed: {type(exc).__name__}"}
+                self.event_sink("run_failed", {"error": type(exc).__name__})
+            try:
+                self.on_result(value)
+            except BaseException as exc:
+                # Rendering is outside the execution boundary.  A closed
+                # stdout must not make the worker report a second fake run.
+                self.event_sink("result_output_failed", {"error": type(exc).__name__})
+            self.event_sink(
+                "run_finished",
+                {
+                    "ok": not (isinstance(value, dict) and bool(value.get("error"))),
+                    "stopped_reason": value.get("stopped_reason") if isinstance(value, dict) else None,
+                    "state": value.get("state") if isinstance(value, dict) else None,
+                },
+            )
+            with self._condition:
+                # Cancellation is fail-closed: follow-ups accepted before the
+                # cancellation request must never start after the current run
+                # returns.  A new submission is allowed only after this worker
+                # has become inactive and explicitly resets the flag.
+                if self._stopped or self._cancel_requested or not self._queue:
+                    self._queue.clear()
+                    self._queue_chars = 0
+                    self._active = False
+                    if not self._stopped:
+                        self._cancel_requested = False
+                    self._condition.notify_all()
+                    return
+                message = self._queue.pop(0)
+                self._queue_chars -= len(message)
+                self.event_sink("followup_dequeued", {"remaining": len(self._queue), "chars": len(message)})
+
+    def _is_no_active_worker(self, value: object) -> bool:
+        return isinstance(value, dict) and value.get("error") == "no active worker"
+
+    def flush_pending_controls(self) -> tuple[object, ...]:
+        """Apply controls received while the worker was still initializing.
+
+        ``submit`` marks the worker active before its thread can construct a
+        ``RunService``.  A terminal command can therefore race that short
+        window; retaining the intent here prevents pause/cancel from being
+        silently lost.
+        """
+        results: list[object] = []
+        with self._condition:
+            pending_cancel = self._pending_cancel
+            pending_pause = self._pending_pause and not pending_cancel
+            self._pending_cancel = False
+            self._pending_pause = False
+        if pending_cancel:
+            results.append(self.cancel_active())
+        elif pending_pause:
+            results.append(self.pause_active())
+        return tuple(results)
+
+    def pause(self) -> object:
+        if not self.active:
+            return {"paused": False, "error": "no active worker"}
+        result = self.pause_active()
+        if self._is_no_active_worker(result):
+            with self._condition:
+                if self._active and not self._cancel_requested:
+                    self._pending_pause = True
+            self.event_sink("pause_pending", {"reason": "worker_initializing"})
+            return {"paused": True, "pending": True, "message": "pause will apply at the next safe boundary"}
+        return result
+
+    def resume(self) -> object:
+        if not self.active:
+            return {"resumed": False, "error": "no active worker"}
+        with self._condition:
+            if self._pending_pause:
+                self._pending_pause = False
+                self.event_sink("resume_pending_cleared", {"reason": "worker_initializing"})
+                return {"resumed": True, "pending": False, "message": "pending pause cleared before worker initialization"}
+        return self.resume_active()
+
+    def cancel(self) -> object:
+        if not self.active:
+            return {"cancelled": False, "error": "no active worker"}
+        with self._condition:
+            self._cancel_requested = True
+            self._queue.clear()
+            self._queue_chars = 0
+        result = self.cancel_active()
+        if self._is_no_active_worker(result):
+            with self._condition:
+                self._pending_cancel = True
+            self.event_sink("cancel_pending", {"reason": "worker_initializing"})
+            return {"cancelled": True, "pending": True, "message": "cancel will apply when the worker is initialized"}
+        return result
+
+    def stop(self, *, cancel: bool = True, timeout: float = 2.0) -> bool:
+        with self._condition:
+            self._stopped = True
+            if cancel:
+                self._cancel_requested = True
+            self._queue.clear()
+            self._queue_chars = 0
+            self._condition.notify_all()
+        if cancel:
+            result = self.cancel_active()
+            if self._is_no_active_worker(result):
+                with self._condition:
+                    # The worker may still be assembling its RunService.
+                    # Preserve the cancellation intent so initialization can
+                    # apply it before the first provider/tool boundary.
+                    self._pending_cancel = True
+                self.event_sink("cancel_pending", {"reason": "worker_initializing"})
+        thread = self._thread
+        if thread is not None and thread is not threading.current_thread():
+            thread.join(max(0.0, min(float(timeout), 5.0)))
+        stopped = not self.active
+        if not stopped:
+            self.event_sink("worker_unresolved", {"reason": "bounded_join_expired", "timeout_seconds": max(0.0, min(float(timeout), 5.0))})
+        return stopped
+
+    def join(self, timeout: float | None = None) -> bool:
+        thread = self._thread
+        if thread is not None and thread is not threading.current_thread():
+            thread.join(timeout)
+        return not self.active
 
 
 @dataclass
@@ -48,6 +272,7 @@ class InteractiveSession:
     _queue: list[str] = field(default_factory=list)
     _queue_chars: int = 0
     stopped: bool = False
+    controller: InteractiveRunController | None = None
 
     COMMANDS = ("help", "status", "plan", "mode", "model", "rules", "files", "skills", "skill", "tree", "review", "test", "compact", "undo", "cancel", "pause", "resume", "quit")
 
@@ -62,7 +287,7 @@ class InteractiveSession:
         if not line.strip():
             return None
         if not line.lstrip().startswith("/"):
-            return self.run_message(line)
+            return self.controller.submit(line) if self.controller is not None else self.run_message(line)
         try:
             parts = shlex.split(line.strip(), posix=True)
         except ValueError as exc:
@@ -147,19 +372,34 @@ class InteractiveSession:
         for line in stream:
             if self.stopped:
                 break
+            # Preserve the historical sequential semantics for stateful slash
+            # commands while leaving control commands responsive during an
+            # active run.  A bounded wait prevents EOF/REPL shutdown from
+            # hanging forever on a provider that will not return.
+            if self.controller is not None and line.lstrip().startswith("/"):
+                command_hint = line.lstrip()[1:].split(None, 1)[0].lower() if line.lstrip()[1:] else ""
+                if command_hint not in {"pause", "resume", "cancel", "status", "help", "quit", "model"} and self.controller.active:
+                    self.controller.join(30.0)
             try:
                 value = self.dispatch(line)
             except SlashCommandError as exc:
                 value = {"error": str(exc)}
+            if self.controller is not None and self.json_mode and not line.lstrip().startswith("/") and self.controller.active:
+                # ``--json`` is the legacy scripted transport and historically
+                # exposed one completed result per input line.  Preserve that
+                # ordering for existing scripts; ``--jsonl`` remains the
+                # asynchronous, controller-oriented transport.
+                self.controller.join(30.0)
             if value is not None:
                 results.append(value)
                 if self.jsonl_mode:
-                    success = not (isinstance(value, dict) and value.get("error"))
+                    success = _interactive_success(value)
                     if success:
                         record = {"schema_version": 1, "kind": "interactive_result", "ok": True, "command": "chat", "data": value, "type": "interactive_result", "payload": value}
                     else:
                         message = str(value.get("message") or value.get("error") or "interactive command failed") if isinstance(value, dict) else str(value)
-                        record = {"schema_version": 1, "kind": "error", "ok": False, "command": "chat", "error": {"code": str(value.get("error", "interactive_failed")) if isinstance(value, dict) else "interactive_failed", "message": message[:2_000]}, "type": "interactive_result", "payload": value}
+                        code = _interactive_error_code(value)
+                        record = {"schema_version": 1, "kind": "error", "ok": False, "command": "chat", "error": {"code": code[:128], "message": message[:2_000]}, "type": "interactive_result", "payload": value}
                     self.output(json.dumps(record, ensure_ascii=False, default=str, allow_nan=False))
                 else:
                     self.output(json.dumps({"type": "interactive_result", "payload": value}, ensure_ascii=False, default=str) if self.json_mode else str(value))
@@ -168,4 +408,4 @@ class InteractiveSession:
         return results
 
 
-__all__ = ["InteractiveSession", "SlashCommandError"]
+__all__ = ["InteractiveRunController", "InteractiveSession", "SlashCommandError"]

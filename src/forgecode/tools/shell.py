@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from ..security.redaction import redact_value
-from .base import ApprovalPolicy, ToolContext, ToolDefinition, ToolResult
+from .base import ApprovalPolicy, PauseRequested, ToolContext, ToolDefinition, ToolResult
 
 
 _MAX_COMMAND_OUTPUT_CHARS = 20_000
@@ -169,6 +169,11 @@ class ShellTool:
             return ToolResult(False, "command skipped because the run deadline has expired", {"error": "deadline_exceeded", "timed_out": True, "started_at": started_at, "ended_at": datetime.now(timezone.utc).isoformat(), **risk_metadata})
         if context.cancelled:
             return ToolResult(False, "run_command cancelled before process start", {"error": "cancelled", "approval": "approved", "termination_result": "not_started", "cancellation_reason": context.cancellation_reason, **risk_metadata})
+        if context.pause_wait is not None:
+            try:
+                context.pause_wait()
+            except PauseRequested:
+                return ToolResult(False, "run_command paused before process start", {"error": "paused", "approval": "approved", "termination_result": "not_started", **risk_metadata})
         environment = {
             name: value
             for name, value in os.environ.items()

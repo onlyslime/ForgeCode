@@ -10,12 +10,13 @@ import shlex
 import subprocess
 import sys
 import re
+import threading
 import uuid
 from typing import Any
 
 from .. import __version__
 from ..agent import AgentConfig, AgentLoop, ContextCompactor, RunState, SessionContextRebuilder
-from .interactive_service import InteractiveSession
+from .interactive_service import InteractiveRunController, InteractiveSession, _interactive_error_code, _interactive_success
 from .run_service import RunService
 from .session_service import aggregate_events
 from ..context import ContextIndex, ContextIndexError, RepositoryMapBuilder
@@ -1491,8 +1492,19 @@ def main(argv: list[str] | None = None) -> int:
         configured_approval = settings.effective.approval if settings.effective else "interactive"
         approval = DenyAllApproval() if configured_approval == "deny" and not (args.auto_approve or args.demo) else InteractiveApproval(auto_approve=args.auto_approve or args.demo or configured_approval == "auto", output_fn=_approval_output(machine_json), prompt_to_output=machine_json, secrets=[api_key])
         state = {"mode": args.mode, "last": None, "plan": None, "plan_targets": (), "reference_specs": (), "rules_fingerprint": "", "reference_fingerprint": "", "index_fingerprint": "", "last_message": "", "last_verification": None}
+        active_service: RunService | None = None
+        active_service_lock = threading.RLock()
+        controller_holder: dict[str, InteractiveRunController | None] = {"value": None}
+        output_lock = threading.RLock()
+        if args.demo and not any((workspace / name).exists() for name in ("demo_calculator.py", "demo_config.json")):
+            # The demo fixture is a bounded, explicit offline setup action.
+            # Prepare it before reading stdin so legacy scripted chat clients
+            # can inspect/edit the file immediately after dispatch returns,
+            # even though real runs now execute on the controller worker.
+            _prepare_demo_workspace(build_default_registry(guard), guard, task=args.demo_task)
 
         def run_message(message: str) -> Any:
+            nonlocal active_service
             if not message.strip():
                 return {"error": "message must not be empty"}
             try:
@@ -1561,7 +1573,21 @@ def main(argv: list[str] | None = None) -> int:
                     return True
 
                 service = RunService(provider, registry, guard, session, service_config, settings.effective, approval, transaction_store, state["plan"].plan_id if state["plan"] else None, "task-1" if state["plan"] else None, expected_rule_fingerprint, state["plan"].evidence_fingerprint() if state["plan"] else "", expected_config_fingerprint, revalidate_context, hook_registry)
-                result = asyncio.run(service.execute(enriched, mode=state["mode"], secrets=(api_key,) if api_key else ()))
+                service.enable_interactive_controls()
+                with active_service_lock:
+                    active_service = service
+                controller = controller_holder["value"]
+                if controller is not None:
+                    # A control command can arrive while references/rules and
+                    # the service are still being assembled.  Apply that
+                    # intent immediately after the loop becomes addressable.
+                    controller.flush_pending_controls()
+                try:
+                    result = asyncio.run(service.execute(enriched, mode=state["mode"], secrets=(api_key,) if api_key else ()))
+                finally:
+                    with active_service_lock:
+                        if active_service is service:
+                            active_service = None
                 state["last"] = result
                 if result.verifications:
                     state["last_verification"] = result.verifications[-1].to_dict()
@@ -1580,6 +1606,50 @@ def main(argv: list[str] | None = None) -> int:
             except (ProviderError, ValueError, OSError) as exc:
                 return {"error": _redact_display(str(exc), [api_key])}
 
+        def _active_service() -> RunService | None:
+            with active_service_lock:
+                return active_service
+
+        def pause_active() -> Any:
+            service = _active_service()
+            return service.pause() if service is not None else {"paused": False, "error": "no active worker"}
+
+        def resume_active() -> Any:
+            service = _active_service()
+            return service.resume() if service is not None else {"resumed": False, "error": "no active worker"}
+
+        def cancel_active() -> Any:
+            service = _active_service()
+            return service.cancel() if service is not None else {"cancelled": False, "error": "no active worker"}
+
+        def persist_controller_event(kind: str, payload: dict[str, object]) -> None:
+            try:
+                session.append(kind, payload, mode=state["mode"])
+            except Exception:
+                # Controller telemetry is best effort; the AgentLoop still
+                # owns the authoritative audit and marks incomplete writes.
+                return
+
+        def emit_interactive_result(value: object) -> None:
+            """Render a worker result without contaminating JSON stdout."""
+            with output_lock:
+                if machine_json:
+                    success = _interactive_success(value)
+                    if success:
+                        record = _machine_envelope("chat", "interactive_result", True, data=value if isinstance(value, dict) else {"value": value}, exit_code=0, type="interactive_result", payload=value)
+                    else:
+                        message = str(value.get("message") or value.get("error") or "interactive command failed") if isinstance(value, dict) else str(value)
+                        code = _interactive_error_code(value)
+                        record = _machine_error("chat", code, message, exit_code=1)
+                        record.update({"type": "interactive_result", "payload": value})
+                    _emit_machine(record)
+                else:
+                    print(value)
+
+        def interactive_output(text: str) -> None:
+            with output_lock:
+                print(text)
+
         def model_command(model_args: list[str]) -> Any:
             nonlocal settings
             action = model_args[0] if model_args else "list"
@@ -1595,6 +1665,11 @@ def main(argv: list[str] | None = None) -> int:
                     return {"profile": selected, "config": config.to_dict()}
                 if action == "select":
                     selected = model_args[1]
+                    with active_service_lock:
+                        busy = active_service is not None or bool(controller_holder["value"] and controller_holder["value"].active)
+                    if busy:
+                        session.append("profile_switch_rejected", {"from": settings.profile, "to": selected, "reason": "worker_active"}, mode=state["mode"], outcome="rejected", error_code="worker_active")
+                        return {"error": "profile switch unavailable while worker is active", "code": "worker_active", "profile": settings.profile}
                     config = ConfigLoader(workspace).load(profile=selected)
                     previous = settings.profile
                     settings = Settings(workspace=workspace, model=config.model, api_key_env=config.api_key_env, base_url=config.base_url, profile=config.profile, effective=config)
@@ -1606,7 +1681,8 @@ def main(argv: list[str] | None = None) -> int:
 
         def status() -> Any:
             manifests = transaction_store.list(limit=20)
-            return {"mode": state["mode"], "run_id": session.run_id, "transactions": len(manifests), "last_state": getattr(state["last"], "state", None), "latest_verification": state["last_verification"]}
+            controller = controller_holder["value"]
+            return {"mode": state["mode"], "run_id": session.run_id, "transactions": len(manifests), "last_state": getattr(state["last"], "state", None), "latest_verification": state["last_verification"], "worker": controller.snapshot() if controller is not None else {"active": False}}
 
         def plan_command(_args: list[str]) -> Any:
             state["mode"] = "plan"
@@ -1717,9 +1793,26 @@ def main(argv: list[str] | None = None) -> int:
                 pass
             return invocation.to_dict()
         def quit_session() -> Any:
+            worker_stopped = True
+            controller = controller_holder["value"]
+            if controller is not None and controller.active:
+                # Request cooperative cancellation first and allow the
+                # provider/tool boundary to observe it.  Only after this
+                # bounded grace period do we use the shorter hard cleanup;
+                # this prevents /quit from racing a late provider response
+                # into a side-effecting tool dispatch.
+                controller.cancel()
+                worker_stopped = controller.join(30.0)
+                if not worker_stopped:
+                    worker_stopped = controller.stop(cancel=True, timeout=2.0)
+                if not worker_stopped:
+                    try:
+                        session.append("recovery_required", {"reason": "interactive worker did not stop within bounded shutdown", "timeout_seconds": 2.0}, mode=state["mode"], outcome="unresolved", error_code="worker_unresolved")
+                    except Exception:
+                        pass
             try:
                 last_result = state.get("last")
-                checkpoint_state = getattr(last_result, "state", None) or "created"
+                checkpoint_state = "recovery_required" if not worker_stopped else (getattr(last_result, "state", None) or "created")
                 checkpoint = Checkpoint.create(
                     guard,
                     run_id=session.run_id,
@@ -1732,10 +1825,10 @@ def main(argv: list[str] | None = None) -> int:
                     secrets=(api_key,) if api_key else (),
                 )
                 CheckpointStore(session.path.with_suffix(".checkpoint.json")).save(checkpoint)
-                event = session.append("interactive_quit", {"state": checkpoint_state, "last_verification": state.get("last_verification"), "checkpoint_sequence": checkpoint.sequence}, mode=state["mode"], outcome="checkpointed")
-                return {"stopped": True, "checkpointed": True, "sequence": event.sequence}
+                event = session.append("interactive_quit", {"state": checkpoint_state, "last_verification": state.get("last_verification"), "checkpoint_sequence": checkpoint.sequence}, mode=state["mode"], outcome="checkpointed" if worker_stopped else "recovery_required", error_code=None if worker_stopped else "worker_unresolved")
+                return {"stopped": True, "checkpointed": True, "worker_stopped": worker_stopped, "recovery_required": not worker_stopped, "sequence": event.sequence}
             except Exception as exc:
-                return {"stopped": True, "checkpointed": False, "error": f"checkpoint failed: {type(exc).__name__}"}
+                return {"stopped": True, "checkpointed": False, "worker_stopped": worker_stopped, "recovery_required": not worker_stopped, "error": f"checkpoint failed: {type(exc).__name__}"}
 
         def files_command(prefix: str = "") -> Any:
             try:
@@ -1752,7 +1845,38 @@ def main(argv: list[str] | None = None) -> int:
             except (OSError, ValueError) as exc:
                 return {"error": _redact_display(str(exc), [api_key])}
 
-        interactive = InteractiveSession(run_message, status=status, plan=plan_command, set_mode=set_mode, model=model_command, review=review, test=test_command, compact=compact, undo=undo_command, rules=lambda: RuleEngine(guard).discover().to_dict(), files=files_command, skills=skills_command, tree=tree_command, cancel=lambda: {"cancelled": False, "message": "no active worker; use Ctrl-C during a run"}, pause=lambda: {"paused": False, "message": "no active worker; pause is available to API callers"}, resume=lambda: {"resumed": False, "message": "start a new run or fork a checkpoint"}, quit=quit_session, output=print, json_mode=False, jsonl_mode=machine_json)
+        controller = InteractiveRunController(
+            start=run_message,
+            on_result=emit_interactive_result,
+            event_sink=persist_controller_event,
+            pause_active=pause_active,
+            resume_active=resume_active,
+            cancel_active=cancel_active,
+        )
+        controller_holder["value"] = controller
+        interactive = InteractiveSession(
+            run_message,
+            status=status,
+            plan=plan_command,
+            set_mode=set_mode,
+            model=model_command,
+            review=review,
+            test=test_command,
+            compact=compact,
+            undo=undo_command,
+            rules=lambda: RuleEngine(guard).discover().to_dict(),
+            files=files_command,
+            skills=skills_command,
+            tree=tree_command,
+            cancel=controller.cancel,
+            pause=controller.pause,
+            resume=controller.resume,
+            quit=quit_session,
+            output=interactive_output,
+            json_mode=bool(getattr(args, "json", False)),
+            jsonl_mode=bool(getattr(args, "jsonl", False)),
+            controller=controller,
+        )
         if machine_json:
             header_data = {"run_id": session.run_id, "workspace": ".", "mode": state["mode"], "profile": settings.profile, "rules": rules_count, "budget": settings.effective.context_budget_chars if settings.effective else 60_000}
             _emit_machine(_machine_envelope("chat", "interactive_header", True, data=header_data, exit_code=0, type="interactive_header", **_compat_aliases(header_data)))
@@ -1765,23 +1889,38 @@ def main(argv: list[str] | None = None) -> int:
                     # ``InteractiveSession.run_stream`` emits subsequent
                     # responses in the same envelope format; initial prompt
                     # follows that contract as well.
-                    success = not (isinstance(initial_result, dict) and initial_result.get("error"))
+                    success = _interactive_success(initial_result)
                     if success:
                         record = _machine_envelope("chat", "interactive_result", True, data=initial_result, exit_code=0, type="interactive_result", payload=initial_result)
                     else:
                         message = str(initial_result.get("message") or initial_result.get("error") or "interactive command failed") if isinstance(initial_result, dict) else str(initial_result)
-                        record = _machine_error("chat", "interactive_failed", message, exit_code=1)
+                        code = _interactive_error_code(initial_result)
+                        record = _machine_error("chat", code, message, exit_code=1)
                         record.update({"type": "interactive_result", "payload": initial_result})
                     _emit_machine(record)
                 else:
                     print(initial_result)
+        shutdown_unresolved = False
         try:
             stream = sys.stdin
             interactive.run_stream(stream)
         except KeyboardInterrupt:
+            controller.stop(cancel=True, timeout=2.0)
             session.append("state_transition", {"to": "cancelled", "reason": "user interruption"}, mode=state["mode"], error_code="cancelled")
             return 130
-        return 0
+        finally:
+            # EOF is a normal terminal boundary.  Give an in-flight worker a
+            # bounded grace period to finish normally (important for a
+            # piped/initial prompt), then request cancellation and record an
+            # unresolved worker if it still cannot stop.
+            if controller.active:
+                controller.join(30.0)
+            if controller.active:
+                stopped = controller.stop(cancel=True, timeout=2.0)
+                if not stopped:
+                    shutdown_unresolved = True
+                    session.append("recovery_required", {"reason": "interactive worker did not stop at EOF", "timeout_seconds": 2.0}, mode=state["mode"], outcome="unresolved", error_code="worker_unresolved")
+        return 3 if shutdown_unresolved else 0
 
     if command == "doctor":
         machine_json = bool(getattr(args, "json", False) or getattr(args, "jsonl", False))

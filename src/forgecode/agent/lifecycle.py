@@ -33,7 +33,7 @@ class RunLifecycle:
 
     _transitions: ClassVar[dict[RunState, frozenset[RunState]]] = {
         RunState.CREATED: frozenset({RunState.DISCOVERING, RunState.CANCELLED, RunState.FAILED}),
-        RunState.DISCOVERING: frozenset({RunState.PLANNING, RunState.FAILED, RunState.CANCELLED, RunState.RECOVERY_REQUIRED}),
+        RunState.DISCOVERING: frozenset({RunState.PLANNING, RunState.PAUSED, RunState.FAILED, RunState.CANCELLED, RunState.RECOVERY_REQUIRED}),
         RunState.PLANNING: frozenset({RunState.AWAITING_APPROVAL, RunState.VERIFYING, RunState.COMPLETED, RunState.FAILED, RunState.CANCELLED, RunState.PAUSED}),
         RunState.AWAITING_APPROVAL: frozenset({RunState.ACTING, RunState.PAUSED, RunState.CANCELLED, RunState.FAILED, RunState.RECOVERY_REQUIRED}),
         RunState.ACTING: frozenset({RunState.DISCOVERING, RunState.VERIFYING, RunState.COMPLETED, RunState.PAUSED, RunState.FAILED, RunState.CANCELLED, RunState.RECOVERY_REQUIRED}),

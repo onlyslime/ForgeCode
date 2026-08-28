@@ -19,6 +19,7 @@ from ..context import RepositoryMapBuilder
 from ..security.redaction import redact_text
 from ..storage import Checkpoint, CheckpointStore, FileFingerprint, SessionStore, bounded
 from ..tools import AgentMode, ToolContext, ToolRegistry
+from ..tools import PauseRequested
 from .context import ContextBuilder
 from .lifecycle import LifecycleError, RunLifecycle, RunState
 from .recovery import ContextCompactor
@@ -98,6 +99,8 @@ class AgentLoop:
         self._last_event_sequence = 0
         self._last_context_summary = ""
         self._pause_requested = False
+        self._interactive_pause = False
+        self._pause_event_recorded = False
         # Attempt/retry ids are only unique within a provider request.  Some
         # adapters (and a number of test/fake adapters) restart their counter
         # for every turn, so using the id by itself can silently drop evidence
@@ -135,7 +138,42 @@ class AgentLoop:
         configured_deadline = now + self.config.total_timeout_seconds
         if context.deadline_monotonic is not None:
             configured_deadline = min(configured_deadline, context.deadline_monotonic)
-        self.context = ToolContext(context.guard, context.approval, approval_observer=record_approval, mode=context.mode, secrets=context.secrets, deadline_monotonic=configured_deadline, cancellation_requested=context.cancellation_requested, cancellation_token=self.cancellation_token, transaction_store=context.transaction_store, run_id=context.run_id or (session.run_id if session else ""), plan_id=context.plan_id, plan_item_id=context.plan_item_id, pre_side_effect_check=context.pre_side_effect_check, rules_fingerprint=context.rules_fingerprint, plan_fingerprint=context.plan_fingerprint, config_fingerprint=context.config_fingerprint, hooks=context.hooks, correlation_id=context.correlation_id)
+        self.context = ToolContext(context.guard, context.approval, approval_observer=record_approval, mode=context.mode, secrets=context.secrets, deadline_monotonic=configured_deadline, cancellation_requested=context.cancellation_requested, cancellation_token=self.cancellation_token, transaction_store=context.transaction_store, run_id=context.run_id or (session.run_id if session else ""), plan_id=context.plan_id, plan_item_id=context.plan_item_id, pre_side_effect_check=context.pre_side_effect_check, rules_fingerprint=context.rules_fingerprint, plan_fingerprint=context.plan_fingerprint, config_fingerprint=context.config_fingerprint, hooks=context.hooks, correlation_id=context.correlation_id, pause_wait=self._wait_for_side_effect_boundary)
+
+    def _wait_for_side_effect_boundary(self) -> None:
+        """Synchronously honor an interactive pause after approval.
+
+        Tool execution is synchronous, so the gate intentionally blocks only
+        at this safe boundary.  Cancellation remains observable while waiting
+        and fails closed before transaction preparation or process spawn.
+        """
+        if not self._pause_requested:
+            return
+        if self._interactive_pause:
+            if not self.lifecycle.terminal and self.lifecycle.state is not RunState.PAUSED:
+                try:
+                    self._transition(RunState.PAUSED, reason="interactive pause requested after approval")
+                except LifecycleError:
+                    self.lifecycle.state = RunState.PAUSED
+            if not self._pause_event_recorded:
+                self._record("pause", {"reason": "interactive pause requested after approval", "interactive": True})
+                self._pause_event_recorded = True
+            while self._pause_requested and not self.context.cancelled:
+                time.sleep(0.01)
+            self._pause_event_recorded = False
+            if self.context.cancelled:
+                return
+            if self.lifecycle.state is RunState.PAUSED:
+                try:
+                    self._transition(RunState.DISCOVERING, reason="interactive pause released after approval")
+                except LifecycleError:
+                    self.lifecycle.state = RunState.DISCOVERING
+            self._record("resume", {"reason": "interactive pause released after approval"})
+        else:
+            # Legacy/API pause still has to block the side effect.  The loop
+            # observes this boundary error, records it as a tool result, and
+            # returns its terminal ``paused`` result at the next loop edge.
+            raise PauseRequested("operation paused before side effect")
 
     def _record(self, kind: str, payload: dict[str, Any]) -> None:
         safe_payload = self._sanitize_session_payload(payload)
@@ -224,6 +262,50 @@ class AgentLoop:
     def pause(self) -> None:
         """Request a cooperative pause at the next provider/tool boundary."""
         self._pause_requested = True
+
+    def enable_interactive_controls(self) -> None:
+        """Keep the loop alive while paused so another thread can resume it."""
+        self._interactive_pause = True
+
+    def resume(self) -> bool:
+        """Release an interactive pause; return whether a pause was pending."""
+        pending = bool(self._pause_requested)
+        self._pause_requested = False
+        return pending
+
+    async def _pause_at_boundary(self, messages: list[Message], verification_ok: bool | None, explored: list[str]) -> LoopResult | None:
+        if not self._pause_requested:
+            return None
+        if not self._interactive_pause:
+            if not self.lifecycle.terminal:
+                try:
+                    self._transition(RunState.PAUSED, reason="cooperative pause requested")
+                except LifecycleError:
+                    self.lifecycle.state = RunState.PAUSED
+            result = LoopResult(tuple(messages), "paused", "run paused; resume requires checkpoint validation", verification_ok, self.context.mode.value, explored=tuple(explored), state=self.lifecycle.state.value, run_id=self.run_id, audit_complete=self.audit_complete, verifications=tuple(self._verification_results))
+            self._record("pause", {"reason": "cooperative pause requested", "interactive": False})
+            self._record("final", {"stopped_reason": result.stopped_reason, "state": result.state})
+            return result
+        if not self.lifecycle.terminal and self.lifecycle.state is not RunState.PAUSED:
+            try:
+                self._transition(RunState.PAUSED, reason="interactive pause requested")
+            except LifecycleError:
+                self.lifecycle.state = RunState.PAUSED
+        if not self._pause_event_recorded:
+            self._record("pause", {"reason": "interactive pause requested", "interactive": True})
+            self._pause_event_recorded = True
+        while self._pause_requested and not self.context.cancelled:
+            await asyncio.sleep(0.01)
+        self._pause_event_recorded = False
+        if self.context.cancelled:
+            return self._cancelled_result(messages, verification_ok, explored, reason=self.context.cancellation_reason)
+        if self.lifecycle.state is RunState.PAUSED:
+            try:
+                self._transition(RunState.DISCOVERING, reason="interactive pause resumed")
+            except LifecycleError:
+                self.lifecycle.state = RunState.DISCOVERING
+        self._record("resume", {"reason": "interactive pause released"})
+        return None
 
     def cancel(self, reason: str = "cancelled") -> bool:
         """Request cooperative cancellation of this run.
@@ -518,9 +600,9 @@ class AgentLoop:
                 # be stopped, the event carries ``unresolved`` evidence and
                 # recovery can inspect it; it must never be reported as a
                 # successful run or replayed automatically.
-                self._transition(RunState.CANCELLED, reason=safe_reason)
+                self._transition(RunState.RECOVERY_REQUIRED if unresolved else RunState.CANCELLED, reason=safe_reason)
             except LifecycleError:
-                self.lifecycle.state = RunState.CANCELLED
+                self.lifecycle.state = RunState.RECOVERY_REQUIRED if unresolved else RunState.CANCELLED
         self._record("cancellation", {"category": category, "reason": safe_reason, "pending_actions": list(self._pending_actions), "unresolved": unresolved})
         result = LoopResult(tuple(messages), category, safe_reason, verification_ok, self.context.mode.value, explored=tuple(explored), state=self.lifecycle.state.value, run_id=self.run_id, audit_complete=self.audit_complete, verifications=tuple(self._verification_results))
         self._record("final", {"stopped_reason": result.stopped_reason, "error": result.error, "state": result.state, "pending_actions": list(self._pending_actions)})
@@ -688,16 +770,9 @@ class AgentLoop:
                 result = LoopResult(tuple(messages), "deadline_exceeded", error_text, verification_ok, self.context.mode.value, explored=tuple(explored), state=self.lifecycle.state.value, run_id=self.run_id, audit_complete=self.audit_complete)
                 self._record("final", {"stopped_reason": result.stopped_reason, "error": result.error, "state": result.state})
                 return result
-            if self._pause_requested:
-                if not self.lifecycle.terminal:
-                    try:
-                        self._transition(RunState.PAUSED, reason="cooperative pause requested")
-                    except LifecycleError:
-                        self.lifecycle.state = RunState.PAUSED
-                result = LoopResult(tuple(messages), "paused", "run paused; resume requires checkpoint validation", verification_ok, self.context.mode.value, explored=tuple(explored), state=self.lifecycle.state.value, run_id=self.run_id, audit_complete=self.audit_complete, verifications=tuple(self._verification_results))
-                self._record("pause", {"reason": "cooperative pause requested"})
-                self._record("final", {"stopped_reason": result.stopped_reason, "state": result.state})
-                return result
+            paused_result = await self._pause_at_boundary(messages, verification_ok, explored)
+            if paused_result is not None:
+                return paused_result
             request_messages = self._maybe_auto_compact(messages, step=step)
             request_messages = self.context_builder.fit(request_messages)
             self._last_context_summary = "\n".join(message.content for message in request_messages[-8:])[:8_000]
@@ -801,6 +876,14 @@ class AgentLoop:
             if self.context.cancelled:
                 return self._cancelled_result(messages, verification_ok, explored, reason=self.context.cancellation_reason)
 
+            # A pause requested while the provider was in flight must take
+            # effect before the response is appended or any tool call is
+            # considered.  The response remains local and is resumed through
+            # the same loop; no model/tool state is duplicated.
+            paused_result = await self._pause_at_boundary(messages, verification_ok, explored)
+            if paused_result is not None:
+                return paused_result
+
             if not response.message.content and not response.message.tool_calls:
                 error_text = "model returned an empty response"
                 self._fail_state("empty response")
@@ -845,6 +928,9 @@ class AgentLoop:
                     result = self._with_current_audit(result)
                     return result
                 if self.config.verification_command and verification_ok is not True and verification_runs < self.config.max_verification_attempts:
+                    paused_result = await self._pause_at_boundary(messages, verification_ok, explored)
+                    if paused_result is not None:
+                        return paused_result
                     verification_runs += 1
                     if self.lifecycle.state is RunState.DISCOVERING:
                         self._transition(RunState.PLANNING, reason="verification requested")
@@ -911,6 +997,9 @@ class AgentLoop:
                 return result
 
             for call in response.message.tool_calls:
+                paused_result = await self._pause_at_boundary(messages, verification_ok, explored)
+                if paused_result is not None:
+                    return paused_result
                 fingerprint_source = json.dumps(call.arguments, ensure_ascii=False, sort_keys=True, default=str)
                 fingerprint = hashlib.sha256(f"{call.name}:{fingerprint_source}".encode("utf-8", errors="replace")).hexdigest()
                 seen_calls[fingerprint] = seen_calls.get(fingerprint, 0) + 1
@@ -949,6 +1038,13 @@ class AgentLoop:
                 tool_started = time.monotonic()
                 tool_result = self.registry.execute(call.name, call.arguments, self.context)
                 tool_duration = round(time.monotonic() - tool_started, 3)
+                if isinstance(tool_result.metadata, dict) and tool_result.metadata.get("error") == "paused" and not self._interactive_pause:
+                    # The non-interactive API keeps its historical terminal
+                    # pause result.  Do not continue to a provider turn after
+                    # a side-effect boundary rejected execution.
+                    paused_result = await self._pause_at_boundary(messages, verification_ok, explored)
+                    if paused_result is not None:
+                        return paused_result
                 unresolved = False
                 if side_effecting:
                     metadata = tool_result.metadata if isinstance(tool_result.metadata, dict) else {}
