@@ -112,6 +112,14 @@ def test_rpc_session_run_rejects_concurrent_busy_handle(tmp_path):
     assert "busy" in busy["error"]["message"]
 
 
+def test_rpc_session_run_rejects_cancelled_handle(tmp_path):
+    handle = _call({"method": "session.open", "params": {"workspace": str(tmp_path)}})["data"]["session"]
+    _call({"method": "session.cancel", "params": {"session": handle}})
+    result = _call({"method": "session.run", "params": {"session": handle, "prompt": "hello", "demo": True}})
+    assert result["ok"] is False
+    assert "cancelled" in result["error"]["message"]
+
+
 def test_rpc_idempotency_caches_multi_event_response(tmp_path):
     request = {"id": "doctor-replay", "method": "doctor", "params": {}}
     first = list(serve_lines([json.dumps(request)]))

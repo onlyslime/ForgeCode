@@ -262,13 +262,12 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                             info = _RPC_SESSIONS.get(handle)
                         if info is None: raise ValueError("session handle is unknown")
                         with _SESSION_LOCK:
-                            if info.get("state") == "approval_denied":
-                                raise ValueError("session approval was denied; open a new session")
+                            state = info.get("state")
+                            if state in {"approval_denied", "cancelled", "completed", "failed"}:
+                                raise ValueError(f"session is {state}; open a new session")
                             if info.get("state") == "running":
                                 raise ValueError("session is busy; wait for the active run to finish")
                             info["state"] = "running"
-                        if info.get("state") == "approval_denied":
-                            raise ValueError("session approval was denied; open a new session")
                         if info.get("mode") == "act":
                             try:
                                 trusted = TrustStore(Path(info["workspace"])).status().get("trusted", False)
