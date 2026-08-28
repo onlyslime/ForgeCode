@@ -115,7 +115,14 @@ export const login = ({ profile, provider, apiKeyEnv, ...options } = {}) => invo
 export const method = (name, options = {}) => invoke([], { ...options, method: name });
 export const run = (prompt, options = {}) => method("run", { ...options, params: { ...(options.params ?? {}), prompt } });
 export const sessionInspect = (session, options = {}) => method("session.inspect", { ...options, params: { ...(options.params ?? {}), session } });
-export const sessionTree = (options = {}) => method("session.tree", options);
+export const sessionTree = ({ workspace, limit, ...options } = {}) => method("session.tree", {
+  ...options,
+  params: {
+    ...(options.params ?? {}),
+    ...(workspace === undefined ? {} : { workspace }),
+    ...(limit === undefined ? {} : { limit }),
+  },
+});
 export const sessionList = ({ workspace, state, limit, ...options } = {}) => method("session.list", {
   ...options,
   params: {

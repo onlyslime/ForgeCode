@@ -10,6 +10,8 @@ slice.
 - Fixed Node `sessionList()` to map workspace, lifecycle state, and limit into
   RPC parameters instead of silently treating them as process options.
 - Verification: Node SDK contract and RPC session tests.
+- Corrected Node `sessionTree()` direct workspace/limit options to map into
+  RPC parameters; this compatibility fix remains grouped under v0.0.33.
 
 ## v0.0.32 — 2026-08-29
 
