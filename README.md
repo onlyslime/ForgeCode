@@ -31,7 +31,7 @@ Chat Completions 返回结构化 tool calls，ForgeCode 在用户指定工作区
 - **真实离线演示**：DemoProvider 在隔离工作区读取有 bug 的 calculator，先跑
   出失败测试，再走 patch 和审批，最后取得真实通过结果；不需要网络或 API key。
 
-当前版本：`v0.0.11`（版本号与 `VERSION`、`pyproject.toml` 和
+当前版本：`v0.0.12`（版本号与 `VERSION`、`pyproject.toml` 和
 `src/forgecode/__init__.py` 保持同步）。
 
 ### v0.0.9 扩展能力
@@ -49,6 +49,10 @@ Chat Completions 返回结构化 tool calls，ForgeCode 在用户指定工作区
 ### v0.0.11 Pi-inspired 终端快捷方式
 
 - **`!<command>` / `!!<command>`**：两者都复用受控 `run_command`、审批、风险分类、超时、取消和脱敏；单 `!` 将有界结果交给下一轮模型，双 `!!` 只返回用户和审计，不触发 provider。快捷方式只接受行首前缀，Plan 模式和危险命令仍会拒绝。
+
+### v0.0.12 Pi-inspired 工具策略
+
+- **运行时工具收窄**：`chat`/`start`/`run` 支持 `--tools read_file,search`、`--exclude-tools run_command` 和 `--no-tools`。它们只会进一步收窄配置中的 `tool_policy`，并一致作用于 provider schema、verification、快捷方式和 AgentLoop；禁用工具 fail-closed，不执行命令。
 
 ### v0.0.8 扩展能力
 
@@ -127,6 +131,17 @@ The v0.0.10 release adds a single-worker interactive control surface: bounded
 FIFO follow-ups, safe `/pause`, `/resume`, `/cancel`, checkpoint/fingerprint
 resume validation, active model-switch rejection and bounded shutdown. It
 does not claim Escape-specific terminal support or an operating-system sandbox.
+
+The v0.0.11 release adds Pi-inspired `!<command>` and `!!<command>` shortcuts;
+the single prefix sends a bounded redacted result to one provider turn, while
+the double prefix remains local and never calls a provider. Both reuse the
+existing approval, risk, timeout, cancellation, workspace and session bounds.
+
+The v0.0.12 release adds runtime tool narrowing. `chat`/`start`/`run` accept
+`--tools`, `--exclude-tools`, and `--no-tools`; configuration and CLI policies
+compose monotonically, and the effective registry is shared by provider
+schemas, verification, AgentLoop, and shortcuts. Disabled tools fail closed
+without spawning a command.
 
 ## Quick start
 

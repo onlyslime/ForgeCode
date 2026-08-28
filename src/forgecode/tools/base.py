@@ -135,6 +135,7 @@ class Tool(Protocol):
 class ToolRegistry:
     def __init__(self, *, max_output_chars: int = 20_000):
         self._tools: dict[str, Tool] = {}
+        self._unavailable_tools: set[str] = set()
         if max_output_chars < 1:
             raise ValueError("max_output_chars must be positive")
         self.max_output_chars = max_output_chars
@@ -154,10 +155,17 @@ class ToolRegistry:
             permits = getattr(policy, "permits", None)
             if permits is None or permits(name, available=available):
                 result.register(tool)
+            else:
+                result._unavailable_tools.add(name)
+        result._unavailable_tools.update(self._unavailable_tools)
         return result
 
     def names(self) -> tuple[str, ...]:
         return tuple(self._tools)
+
+    def unavailable_names(self) -> tuple[str, ...]:
+        """Return tools known to the base registry but removed by policy."""
+        return tuple(sorted(self._unavailable_tools))
 
     def definitions(self, mode: AgentMode | str | None = None) -> tuple[ToolDefinition, ...]:
         definitions = tuple(tool.definition for tool in self._tools.values())
@@ -181,6 +189,8 @@ class ToolRegistry:
     def execute(self, name: str, arguments: dict[str, Any], context: ToolContext) -> ToolResult:
         tool = self._tools.get(name)
         if tool is None:
+            if name in self._unavailable_tools:
+                return ToolResult(False, f"{name} is unavailable under the active tool policy", {"error": "tool_unavailable", "tool": name})
             return ToolResult(False, f"unknown tool: {name}", {"error": "unknown_tool"})
         # A provider can return a tool call at the same moment another thread
         # requests cancellation. Check at the executor boundary so a

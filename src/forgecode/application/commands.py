@@ -22,7 +22,7 @@ from .run_service import RunService
 from .session_service import aggregate_events
 from ..context import ContextIndex, ContextIndexError, RepositoryMapBuilder
 from ..skills import MAX_SKILL_INPUT_CHARS, SkillError, SkillExecutor, SkillInvocation, SkillLoader, SkillRegistry
-from ..config import ConfigError, ConfigLoader, Settings
+from ..config import ConfigError, ConfigLoader, Settings, parse_tool_policy_options
 from ..references import ReferenceResolver, parse_references
 from ..rules import RuleEngine
 from ..plan import PlanItem, TaskPlan
@@ -249,6 +249,23 @@ def _emit_command_payload(
     _emit_machine(envelope)
 
 
+def _add_tool_policy_arguments(parser: argparse.ArgumentParser) -> None:
+    """Add Pi-inspired runtime tool narrowing options to a command parser."""
+    parser.add_argument(
+        "--tools",
+        help="comma-separated allowlist of built-in tools (can only narrow configured policy)",
+    )
+    parser.add_argument(
+        "--exclude-tools",
+        help="comma-separated built-in tools to disable (can only narrow configured policy)",
+    )
+    parser.add_argument(
+        "--no-tools",
+        action="store_true",
+        help="disable all model and verification tools for this run",
+    )
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="forgecode", description="Self-built coding agent framework")
     parser.add_argument("--version", action="version", version=f"forgecode {__version__}")
@@ -348,6 +365,7 @@ def _parser() -> argparse.ArgumentParser:
     chat_parser.add_argument("--demo", action="store_true")
     chat_parser.add_argument("--demo-task", choices=("calculator", "json"), default="calculator")
     chat_parser.add_argument("--session", type=Path)
+    _add_tool_policy_arguments(chat_parser)
     chat_parser.add_argument("--json", action="store_true", default=argparse.SUPPRESS, dest="json")
     chat_parser.add_argument("--jsonl", action="store_true", default=argparse.SUPPRESS, dest="jsonl")
     inspect_parser = subparsers.add_parser("inspect", aliases=["map"], help="inspect a bounded read-only repository map")
@@ -498,6 +516,7 @@ def _parser() -> argparse.ArgumentParser:
     run_parser.add_argument("--fork", action="store_true", help="fork a completed/paused session into a new run id")
     run_parser.add_argument("--dry-run", "--inspect", action="store_true", help="inspect a resume without executing side effects")
     run_parser.add_argument("--force-recovery", action="store_true", help="explicitly acknowledge checkpoint conflicts (still requires approval)")
+    _add_tool_policy_arguments(run_parser)
     run_parser.add_argument("--json", action="store_true", default=argparse.SUPPRESS, dest="json")
     run_parser.add_argument("--jsonl", action="store_true", default=argparse.SUPPRESS, dest="jsonl", help="emit one machine-readable event/result object per line")
     return parser
@@ -541,7 +560,7 @@ def _raw_command_name(argv: list[str]) -> str:
     command = "doctor"
     command_index = -1
     options_with_values = {
-        "--workspace", "--profile", "--session", "--task", "--budget-chars", "--max-steps", "--verify", "--demo-task", "--resume", "--timeout", "--timeout-seconds", "--name", "--input", "--line-range", "--line-start", "--line-end", "--language", "--path", "--glob", "--regex", "--max-results", "--context-lines", "--max-chars", "--transaction", "--transaction-id", "--export", "--export-path", "--import", "--import-path", "--limit",
+        "--workspace", "--profile", "--session", "--task", "--budget-chars", "--max-steps", "--verify", "--demo-task", "--resume", "--timeout", "--timeout-seconds", "--name", "--input", "--line-range", "--line-start", "--line-end", "--language", "--path", "--glob", "--regex", "--max-results", "--context-lines", "--max-chars", "--transaction", "--transaction-id", "--export", "--export-path", "--import", "--import-path", "--limit", "--tools", "--exclude-tools",
     }
     skip_next = False
     for index, token in enumerate(argv):
@@ -635,9 +654,35 @@ def main(argv: list[str] | None = None) -> int:
             print(f"configuration invalid: {message}", file=sys.stderr)
         return 2
     guard = WorkspaceGuard(workspace)
-    registry = build_default_registry(guard)
+    base_registry = build_default_registry(guard)
+    try:
+        cli_tool_policy = parse_tool_policy_options(
+            getattr(args, "tools", None),
+            getattr(args, "exclude_tools", None),
+            no_tools=bool(getattr(args, "no_tools", False)),
+            available=base_registry.names(),
+        )
+    except ConfigError as exc:
+        message = _redact_display(str(exc))
+        if machine_json:
+            _emit_machine(_machine_error(command, "tool_policy_invalid", message, exit_code=2))
+        else:
+            print(f"invalid tool policy: {message}", file=sys.stderr)
+        return 2
+    registry = base_registry
     if settings.effective is not None:
         registry = registry.filter(settings.effective.tool_policy)
+    if cli_tool_policy is not None:
+        registry = registry.filter(cli_tool_policy)
+    tool_policy_summary = {
+        "requested": {
+            "tools": getattr(args, "tools", None),
+            "exclude_tools": getattr(args, "exclude_tools", None),
+            "no_tools": bool(getattr(args, "no_tools", False)),
+        },
+        "enabled": list(registry.names()),
+        "unavailable": list(registry.unavailable_names()),
+    }
     if command == "run":
         args.mode = args.mode or (settings.effective.default_mode if settings.effective else AgentMode.ACT.value)
         args.max_steps = args.max_steps if args.max_steps is not None else (settings.effective.max_steps if settings.effective else 12)
@@ -1478,6 +1523,7 @@ def main(argv: list[str] | None = None) -> int:
                     print(payload["message"], file=sys.stderr)
                 return 3
         session = SessionStore(session_path, secrets=[api_key], run_id=new_run_id, mode=args.mode)
+        session.append("tool_policy", tool_policy_summary, mode=args.mode)
         transaction_store = TransactionStore(guard)
         context_index = ContextIndex(guard)
         hook_registry = HookRegistry()
@@ -1503,7 +1549,7 @@ def main(argv: list[str] | None = None) -> int:
             # Prepare it before reading stdin so legacy scripted chat clients
             # can inspect/edit the file immediately after dispatch returns,
             # even though real runs now execute on the controller worker.
-            _prepare_demo_workspace(build_default_registry(guard), guard, task=args.demo_task)
+            _prepare_demo_workspace(registry, guard, task=args.demo_task)
 
         def run_message(message: str) -> Any:
             nonlocal active_service
@@ -1528,7 +1574,7 @@ def main(argv: list[str] | None = None) -> int:
                     state["plan_targets"] = tuple(target_paths)
                     session.append("plan_created", {"plan": state["plan"].to_dict()}, mode="plan")
                 elif args.demo and not any((workspace / name).exists() for name in ("demo_calculator.py", "demo_config.json")):
-                    _prepare_demo_workspace(build_default_registry(guard), guard, task=args.demo_task)
+                    _prepare_demo_workspace(registry, guard, task=args.demo_task)
                 expected_rule_fingerprint = rules.fingerprint
                 expected_reference_fingerprint = references.fingerprint
                 reference_specs = tuple(item.reference for item in references.items)
@@ -1537,7 +1583,6 @@ def main(argv: list[str] | None = None) -> int:
                 state["reference_specs"] = reference_specs
                 state["rules_fingerprint"] = expected_rule_fingerprint
                 state["reference_fingerprint"] = expected_reference_fingerprint
-                registry = build_default_registry(guard)
                 if args.demo:
                     provider = DemoProvider(args.demo_task)
                 else:
@@ -1701,7 +1746,7 @@ def main(argv: list[str] | None = None) -> int:
                 )
 
             try:
-                result = build_default_registry(guard).execute(
+                result = registry.execute(
                     "run_command",
                     {"command": shortcut.command},
                     ToolContext(
@@ -1784,7 +1829,7 @@ def main(argv: list[str] | None = None) -> int:
                     outcome="completed" if result.ok else ("cancelled" if payload["cancelled"] else "failed"),
                     error_code=str(error_code)[:128] if error_code else None,
                 )
-                if shortcut.kind == "local" or payload["cancelled"] or metadata.get("error") == "paused":
+                if shortcut.kind == "local" or payload["cancelled"] or metadata.get("error") in {"paused", "tool_unavailable"}:
                     return payload
                 # Only the model-visible shortcut feeds the bounded result into
                 # the existing AgentLoop.  The command text and raw metadata
@@ -1952,7 +1997,7 @@ def main(argv: list[str] | None = None) -> int:
                     return "project rules changed after planning"
                 return True
 
-            result = build_default_registry(guard).execute("run_command", {"command": command}, ToolContext(guard, approval, mode="act", secrets=(api_key,) if api_key else (), transaction_store=transaction_store, run_id=session.run_id, pre_side_effect_check=revalidate_verification_context, rules_fingerprint=expected_rule_fingerprint))
+            result = registry.execute("run_command", {"command": command}, ToolContext(guard, approval, mode="act", secrets=(api_key,) if api_key else (), transaction_store=transaction_store, run_id=session.run_id, pre_side_effect_check=revalidate_verification_context, rules_fingerprint=expected_rule_fingerprint))
             verification = {"ok": result.ok, "command": command, "exit_code": result.metadata.get("exit_code"), "timed_out": bool(result.metadata.get("timed_out", False)), "risk": result.metadata.get("risk"), "approval": result.metadata.get("approval"), "stdout": str(result.metadata.get("stdout", ""))[:20_000], "stderr": str(result.metadata.get("stderr", ""))[:20_000], "conflict": False, "changed_files": []}
             if result.metadata.get("error") in {"stale_context", "context_revalidation_failed"}:
                 verification.update({"ok": False, "conflict": True, "failure_summary": result.output[:2_000]})
@@ -2556,6 +2601,8 @@ def main(argv: list[str] | None = None) -> int:
                 print(message, file=sys.stderr)
             return 2
         session = SessionStore(session_path, secrets=[api_key], run_id=None if args.resume else new_run_id, mode=args.mode)
+        if not args.resume:
+            session.append("tool_policy", tool_policy_summary, mode=args.mode)
         if args.resume:
             parent_session_path = session_path
             parent_run_id = session.run_id
@@ -2682,6 +2729,7 @@ def main(argv: list[str] | None = None) -> int:
                 session_path = _new_session_path(guard, new_run_id)
                 session = SessionStore(session_path, secrets=[api_key], run_id=new_run_id, mode=args.mode)
                 session.append("forked", {"parent_run_id": parent_run_id, "parent_sequence": checkpoint.sequence, "parent_session": guard.relative(parent_session_path), "state": checkpoint.state}, mode=args.mode)
+            session.append("tool_policy", tool_policy_summary, mode=args.mode)
             rebuilt = SessionContextRebuilder().rebuild(SessionStore(parent_session_path), checkpoint)
             if rebuilt.conflicts:
                 message = "resume context is inconsistent: " + "; ".join(rebuilt.conflicts[:10])

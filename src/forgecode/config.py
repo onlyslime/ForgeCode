@@ -27,6 +27,7 @@ class ConfigError(ValueError):
 
 
 MAX_CONFIG_BYTES = 1_000_000
+MAX_TOOL_POLICY_OPTION_CHARS = 4_000
 
 
 @dataclass(frozen=True)
@@ -85,6 +86,55 @@ class ToolPolicy:
         if self.allow and name not in self.allow:
             return False
         return available is None or name in available
+
+
+def parse_tool_policy_options(
+    tools: str | None = None,
+    exclude_tools: str | None = None,
+    *,
+    no_tools: bool = False,
+    available: tuple[str, ...] = (),
+) -> ToolPolicy | None:
+    """Parse bounded CLI tool narrowing options.
+
+    The returned policy can only narrow the supplied registry.  Names are
+    comma-separated, case-sensitive built-in tool identifiers; malformed,
+    duplicate, unknown, or contradictory selections fail closed with a
+    stable ``ConfigError`` rather than being silently ignored.
+    """
+
+    if tools is None and exclude_tools is None and not no_tools:
+        return None
+    known = tuple(str(name) for name in available)
+    known_set = set(known)
+
+    def parse(value: str | None, option: str) -> tuple[str, ...]:
+        if value is None:
+            return ()
+        if not isinstance(value, str) or not value.strip():
+            raise ConfigError(f"{option} must contain one or more comma-separated tool names")
+        if len(value) > MAX_TOOL_POLICY_OPTION_CHARS:
+            raise ConfigError(f"{option} exceeds the {MAX_TOOL_POLICY_OPTION_CHARS}-character safety limit")
+        names = tuple(item.strip() for item in value.split(","))
+        if any(not item for item in names):
+            raise ConfigError(f"{option} contains an empty tool name")
+        if len(set(names)) != len(names):
+            raise ConfigError(f"{option} contains duplicate tool names")
+        unknown = tuple(item for item in names if item not in known_set)
+        if unknown:
+            raise ConfigError(f"{option} contains unknown tools: {', '.join(unknown)}")
+        return names
+
+    selected = parse(tools, "--tools")
+    excluded = parse(exclude_tools, "--exclude-tools")
+    if no_tools and (tools is not None or exclude_tools is not None):
+        raise ConfigError("--no-tools cannot be combined with --tools or --exclude-tools")
+    overlap = tuple(name for name in selected if name in set(excluded))
+    if overlap:
+        raise ConfigError(f"--tools and --exclude-tools overlap: {', '.join(overlap)}")
+    if no_tools:
+        return ToolPolicy(deny=known)
+    return ToolPolicy(allow=selected, deny=excluded)
 
 
 @dataclass(frozen=True)
@@ -422,4 +472,4 @@ def _reject_secret_fields(value: Any, *, _path: str = "config") -> None:
     walk(value, _path, 0)
 
 
-__all__ = ["MAX_CONFIG_BYTES", "ConfigError", "ConfigLoader", "EffectiveConfig", "ModelProfile", "Settings", "ToolPolicy", "load_effective_config"]
+__all__ = ["MAX_CONFIG_BYTES", "MAX_TOOL_POLICY_OPTION_CHARS", "ConfigError", "ConfigLoader", "EffectiveConfig", "ModelProfile", "Settings", "ToolPolicy", "load_effective_config", "parse_tool_policy_options"]
