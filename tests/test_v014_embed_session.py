@@ -19,3 +19,15 @@ def test_embedded_session_controls_production_chat(tmp_path):
         session.close()
     assert not session.is_alive
     assert session.returncode is not None
+
+
+def test_embedded_session_reconnects_dead_worker(tmp_path):
+    session = EmbeddedSession(str(tmp_path))
+    try:
+        session.process.terminate()
+        session.process.wait(timeout=3)
+        assert session.reconnect() is True
+        event = session.poll(2)
+        assert event and event.get("kind") == "process_reconnected"
+    finally:
+        session.close()

@@ -60,6 +60,7 @@ class EmbeddedSession:
         if mode not in {"plan", "act"}:
             raise ValueError("mode must be plan or act")
         command = [sys.executable, "-u", "-m", "forgecode"] if executable == "forgecode" else [executable]
+        self._workspace, self._mode, self._command, self._environment = workspace, mode, command, dict(os.environ)
         environment = dict(os.environ)
         source_root = str(Path(__file__).resolve().parents[1])
         environment["PYTHONPATH"] = source_root + os.pathsep + environment.get("PYTHONPATH", "")
@@ -71,6 +72,22 @@ class EmbeddedSession:
         self._err_reader = threading.Thread(target=self._read_stderr, daemon=True)
         self._reader.start()
         self._err_reader.start()
+
+    def reconnect(self) -> bool:
+        """Restart a dead worker once, preserving workspace and mode binding."""
+        if self.is_alive:
+            return False
+        environment = dict(self._environment)
+        source_root = str(Path(__file__).resolve().parents[1])
+        environment["PYTHONPATH"] = source_root + os.pathsep + environment.get("PYTHONPATH", "")
+        self.process = subprocess.Popen([*self._command, "--workspace", self._workspace, "chat", "--mode", self._mode, "--jsonl"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8", bufsize=1, env=environment)
+        self._events = Queue()
+        self._stderr_text = ""
+        self._reader = threading.Thread(target=self._read, daemon=True)
+        self._err_reader = threading.Thread(target=self._read_stderr, daemon=True)
+        self._reader.start(); self._err_reader.start()
+        self._events.put({"kind": "process_reconnected", "workspace": self._workspace, "mode": self._mode})
+        return True
 
     def _read(self) -> None:
         assert self.process.stdout is not None
