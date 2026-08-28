@@ -35,6 +35,7 @@ def _persist_session(handle: str, info: dict[str, Any]) -> None:
     path = _session_record_path(info, handle)
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = {key: info.get(key) for key in ("workspace", "mode", "session_path", "state", "sequence", "created_at")}
+    payload["events"] = list(info.get("events", []))[-_MAX_SESSION_EVENTS:]
     tmp = path.with_suffix(".tmp")
     tmp.write_text(json.dumps(payload, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     tmp.replace(path)
@@ -54,7 +55,9 @@ def _load_session(handle: str, workspace_hint: str | None = None) -> dict[str, A
             workspace = Path(str(raw["workspace"])).expanduser().resolve()
             if not workspace.is_dir() or (workspace / ".forgecode" / "rpc-sessions" / f"{handle}.json").resolve() != candidate.resolve():
                 continue
-            info = {"workspace": str(workspace), "mode": raw["mode"], "session_path": raw["session_path"], "state": raw.get("state", "idle"), "sequence": int(raw.get("sequence", 0)), "events": [], "created_monotonic": time.monotonic(), "created_at": raw.get("created_at")}
+            events = raw.get("events", [])
+            if not isinstance(events, list): events = []
+            info = {"workspace": str(workspace), "mode": raw["mode"], "session_path": raw["session_path"], "state": raw.get("state", "idle"), "sequence": int(raw.get("sequence", 0)), "events": events[-_MAX_SESSION_EVENTS:], "created_monotonic": time.monotonic(), "created_at": raw.get("created_at")}
             if info["mode"] not in {"plan", "act"}: continue
             return info
         except (OSError, ValueError, KeyError, TypeError):
@@ -269,6 +272,7 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                         info["state"] = "completed" if code == 0 else ("cancelled" if code == 130 else "failed")
                         info["sequence"] = int(info.get("sequence", 0)) + 1
                         info.setdefault("events", []).append({"sequence": info["sequence"], "type": "run_finished", "state": info["state"], "exit_code": code})
+                        _persist_session(handle, info)
             output = [item for item in captured.getvalue().splitlines() if item.strip()]
             if not output:
                 payload = {"schema_version": 1, "kind": "result", "ok": code == 0, "command": "rpc", "data": {}, "exit_code": code}
