@@ -24,6 +24,8 @@ class ForgeCodeError(RuntimeError):
 
 def invoke(argv: list[str], *, request_id: str | int | None = None, raise_for_status: bool = False, max_response_bytes: int = 2_000_000) -> list[dict[str, Any]]:
     """Execute one bounded CLI request and return every JSONL envelope."""
+    if not isinstance(argv, list) or len(argv) > 128 or any(not isinstance(item, str) or len(item) > 1_000 for item in argv):
+        raise ValueError("argv must contain at most 128 bounded string arguments")
     if isinstance(max_response_bytes, bool) or not isinstance(max_response_bytes, int) or max_response_bytes < 1:
         raise ValueError("max_response_bytes must be a positive integer")
     request: dict[str, Any] = {"argv": [*argv, "--jsonl"] if "--jsonl" not in argv and "--json" not in argv else list(argv)}

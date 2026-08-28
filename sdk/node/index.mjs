@@ -5,6 +5,9 @@ function boundedNumber(value, name, { min = 1, integer = false } = {}) {
   if (typeof value !== "number" || !Number.isFinite(value) || value < min || (integer && !Number.isInteger(value))) throw new TypeError(`${name} must be a finite ${integer ? "integer" : "number"} >= ${min}`);
   return value;
 }
+function validateArgv(argv) {
+  if (!Array.isArray(argv) || argv.length > 128 || argv.some((item) => typeof item !== "string" || item.length > 1000)) throw new TypeError("argv must contain at most 128 bounded string arguments");
+}
 
 export class ForgeCodeError extends Error {
   constructor(message, { code = "sdk_error", envelope = null, exitCode = null } = {}) {
@@ -13,6 +16,7 @@ export class ForgeCodeError extends Error {
 }
 
 export function invoke(argv = [], { cwd, executable = "forgecode", method, params = {}, id, timeoutMs = 30000, maxOutputBytes = 2_000_000 } = {}) {
+  validateArgv(argv);
   boundedNumber(timeoutMs, "timeoutMs"); boundedNumber(maxOutputBytes, "maxOutputBytes", { integer: true });
   return new Promise((resolve, reject) => {
     const rpc = method !== undefined;

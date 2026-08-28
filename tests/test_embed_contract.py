@@ -28,6 +28,13 @@ def test_embed_invoke_validates_request_id():
         invoke(["doctor"], request_id=True)
 
 
+def test_embed_invoke_validates_argv_bounds():
+    with pytest.raises(ValueError):
+        invoke(["doctor"] * 129)
+    with pytest.raises(ValueError):
+        invoke(["x" * 1_001])
+
+
 def test_embed_stream_strict_mode_raises_on_failed_rpc():
     with pytest.raises(ForgeCodeError):
         list(stream([{"method": "not-supported"}], raise_for_status=True))
