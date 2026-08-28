@@ -94,4 +94,5 @@ def test_rpc_act_handle_fails_closed_after_trust_revoke(tmp_path):
     _call({"method": "trust.revoke", "params": {"workspace": str(tmp_path)}})
     denied = _call({"method": "session.status", "params": {"session": handle}})
     assert denied["ok"] is False
+    assert denied["error"]["code"] == "trust_revoked"
     assert "trust" in denied["error"]["message"]

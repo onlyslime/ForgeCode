@@ -205,7 +205,9 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                     while len(_RPC_REPLAYS) > 1024: _RPC_REPLAYS.pop(next(iter(_RPC_REPLAYS)))
             yield from responses
         except Exception as exc:
-            yield json.dumps({"schema_version": 1, "kind": "error", "ok": False, "command": "rpc", "error": {"code": "invalid_request", "message": str(exc)[:2000]}, "exit_code": 2}, ensure_ascii=False)
+            message = str(exc)[:2000]
+            code = "trust_revoked" if "workspace trust" in message else "invalid_request"
+            yield json.dumps({"schema_version": 1, "kind": "error", "ok": False, "command": "rpc", "error": {"code": code, "message": message}, "exit_code": 2}, ensure_ascii=False)
 
 
 __all__ = ["serve_lines"]
