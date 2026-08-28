@@ -39,11 +39,12 @@ export function invokeStream(argv = [], options = {}) {
     const rpc = options.method !== undefined;
     const child = spawn(options.executable ?? "forgecode", rpc ? ["rpc"] : [...argv, "--jsonl"], { cwd: options.cwd, stdio: ["pipe", "pipe", "pipe"] });
     if (rpc) { child.stdin.write(JSON.stringify({ argv: [], method: options.method, params: options.params ?? {}, ...(options.id === undefined ? {} : { id: options.id }) }) + "\n"); child.stdin.end(); }
-    let buffer = ""; const events = []; let err = "";
-    child.stdout.on("data", (chunk) => { buffer += chunk; const lines = buffer.split(/\r?\n/); buffer = lines.pop(); for (const line of lines) if (line.trim()) events.push(JSON.parse(line)); });
+    let buffer = ""; const events = []; let err = ""; let bytes = 0; let settled = false;
+    const timer = setTimeout(() => { if (!settled) { child.kill(); settled = true; reject(new ForgeCodeError("request timed out", { code: "timeout" })); } }, Math.max(1, options.timeoutMs ?? 30000));
+    child.stdout.on("data", (chunk) => { bytes += chunk.byteLength; if (bytes > (options.maxOutputBytes ?? 2_000_000) && !settled) { child.kill(); settled = true; clearTimeout(timer); reject(new ForgeCodeError("response exceeds output limit", { code: "output_limit" })); return; } buffer += chunk; const lines = buffer.split(/\r?\n/); buffer = lines.pop(); for (const line of lines) if (line.trim()) { if (events.length >= (options.maxItems ?? 1024)) { child.kill(); settled = true; clearTimeout(timer); reject(new ForgeCodeError("response exceeds item limit", { code: "output_limit" })); return; } events.push(JSON.parse(line)); } });
     child.stderr.on("data", (chunk) => { err += chunk; });
-    child.on("error", reject);
-    child.on("close", (code) => { if (buffer.trim()) events.push(JSON.parse(buffer)); if (!events.length) return reject(new Error(err.trim() || `forgecode exited ${code}`)); resolve({ events, process_exit_code: code }); });
+    child.on("error", (error) => { if (!settled) { settled = true; clearTimeout(timer); reject(error); } });
+    child.on("close", (code) => { if (settled) return; settled = true; clearTimeout(timer); if (buffer.trim()) events.push(JSON.parse(buffer)); if (!events.length) return reject(new ForgeCodeError(err.trim() || `forgecode exited ${code}`, { code: "empty_response", exitCode: code })); resolve({ events, process_exit_code: code }); });
   });
 }
 

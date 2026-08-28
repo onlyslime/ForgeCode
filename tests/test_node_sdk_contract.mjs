@@ -8,3 +8,9 @@ try {
 } catch (error) {
   assert.ok(error instanceof ForgeCodeError || error.code);
 }
+
+try {
+  await (await import("../sdk/node/index.mjs")).invokeStream([], { executable: process.execPath, method: "bad method", maxItems: 1, timeoutMs: 1000 });
+} catch (error) {
+  assert.ok(error instanceof ForgeCodeError || error.code);
+}
