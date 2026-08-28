@@ -128,7 +128,11 @@ def _load_session(handle: str, workspace_hint: str | None = None) -> dict[str, A
                 continue
             events = raw.get("events", [])
             if not isinstance(events, list): events = []
-            info = {"workspace": str(workspace), "mode": raw["mode"], "session_path": raw["session_path"], "state": raw.get("state", "idle"), "sequence": int(raw.get("sequence", 0)), "events": events[-_MAX_SESSION_EVENTS:], "created_monotonic": time.monotonic(), "created_at": raw.get("created_at"), "cancel_requested": bool(raw.get("cancel_requested", False))}
+            persisted_state = raw.get("state", "idle")
+            # A daemon restart cannot retain an in-process worker. Never
+            # claim that a recovered running handle is still executing.
+            state = "recovery_required" if persisted_state == "running" else persisted_state
+            info = {"workspace": str(workspace), "mode": raw["mode"], "session_path": raw["session_path"], "state": state, "sequence": int(raw.get("sequence", 0)), "events": events[-_MAX_SESSION_EVENTS:], "created_monotonic": time.monotonic(), "created_at": raw.get("created_at"), "cancel_requested": bool(raw.get("cancel_requested", False))}
             if info["mode"] not in {"plan", "act"}: continue
             created_at = info.get("created_at")
             if isinstance(created_at, (int, float)) and time.time() - float(created_at) > _SESSION_TTL_SECONDS:
@@ -342,6 +346,9 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                             if not trusted: raise ValueError("workspace trust is not granted")
                         with _SESSION_LOCK:
                             info["state"] = "running"
+                            if state == "recovery_required":
+                                info["sequence"] = int(info.get("sequence", 0)) + 1
+                                info.setdefault("events", []).append({"sequence": info["sequence"], "type": "recovery_restarted", "state": "running"})
                         # A new explicit run clears a prior cancellation latch;
                         # the previous run remains recorded as cancelled.
                         with _SESSION_LOCK:

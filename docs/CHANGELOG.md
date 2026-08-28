@@ -12,6 +12,8 @@ slice.
   handle executes on a daemon worker; status/events expose terminal
   completion and concurrent controls can cancel or pause the run.
 - Synchronous `session.run` behavior remains backward compatible.
+- Recovered orphaned running handles now report `recovery_required` and emit a
+  restart event when explicitly reclaimed by a new run.
 - Verification: RPC lifecycle suite, compile, and CLI version checks.
 
 ## v0.0.27 — 2026-08-28
