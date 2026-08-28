@@ -9,9 +9,14 @@ from __future__ import annotations
 import contextlib
 import io
 import json
+import threading
+import uuid
 from typing import Any, Iterable
 
 from .application.commands import main
+
+_SESSION_LOCK = threading.RLock()
+_RPC_SESSIONS: dict[str, dict[str, str]] = {}
 
 
 def serve_lines(lines: Iterable[str]) -> Iterable[str]:
@@ -28,7 +33,7 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
             if method is not None:
                 if not isinstance(method, str) or len(method) > 128 or any(ch.isspace() for ch in method):
                     raise ValueError("method must be bounded non-whitespace text")
-                method_map = {"trust.status": ["trust", "status"], "trust.grant": ["trust", "grant"], "trust.revoke": ["trust", "revoke"], "provider.list": ["provider", "list"], "provider.health": ["provider", "health"], "config.show": ["config", "show"], "doctor": ["doctor"], "login": ["login"], "run": ["run"], "session.inspect": ["session", "inspect"], "session.tree": ["session", "tree"], "session.export": ["session", "export"]}
+                method_map = {"trust.status": ["trust", "status"], "trust.grant": ["trust", "grant"], "trust.revoke": ["trust", "revoke"], "provider.list": ["provider", "list"], "provider.health": ["provider", "health"], "config.show": ["config", "show"], "doctor": ["doctor"], "login": ["login"], "run": ["run"], "session.open": ["session", "open"], "session.close": ["session", "close"], "session.status": ["session", "status"], "session.inspect": ["session", "inspect"], "session.tree": ["session", "tree"], "session.export": ["session", "export"]}
                 if method not in method_map:
                     raise ValueError("unsupported RPC method")
                 if argv_value:
@@ -38,12 +43,44 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                 if not isinstance(params, dict) or len(params) > 16:
                     raise ValueError("params must be a bounded object")
                 argv_value = list(method_map[method])
+                if method == "session.open":
+                    workspace = params.get("workspace", ".")
+                    mode = params.get("mode", "plan")
+                    if not isinstance(workspace, str) or len(workspace) > 1_000 or any(ch in workspace for ch in "\r\n"):
+                        raise ValueError("session.open.workspace is invalid")
+                    if mode not in {"plan", "act"}:
+                        raise ValueError("session.open.mode must be plan or act")
+                    handle = uuid.uuid4().hex
+                    with _SESSION_LOCK:
+                        _RPC_SESSIONS[handle] = {"workspace": workspace, "mode": mode}
+                    payload = {"schema_version": 1, "kind": "session", "ok": True, "command": "session.open", "data": {"session": handle, "workspace": workspace, "mode": mode}, "exit_code": 0}
+                    if request_id is not None: payload["id"] = request_id
+                    yield json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+                    continue
+                if method in {"session.close", "session.status"}:
+                    handle = params.get("session") or params.get("session_id")
+                    if not isinstance(handle, str) or handle not in _RPC_SESSIONS:
+                        raise ValueError("session handle is unknown")
+                    with _SESSION_LOCK:
+                        info = _RPC_SESSIONS.get(handle, {})
+                        if method == "session.close": _RPC_SESSIONS.pop(handle, None)
+                    payload = {"schema_version": 1, "kind": "session", "ok": True, "command": method, "data": {"session": handle, "closed": method == "session.close", **info}, "exit_code": 0}
+                    if request_id is not None: payload["id"] = request_id
+                    yield json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+                    continue
                 if method == "run":
                     prompt = params.get("prompt", "")
                     if not isinstance(prompt, str) or not prompt.strip() or len(prompt) > 8_000:
                         raise ValueError("run.prompt must be non-empty and bounded")
                     global_args = []
                     argv_value.append(prompt)
+                    handle = params.get("session")
+                    if handle:
+                        with _SESSION_LOCK:
+                            info = _RPC_SESSIONS.get(handle)
+                        if info is None: raise ValueError("session handle is unknown")
+                        global_args.extend(["--workspace", info["workspace"]])
+                        argv_value.extend(["--mode", info["mode"], "--session", handle])
                     for key, flag in (("workspace", "--workspace"), ("mode", "--mode"), ("session", "--session"), ("profile", "--profile")):
                         value = params.get(key)
                         if value is not None:
