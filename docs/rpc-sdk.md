@@ -10,6 +10,8 @@ Handle metadata is persisted under the workspace's ignored
 `.forgecode/rpc-sessions/` directory without prompts or credentials. A new
 daemon may explicitly reopen a handle after canonical workspace and mode
 validation.
+The persisted record includes only the bounded recent event window and its
+sequence, allowing cursor-based event recovery after daemon restart.
 Each handle retains only the most recent 512 control/run events. Clients must
 use `next_sequence` and treat cursors older than the retained window as a
 resynchronization point.
