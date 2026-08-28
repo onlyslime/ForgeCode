@@ -411,6 +411,7 @@ def test_rpc_recovery_marks_orphaned_running_worker(tmp_path):
     rpc._RPC_SESSIONS.pop(handle, None)
     recovered = _call({"method": "session.open", "params": {"workspace": str(tmp_path), "session": handle}})
     assert recovered["data"]["state"] == "recovery_required"
+    assert recovered["data"]["worker_alive"] is False
     denied = _call({"method": "session.pause", "params": {"session": handle}})
     assert denied["ok"] is False
     assert "recovery" in denied["error"]["message"]

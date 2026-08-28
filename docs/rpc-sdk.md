@@ -18,6 +18,8 @@ requires current workspace trust for Act handles before returning success.
 If a persisted handle was `running` when the daemon disappeared, recovery
 returns `recovery_required` rather than claiming a worker still exists. A new
 `session.run` explicitly reclaims that handle and emits `recovery_restarted`.
+Recovered opens identify the prior execution mode and always report
+`worker_alive: false`, because in-process workers cannot survive daemon exit.
 Control and close requests against a `recovery_required` handle fail with
 `recovery_required`; only an explicit new run may reclaim it.
 After Act trust is revoked, cancellation remains permitted so clients can

@@ -56,6 +56,8 @@ slice.
   still alive, eliminating a teardown/recovery race.
 - Added bounded terminate/kill cancellation fallback and auditable termination
   method metadata for isolated RPC workers.
+- Included execution mode and explicit `worker_alive=false` in recovered open
+  responses for deterministic client recovery decisions.
 - Finalized isolated RPC handles on child-process startup failure with a
   structured process error instead of leaving them stuck in `running`.
 - Added read-only `session.result` RPC and Node helper for retrieving bounded
