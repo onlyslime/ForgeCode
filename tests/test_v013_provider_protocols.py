@@ -1,7 +1,8 @@
 import asyncio
 import json
 
-from forgecode.models import AnthropicProvider, GoogleProvider, Message, OllamaProvider
+import pytest
+from forgecode.models import AnthropicProvider, GoogleProvider, Message, OllamaProvider, ProviderError
 
 
 class Transport:
@@ -48,3 +49,19 @@ def test_anthropic_stream_is_normalized_to_openai_sse():
     provider = AnthropicProvider(api_key="secret", base_url="https://a.test/v1", model="m", transport=StreamTransport({}), streaming=True)
     result = asyncio.run(provider.complete([Message("user", "hi")], []))
     assert result.message.content == "hi"
+
+
+def test_stream_interruption_has_stable_error_category():
+    class InterruptedTransport(Transport):
+        def post_stream(self, url, headers, body, timeout):
+            def frames():
+                yield b'data: {"choices":[{"index":0,"delta":{"content":"partial"}}]}\n\n'
+                raise OSError("connection reset")
+            return 200, frames(), {}
+
+    provider = AnthropicProvider(api_key="secret", base_url="https://a.test/v1", model="m", transport=InterruptedTransport({}), streaming=True, max_retries=0)
+    with pytest.raises(ProviderError) as caught:
+        asyncio.run(provider.complete([Message("user", "hi")], []))
+    assert caught.value.category == "stream_error"
+    assert caught.value.retryable is False
+    assert provider.attempt_events[-1]["outcome"] == "error"
