@@ -94,6 +94,9 @@ is represented by a redacted truncation marker.
 the retained result payload and terminal metadata.
 `session.wait` provides a bounded wait (0–60 seconds) for background runs and
 returns `timed_out`, state, sequence, and the same retained result payload.
+The state and sequence fields are refreshed after the wait completes, so a
+non-timeout response is a coherent terminal snapshot rather than a pre-wait
+observation.
 Node `sessionWait()` and Python `session_wait()` expose this contract directly.
 The daemon uses a condition notification on worker/control state changes, so
 long waits do not busy-poll while retaining the same bounded timeout.

@@ -42,6 +42,8 @@ slice.
   for cross-workspace daemon clients.
 - Replaced session wait polling with condition notifications on state changes,
   reducing idle wakeups without changing timeout behavior.
+- Corrected `session.wait` to refresh state, sequence, and worker liveness after
+  waiting, returning a coherent terminal snapshot.
 - Isolated RPC pause/resume now attempt OS-level suspension signals where
   supported and record the applied control mechanism in session events.
 - Prevented closing paused RPC handles while their worker may still be alive;

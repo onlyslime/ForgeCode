@@ -176,6 +176,7 @@ def test_rpc_background_run_persists_structured_result(tmp_path, monkeypatch):
     assert recovered["data"]["recovered"] is True
     waited = _call({"method": "session.wait", "params": {"session": handle, "timeout": 0}})
     assert waited["data"]["timed_out"] is False
+    assert waited["data"]["state"] == "completed"
 
 
 def test_rpc_isolated_background_run_can_be_terminated(tmp_path):

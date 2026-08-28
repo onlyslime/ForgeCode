@@ -428,6 +428,10 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                             _SESSION_CONDITION.wait(timeout=max(0.0, deadline - time.monotonic()))
                             info = _RPC_SESSIONS.get(handle, info)
                         data["timed_out"] = info.get("state") in {"running", "paused"}
+                        data["state"] = info.get("state")
+                        data["sequence"] = info.get("sequence", 0)
+                        worker = info.get("process") or info.get("worker")
+                        data["worker_alive"] = bool(worker is not None and (worker.poll() is None if hasattr(worker, "poll") else worker.is_alive()))
                         data["result"] = info.get("result")
                     if method == "session.events":
                         after = params.get("after", 0)
