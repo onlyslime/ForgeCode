@@ -16,7 +16,7 @@ from typing import Any, Iterable
 from .application.commands import main
 
 _SESSION_LOCK = threading.RLock()
-_RPC_SESSIONS: dict[str, dict[str, str]] = {}
+_RPC_SESSIONS: dict[str, dict[str, Any]] = {}
 
 
 def serve_lines(lines: Iterable[str]) -> Iterable[str]:
@@ -33,7 +33,7 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
             if method is not None:
                 if not isinstance(method, str) or len(method) > 128 or any(ch.isspace() for ch in method):
                     raise ValueError("method must be bounded non-whitespace text")
-                method_map = {"trust.status": ["trust", "status"], "trust.grant": ["trust", "grant"], "trust.revoke": ["trust", "revoke"], "provider.list": ["provider", "list"], "provider.health": ["provider", "health"], "config.show": ["config", "show"], "doctor": ["doctor"], "login": ["login"], "run": ["run"], "session.open": ["session", "open"], "session.run": ["run"], "session.close": ["session", "close"], "session.status": ["session", "status"], "session.inspect": ["session", "inspect"], "session.tree": ["session", "tree"], "session.export": ["session", "export"]}
+                method_map = {"trust.status": ["trust", "status"], "trust.grant": ["trust", "grant"], "trust.revoke": ["trust", "revoke"], "provider.list": ["provider", "list"], "provider.health": ["provider", "health"], "config.show": ["config", "show"], "doctor": ["doctor"], "login": ["login"], "run": ["run"], "session.open": ["session", "open"], "session.run": ["run"], "session.events": ["session", "events"], "session.cancel": ["session", "cancel"], "session.pause": ["session", "pause"], "session.resume": ["session", "resume"], "session.close": ["session", "close"], "session.status": ["session", "status"], "session.inspect": ["session", "inspect"], "session.tree": ["session", "tree"], "session.export": ["session", "export"]}
                 if method not in method_map:
                     raise ValueError("unsupported RPC method")
                 if argv_value:
@@ -52,19 +52,27 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                         raise ValueError("session.open.mode must be plan or act")
                     handle = uuid.uuid4().hex
                     with _SESSION_LOCK:
-                        _RPC_SESSIONS[handle] = {"workspace": workspace, "mode": mode}
+                        _RPC_SESSIONS[handle] = {"workspace": workspace, "mode": mode, "state": "idle", "sequence": 0, "events": []}
                     payload = {"schema_version": 1, "kind": "session", "ok": True, "command": "session.open", "data": {"session": handle, "workspace": workspace, "mode": mode}, "exit_code": 0}
                     if request_id is not None: payload["id"] = request_id
                     yield json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
                     continue
-                if method in {"session.close", "session.status"}:
+                if method in {"session.close", "session.status", "session.events", "session.cancel", "session.pause", "session.resume"}:
                     handle = params.get("session") or params.get("session_id")
                     if not isinstance(handle, str) or handle not in _RPC_SESSIONS:
                         raise ValueError("session handle is unknown")
                     with _SESSION_LOCK:
                         info = _RPC_SESSIONS.get(handle, {})
+                        if method == "session.cancel": info["state"] = "cancelled"
+                        elif method == "session.pause": info["state"] = "paused"
+                        elif method == "session.resume": info["state"] = "running"
+                        if method != "session.events":
+                            info["sequence"] = int(info.get("sequence", 0)) + 1
+                            info.setdefault("events", []).append({"sequence": info["sequence"], "type": method.rsplit(".", 1)[-1], "state": info.get("state")})
                         if method == "session.close": _RPC_SESSIONS.pop(handle, None)
-                    payload = {"schema_version": 1, "kind": "session", "ok": True, "command": method, "data": {"session": handle, "closed": method == "session.close", **info}, "exit_code": 0}
+                    data = {"session": handle, "closed": method == "session.close", "state": info.get("state"), "sequence": info.get("sequence", 0), "workspace": info.get("workspace"), "mode": info.get("mode")}
+                    if method == "session.events": data["events"] = list(info.get("events", []))[-100:]
+                    payload = {"schema_version": 1, "kind": "session", "ok": True, "command": method, "data": data, "exit_code": 0}
                     if request_id is not None: payload["id"] = request_id
                     yield json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
                     continue

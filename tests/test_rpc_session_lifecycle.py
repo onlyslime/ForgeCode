@@ -39,3 +39,14 @@ def test_rpc_session_run_requires_handle():
     payload = _call({"method": "session.run", "params": {"prompt": "hello"}})
     assert payload["ok"] is False
     assert "requires session handle" in payload["error"]["message"]
+
+
+def test_rpc_session_control_is_sequenced_and_replayable(tmp_path):
+    opened = _call({"method": "session.open", "params": {"workspace": str(tmp_path)}})
+    handle = opened["data"]["session"]
+    paused = _call({"id": "p", "method": "session.pause", "params": {"session": handle}})
+    assert paused["data"]["state"] == "paused"
+    resumed = _call({"id": "r", "method": "session.resume", "params": {"session": handle}})
+    assert resumed["data"]["sequence"] == 2
+    events = _call({"method": "session.events", "params": {"session": handle}})
+    assert [item["type"] for item in events["data"]["events"]] == ["pause", "resume"]
