@@ -60,3 +60,11 @@ def test_rpc_request_id_replays_without_reapplying_control(tmp_path):
     assert first == second
     status = _call({"method": "session.status", "params": {"session": handle}})
     assert status["data"]["sequence"] == 1
+
+
+def test_rpc_session_approval_requires_boolean_and_updates_state(tmp_path):
+    handle = _call({"method": "session.open", "params": {"workspace": str(tmp_path)}})["data"]["session"]
+    denied = _call({"method": "session.approval", "params": {"session": handle, "approved": False}})
+    assert denied["data"]["state"] == "approval_denied"
+    invalid = _call({"method": "session.approval", "params": {"session": handle, "approved": "no"}})
+    assert invalid["ok"] is False
