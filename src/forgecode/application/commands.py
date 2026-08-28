@@ -899,6 +899,7 @@ def main(argv: list[str] | None = None) -> int:
             },
             "network_request": False,
         }
+        payload["credential"] = "required" if provider_requires_credential(payload["provider"]) else "optional"
         if machine_json:
             envelope = _machine_envelope(command_name, "provider_health", True, data=payload, exit_code=0, **_compat_aliases(payload))
             if getattr(args, "jsonl", False):
@@ -2340,6 +2341,7 @@ def main(argv: list[str] | None = None) -> int:
             "streaming": effective.streaming if effective else "auto",
             "capabilities": {"tool_calling": True, "json_mode": False, "streaming": bool(effective and effective.streaming in {"on", "required"}), "max_input_chars": 4_000_000, "max_output_chars": 4_000_000},
         }
+        provider_health["credential"] = "required" if provider_requires_credential(provider_health["provider"]) else "optional"
         if machine_json:
             # A model name alone is not a usable provider configuration; the
             # configured flag must agree with the offline health probe and
