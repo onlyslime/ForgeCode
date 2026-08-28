@@ -27,6 +27,41 @@ _MAX_RPC_SESSIONS = 256
 _MAX_SESSION_EVENTS = 512
 
 
+def _session_record_path(info: dict[str, Any], handle: str) -> Path:
+    return Path(info["workspace"]) / ".forgecode" / "rpc-sessions" / f"{handle}.json"
+
+
+def _persist_session(handle: str, info: dict[str, Any]) -> None:
+    path = _session_record_path(info, handle)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {key: info.get(key) for key in ("workspace", "mode", "session_path", "state", "sequence", "created_at")}
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(json.dumps(payload, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+    tmp.replace(path)
+
+
+def _load_session(handle: str, workspace_hint: str | None = None) -> dict[str, Any] | None:
+    if not isinstance(handle, str) or len(handle) != 32 or any(ch not in "0123456789abcdef" for ch in handle):
+        return None
+    roots = [Path(workspace_hint).expanduser().resolve()] if workspace_hint else [Path.cwd()]
+    for root in roots:
+        candidate_dir = root / ".forgecode" / "rpc-sessions"
+        candidate = candidate_dir / f"{handle}.json"
+        if not candidate.is_file():
+            continue
+        try:
+            raw = json.loads(candidate.read_text(encoding="utf-8"))
+            workspace = Path(str(raw["workspace"])).expanduser().resolve()
+            if not workspace.is_dir() or (workspace / ".forgecode" / "rpc-sessions" / f"{handle}.json").resolve() != candidate.resolve():
+                continue
+            info = {"workspace": str(workspace), "mode": raw["mode"], "session_path": raw["session_path"], "state": raw.get("state", "idle"), "sequence": int(raw.get("sequence", 0)), "events": [], "created_monotonic": time.monotonic(), "created_at": raw.get("created_at")}
+            if info["mode"] not in {"plan", "act"}: continue
+            return info
+        except (OSError, ValueError, KeyError, TypeError):
+            continue
+    return None
+
+
 def _prune_sessions() -> None:
     now = time.monotonic()
     stale = [key for key, value in _RPC_SESSIONS.items() if now - float(value.get("created_monotonic", now)) > _SESSION_TTL_SECONDS]
@@ -85,10 +120,23 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                         raise ValueError("session.open.workspace is invalid")
                     if mode not in {"plan", "act"}:
                         raise ValueError("session.open.mode must be plan or act")
+                    requested_handle = params.get("session")
+                    if requested_handle is not None:
+                        if not isinstance(requested_handle, str) or len(requested_handle) != 32:
+                            raise ValueError("session.open.session handle is invalid")
+                        restored = _load_session(requested_handle, workspace)
+                        if restored is None: raise ValueError("session handle is not recoverable")
+                        handle = requested_handle
+                        with _SESSION_LOCK: _RPC_SESSIONS[handle] = restored
+                        payload = {"schema_version": 1, "kind": "session", "ok": True, "command": "session.open", "data": {"session": handle, "workspace": restored["workspace"], "mode": restored["mode"], "recovered": True}, "exit_code": 0}
+                        if request_id is not None: payload["id"] = request_id
+                        yield json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+                        continue
                     handle = uuid.uuid4().hex
                     with _SESSION_LOCK:
                         _prune_sessions()
-                        _RPC_SESSIONS[handle] = {"workspace": workspace, "mode": mode, "session_path": f".forgecode/sessions/{handle}.jsonl", "state": "idle", "sequence": 0, "events": [], "created_monotonic": time.monotonic()}
+                        _RPC_SESSIONS[handle] = {"workspace": workspace, "mode": mode, "session_path": f".forgecode/sessions/{handle}.jsonl", "state": "idle", "sequence": 0, "events": [], "created_monotonic": time.monotonic(), "created_at": int(time.time())}
+                        _persist_session(handle, _RPC_SESSIONS[handle])
                     payload = {"schema_version": 1, "kind": "session", "ok": True, "command": "session.open", "data": {"session": handle, "workspace": workspace, "mode": mode}, "exit_code": 0}
                     if request_id is not None: payload["id"] = request_id
                     encoded = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
@@ -102,6 +150,10 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                 if method in {"session.close", "session.status", "session.events", "session.cancel", "session.pause", "session.resume", "session.approval"}:
                     handle = params.get("session") or params.get("session_id")
                     with _SESSION_LOCK: _prune_sessions()
+                    if handle not in _RPC_SESSIONS:
+                        restored = _load_session(handle, params.get("workspace"))
+                        if restored is not None:
+                            with _SESSION_LOCK: _RPC_SESSIONS[handle] = restored
                     if not isinstance(handle, str) or handle not in _RPC_SESSIONS:
                         raise ValueError("session handle is unknown")
                     with _SESSION_LOCK:
@@ -129,6 +181,8 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                             if len(info["events"]) > _MAX_SESSION_EVENTS:
                                 del info["events"][:-_MAX_SESSION_EVENTS]
                         if method == "session.close": _RPC_SESSIONS.pop(handle, None)
+                        elif method in {"session.cancel", "session.pause", "session.resume", "session.approval"}:
+                            _persist_session(handle, info)
                     data = {"session": handle, "closed": method == "session.close", "state": info.get("state"), "sequence": info.get("sequence", 0), "workspace": info.get("workspace"), "mode": info.get("mode")}
                     if method == "session.events":
                         after = params.get("after", 0)

@@ -118,3 +118,13 @@ def test_rpc_session_event_history_is_bounded(tmp_path):
     events = _call({"method": "session.events", "params": {"session": handle, "limit": 100}})["data"]["events"]
     assert len(events) == 100
     assert events[0]["sequence"] > 512
+
+
+def test_rpc_session_handle_can_be_recovered_from_workspace_metadata(tmp_path):
+    opened = _call({"method": "session.open", "params": {"workspace": str(tmp_path)}})
+    handle = opened["data"]["session"]
+    from forgecode import rpc
+    rpc._RPC_SESSIONS.pop(handle, None)
+    recovered = _call({"method": "session.open", "params": {"workspace": str(tmp_path), "session": handle}})
+    assert recovered["data"]["session"] == handle
+    assert recovered["data"]["recovered"] is True
