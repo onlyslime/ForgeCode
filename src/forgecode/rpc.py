@@ -28,12 +28,30 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
             if method is not None:
                 if not isinstance(method, str) or len(method) > 128 or any(ch.isspace() for ch in method):
                     raise ValueError("method must be bounded non-whitespace text")
-                method_map = {"trust.status": ["trust", "status"], "trust.grant": ["trust", "grant"], "trust.revoke": ["trust", "revoke"], "provider.list": ["provider", "list"], "provider.health": ["provider", "health"], "config.show": ["config", "show"], "doctor": ["doctor"], "login": ["login"]}
+                method_map = {"trust.status": ["trust", "status"], "trust.grant": ["trust", "grant"], "trust.revoke": ["trust", "revoke"], "provider.list": ["provider", "list"], "provider.health": ["provider", "health"], "config.show": ["config", "show"], "doctor": ["doctor"], "login": ["login"], "run": ["run"]}
                 if method not in method_map:
                     raise ValueError("unsupported RPC method")
                 if argv_value:
                     raise ValueError("method and argv cannot be combined")
-                argv_value = [*method_map[method], "--jsonl"]
+                params = request.get("params", {})
+                if params is None: params = {}
+                if not isinstance(params, dict) or len(params) > 16:
+                    raise ValueError("params must be a bounded object")
+                argv_value = list(method_map[method])
+                if method == "run":
+                    prompt = params.get("prompt", "")
+                    if not isinstance(prompt, str) or not prompt.strip() or len(prompt) > 8_000:
+                        raise ValueError("run.prompt must be non-empty and bounded")
+                    argv_value.append(prompt)
+                    for key, flag in (("workspace", "--workspace"), ("mode", "--mode"), ("session", "--session"), ("profile", "--profile")):
+                        value = params.get(key)
+                        if value is not None:
+                            if not isinstance(value, str) or len(value) > 1_000 or any(ch in value for ch in "\r\n"):
+                                raise ValueError(f"run.{key} is invalid")
+                            argv_value.extend([flag, value])
+                    if params.get("auto_approve") is True: argv_value.append("--auto-approve")
+                    if params.get("require_trust") is True: argv_value.append("--require-trust")
+                argv_value.append("--jsonl")
             if not isinstance(argv_value, list):
                 raise ValueError("argv must be an array")
             argv = [str(item) for item in argv_value]

@@ -15,5 +15,8 @@
 RPC 请求可携带有界 `id` 与显式方法名（如 `provider.list`、`config.show`、
 `trust.status`、`doctor`）；旧客户端继续使用 `argv` 数组。
 
+`run` 方法接受有界 `params.prompt` 以及 workspace、mode、session、profile、
+auto_approve、require_trust 参数，输出与 CLI 完全相同的事件 envelope。
+
 当真实 provider 已配置时，Act 模式自动要求 trust；框架离线/未配置模式保留
 旧版只读与测试兼容性，亦可用 `--require-trust` 显式启用门禁。

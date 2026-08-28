@@ -42,3 +42,12 @@ def test_rpc_config_and_doctor_methods(tmp_path):
         assert payload["id"] == name
         assert payload["method"] == name
         assert payload["ok"] is True
+
+
+def test_rpc_run_method_requires_bounded_prompt(tmp_path):
+    request = json.dumps({"id": "run-1", "method": "run", "params": {"workspace": str(tmp_path), "prompt": "inspect", "mode": "plan"}})
+    results = [json.loads(item) for item in serve_lines([request])]
+    assert results and all(item.get("id") == "run-1" for item in results)
+    assert any(item.get("kind") == "result" for item in results)
+    bad = json.loads(next(serve_lines([json.dumps({"method": "run", "params": {"prompt": ""}})])))
+    assert bad["error"]["code"] == "invalid_request"
