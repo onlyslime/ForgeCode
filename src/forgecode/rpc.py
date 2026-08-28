@@ -197,7 +197,8 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                         with _SESSION_LOCK:
                             _RPC_REPLAYS[request_id] = (encoded,)
                             _RPC_FINGERPRINTS[request_id] = fingerprint
-                            while len(_RPC_REPLAYS) > 1024: _RPC_REPLAYS.pop(next(iter(_RPC_REPLAYS)))
+                            while len(_RPC_REPLAYS) > 1024:
+                                oldest = next(iter(_RPC_REPLAYS)); _RPC_REPLAYS.pop(oldest, None); _RPC_FINGERPRINTS.pop(oldest, None)
                     yield encoded
                     continue
                 if method in {"session.close", "session.status", "session.events", "session.cancel", "session.pause", "session.resume", "session.approval"}:
@@ -264,7 +265,8 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                         with _SESSION_LOCK:
                             _RPC_REPLAYS[request_id] = (encoded,)
                             _RPC_FINGERPRINTS[request_id] = fingerprint
-                            while len(_RPC_REPLAYS) > 1024: _RPC_REPLAYS.pop(next(iter(_RPC_REPLAYS)))
+                            while len(_RPC_REPLAYS) > 1024:
+                                oldest = next(iter(_RPC_REPLAYS)); _RPC_REPLAYS.pop(oldest, None); _RPC_FINGERPRINTS.pop(oldest, None)
                     yield encoded
                     continue
                 if method in {"run", "session.run"}:
@@ -359,7 +361,8 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                     with _SESSION_LOCK:
                         _RPC_REPLAYS[request_id] = (encoded,)
                         _RPC_FINGERPRINTS[request_id] = fingerprint
-                        while len(_RPC_REPLAYS) > 1024: _RPC_REPLAYS.pop(next(iter(_RPC_REPLAYS)))
+                        while len(_RPC_REPLAYS) > 1024:
+                            oldest = next(iter(_RPC_REPLAYS)); _RPC_REPLAYS.pop(oldest, None); _RPC_FINGERPRINTS.pop(oldest, None)
                 yield encoded
                 continue
             responses: list[str] = []
@@ -374,7 +377,8 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                 with _SESSION_LOCK:
                     _RPC_REPLAYS[request_id] = tuple(responses)
                     _RPC_FINGERPRINTS[request_id] = fingerprint
-                    while len(_RPC_REPLAYS) > 1024: _RPC_REPLAYS.pop(next(iter(_RPC_REPLAYS)))
+                    while len(_RPC_REPLAYS) > 1024:
+                        oldest = next(iter(_RPC_REPLAYS)); _RPC_REPLAYS.pop(oldest, None); _RPC_FINGERPRINTS.pop(oldest, None)
             yield from responses
         except Exception as exc:
             message = str(exc)[:2000]

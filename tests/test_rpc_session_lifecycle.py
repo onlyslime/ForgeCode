@@ -253,6 +253,7 @@ def test_rpc_recovery_replay_cache_remains_bounded(tmp_path):
         request = {"id": f"recover-{index}", "method": "session.open", "params": {"workspace": str(tmp_path), "session": handle}}
         list(serve_lines([json.dumps(request)]))
     assert len(rpc._RPC_REPLAYS) <= 1024
+    assert len(rpc._RPC_FINGERPRINTS) <= 1024
 
 
 def test_rpc_recovery_restores_event_cursor(tmp_path):
