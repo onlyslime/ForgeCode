@@ -20,6 +20,9 @@ returns `recovery_required` rather than claiming a worker still exists. A new
 `session.run` explicitly reclaims that handle and emits `recovery_restarted`.
 Control and close requests against a `recovery_required` handle fail with
 `recovery_required`; only an explicit new run may reclaim it.
+After Act trust is revoked, cancellation remains permitted so clients can
+terminate an active worker; new execution and other lifecycle controls remain
+fail-closed with `trust_revoked`.
 The persisted record includes only the bounded recent event window and its
 sequence, allowing cursor-based event recovery after daemon restart.
 Each handle retains only the most recent 512 control/run events. Clients must

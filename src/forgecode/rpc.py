@@ -330,7 +330,7 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                                 trusted = TrustStore(Path(info["workspace"])).status().get("trusted", False)
                             except TrustError:
                                 trusted = False
-                            if not trusted:
+                            if not trusted and method != "session.cancel":
                                 info["state"] = "trust_revoked"
                                 raise ValueError("workspace trust is not granted")
                         if method in {"session.pause", "session.resume", "session.cancel", "session.approval"} and info.get("state") in {"completed", "failed", "cancelled", "approval_denied"}:

@@ -36,6 +36,8 @@ slice.
   method and Node `configProfiles` helper.
 - Made config/provider/doctor RPC workspace selection explicit and canonical,
   with the selected workspace echoed for auditability.
+- Kept Act-session cancellation available after trust revocation so active
+  workers can always be stopped while new execution remains denied.
 - Verification: full regression `444 passed, 8 skipped, 2 warnings`, RPC
   lifecycle suite, compile, and CLI/doctor checks.
 
