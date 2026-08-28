@@ -44,5 +44,17 @@ def test_rpc_login_forwards_bounded_provider_params(tmp_path: Path):
     payload = json.loads(records[0])
     assert payload["id"] == "login-1"
     assert payload["method"] == "login"
+
+
+def test_login_profile_reports_selected_credential_reference(tmp_path: Path, capsys):
+    (tmp_path / ".forgecode").mkdir()
+    (tmp_path / ".forgecode" / "config.toml").write_text(
+        'profile = "local"\n[profiles.local]\nprovider = "ollama"\nmodel = "llama3"\n', encoding="utf-8"
+    )
+    assert main(["--workspace", str(tmp_path), "login", "--profile", "local", "--json"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["data"]["profile"] == "local"
+    assert payload["data"]["provider"] == "ollama"
+    assert payload["data"]["model"] == "llama3"
     assert payload["data"]["provider"] == "ollama"
     assert payload["data"]["configured"] is True

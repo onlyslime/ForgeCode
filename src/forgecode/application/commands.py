@@ -382,6 +382,7 @@ def _parser() -> argparse.ArgumentParser:
     login_parser = subparsers.add_parser("login", help="show secure environment-based credential setup")
     login_parser.add_argument("--provider", default="openai-compatible")
     login_parser.add_argument("--api-key-env", default="FORGECODE_API_KEY")
+    login_parser.add_argument("--profile", help="inspect credentials for a named model profile")
     login_parser.add_argument("--json", action="store_true", default=argparse.SUPPRESS, dest="json")
     login_parser.add_argument("--jsonl", action="store_true", default=argparse.SUPPRESS, dest="jsonl")
     trust_parser = subparsers.add_parser("trust", help="inspect or change workspace trust")
@@ -770,15 +771,29 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if command == "login":
         machine_json = bool(getattr(args, "json", False) or getattr(args, "jsonl", False))
-        if args.provider not in SUPPORTED_PROVIDERS:
-            message = f"unsupported provider: {args.provider}"
+        profile_name = getattr(args, "profile", None)
+        selected_provider, selected_env = args.provider, args.api_key_env
+        selected_model = None
+        if profile_name:
+            try:
+                profile_config = ConfigLoader(workspace).load(profile=profile_name)
+                selected_provider = profile_config.provider
+                selected_env = profile_config.api_key_env
+                selected_model = profile_config.model
+            except (ConfigError, OSError) as exc:
+                message = str(exc)
+                if machine_json: _emit_machine(_machine_error("login", "invalid_profile", message, exit_code=2))
+                else: print(message, file=sys.stderr)
+                return 2
+        if selected_provider not in SUPPORTED_PROVIDERS:
+            message = f"unsupported provider: {selected_provider}"
             if machine_json:
                 _emit_machine(_machine_error("login", "unsupported_provider", message, exit_code=2))
             else:
                 print(message, file=sys.stderr)
             return 2
-        requires_key = provider_requires_credential(args.provider)
-        payload = {"provider": args.provider, "api_key_env": args.api_key_env if requires_key else None, "configured": (not requires_key) or bool(os.getenv(args.api_key_env, "")), "credential": "required" if requires_key else "optional", "storage": "environment-only", "message": (f"Set {args.api_key_env} in the environment; ForgeCode never stores credential values." if requires_key else "Ollama uses a local endpoint and does not require an API key.")}
+        requires_key = provider_requires_credential(selected_provider)
+        payload = {"provider": selected_provider, "profile": profile_name, "model": selected_model, "api_key_env": selected_env if requires_key else None, "configured": (not requires_key) or bool(os.getenv(selected_env, "")), "credential": "required" if requires_key else "optional", "storage": "environment-only", "message": (f"Set {selected_env} in the environment; ForgeCode never stores credential values." if requires_key else "Ollama uses a local endpoint and does not require an API key.")}
         if machine_json:
             _emit_machine(_machine_envelope("login", "login", True, data=payload, exit_code=0))
         else:

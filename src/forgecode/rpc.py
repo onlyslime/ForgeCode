@@ -283,6 +283,11 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                         if not isinstance(api_key_env, str) or not api_key_env.strip() or len(api_key_env) > 128 or any(ch in api_key_env for ch in "\r\n"):
                             raise ValueError("login.api_key_env is invalid")
                         argv_value.extend(["--api-key-env", api_key_env])
+                    profile = params.get("profile")
+                    if profile is not None:
+                        if not isinstance(profile, str) or not profile.strip() or len(profile) > 128 or any(ch in profile for ch in "\r\n"):
+                            raise ValueError("login.profile is invalid")
+                        argv_value.extend(["--profile", profile])
                 elif method.startswith("session."):
                     session_id = params.get("session") or params.get("session_id")
                     if method == "session.tree":
