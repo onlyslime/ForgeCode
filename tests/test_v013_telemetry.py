@@ -13,7 +13,7 @@ def test_local_telemetry_is_bounded(tmp_path):
     telemetry = Telemetry(tmp_path, mode="local")
     assert telemetry.record("run", prompt="secret", nested={"x": 1}) is True
     text = (tmp_path / ".forgecode" / "telemetry.jsonl").read_text()
-    assert "secret" in text and "nested" not in text
+    assert "secret" not in text and "nested" not in text
 
 
 def test_telemetry_cli_status_and_export(capsys, tmp_path):

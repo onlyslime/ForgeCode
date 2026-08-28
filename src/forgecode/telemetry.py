@@ -14,6 +14,8 @@ from typing import Any
 
 class Telemetry:
     MAX_RECORDS = 5_000
+    SCHEMA_VERSION = 1
+    _SENSITIVE_KEYS = ("prompt", "content", "secret", "token", "api_key", "password", "credential", "command", "args", "stdout", "stderr", "workspace", "environment", "env")
     def __init__(self, workspace: Path, *, mode: str = "off", offline: bool = False):
         self.workspace = Path(workspace).resolve()
         self.mode = "off" if offline else mode
@@ -27,10 +29,22 @@ class Telemetry:
     def record(self, event: str, **metadata: Any) -> bool:
         if self.mode != "local":
             return False
-        safe = {"event": str(event)[:128], "timestamp": int(time.time())}
+        safe = {"schema_version": self.SCHEMA_VERSION, "event": str(event)[:128], "timestamp": int(time.time())}
+        dropped = 0
         for key, value in metadata.items():
+            key_text = str(key)[:64]
+            if any(part in key_text.lower() for part in self._SENSITIVE_KEYS):
+                dropped += 1
+                continue
             if isinstance(value, (str, int, float, bool)) or value is None:
-                safe[str(key)[:64]] = value
+                if isinstance(value, str) and len(value) > 256:
+                    dropped += 1
+                    continue
+                safe[key_text] = value
+            else:
+                dropped += 1
+        if dropped:
+            safe["dropped_fields"] = dropped
         path = self.workspace / ".forgecode" / "telemetry.jsonl"
         path.parent.mkdir(parents=True, exist_ok=True)
         record = json.dumps(safe, ensure_ascii=False, separators=(",", ":")) + "\n"
