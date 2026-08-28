@@ -18,6 +18,11 @@ The handle registry is deliberately bounded by request validation and does not
 create a second execution loop. Production execution remains owned by the
 existing AgentLoop/RunService path.
 
+Provider health is offline by default. `provider health --probe` is an explicit
+opt-in reachability check, bounded to a short HEAD request and never including
+credential values; offline policy or missing configuration prevents the
+request and returns a structured reason.
+
 ## Safety and compatibility
 
 Prompts, paths, provider names and environment-variable names are bounded and
