@@ -31,7 +31,28 @@ Chat Completions 返回结构化 tool calls，ForgeCode 在用户指定工作区
 - **真实离线演示**：DemoProvider 在隔离工作区读取有 bug 的 calculator，先跑
   出失败测试，再走 patch 和审批，最后取得真实通过结果；不需要网络或 API key。
 
-当前版本：`v0.0.7`。
+当前版本：`v0.0.8`（版本号与 `VERSION`、`pyproject.toml` 和
+`src/forgecode/__init__.py` 保持同步）。
+
+### v0.0.8 扩展能力
+
+- **命名测试配置**：`.forgecode/tests.toml` 使用严格 TOML schema；每个 profile
+  是不可注入的 argv 数组，可声明工作目录、setup/teardown、非敏感环境变量白名单、
+  stdout/stderr/总量额度、超时和允许的退出码。`test` CLI 的 list/show/run
+  使用该执行器；交互式 `/test` 保留兼容的验证命令入口并共享审批、
+  超时、脱敏和 session 审计边界。两种入口都记录有限输出与结果状态。
+- **证据驱动 review**：`review` 聚合 session、plan、context、transaction、
+  test、hook 和 diff hunk 证据，运行 secrets、forbidden-path、suspicious-command
+  与 Python AST syntax 检查；报告只引用相对路径、序列号和 SHA-256，不接受模型文字
+  直接宣称通过。`review --export` 生成绑定工作区的摘要，`--verify` 检查篡改、过期
+  文件和 artifact digest。
+- **取消与未决恢复**：`CancellationToken` 和 deadline 从 AgentLoop 传到 provider、
+  测试进程及 SSE 解析器；无法确认终止的 worker 会被标记 `unresolved` 并进入恢复证据，
+  不会把晚到响应当成成功，也不会在副作用后自动重放工具调用。provider retry/attempt
+  事件带 request id、attempt id 和结果分类。
+- **严格机器接口**：`--jsonl` 输出单行 envelope（`schema_version/kind/ok/command`
+  加互斥的 `data` 或 `error`），进度和审批提示不污染 stdout；旧 `--json` 的必要兼容
+  形状仍保留。退出码区分成功、执行失败、输入错误、恢复冲突和取消。
 
 ### v0.0.7 扩展能力
 
@@ -74,14 +95,16 @@ prompt -> bounded context -> model response/tool calls -> local tools
 `https://api.openai.com/v1`), and `FORGECODE_MODEL` from the environment. The
 offline `DemoProvider` follows the same `AgentLoop` and `ToolRegistry` path.
 
-The v0.0.7 release adds a strict Markdown skill manifest and a local
-incremental context index. `skills list|check|show|run` and
-`context index|search|show|clear` are read-only, bounded, JSON-capable
-interfaces; index snippets are digest-checked before use. `provider health`
-reports capabilities without a network request, while lifecycle hooks provide
-auditable before/after tool and model observations with optional fail-closed
-behavior. These additions do not grant extensions implicit shell, write,
-network or secret access.
+The v0.0.8 release adds strict named test profiles, evidence-driven review and
+deterministic security checks, provider cancellation/deadline propagation,
+unresolved-attempt recovery evidence, and a stable machine-output envelope.
+`test list|show|run` accepts only bounded argv profiles; `review` joins the
+session/plan/context/transaction/test/hook ledger and can export or verify a
+workspace-bound digest artifact. `--jsonl` keeps one parseable envelope per
+line, while progress and approval prompts stay on stderr. The v0.0.7 Markdown
+skill manifest, incremental context index, provider health diagnostics and
+lifecycle hooks remain available. None of these extensions grants implicit
+shell, write, network or secret access.
 
 ## Quick start
 
@@ -97,8 +120,16 @@ uv run forgecode provider health
 uv run forgecode skills list
 uv run forgecode context index
 uv run forgecode context search "AgentLoop"
+uv run forgecode test list
+uv run forgecode test show default --jsonl
+uv run forgecode review --jsonl
 uv run pytest
 ```
+
+`review` deliberately reports non-zero when the inspected tree contains
+credential-shaped test fixtures or other findings; that is a finding report,
+not a crash. Use the fresh offline demo above to see a clean pass, or inspect
+the bounded `findings`/`checks` fields in JSONL output.
 
 Read-only planning in the current workspace:
 
@@ -145,12 +176,13 @@ $lines | uv run forgecode --workspace $demo chat --demo --auto-approve
 
 Useful read-only commands include `plan`, `rules show|check`, `config
 show|validate`, `session show|export|inspect|compact|fork`, `status`, `diff`,
-and `review`/`transaction`. `review` joins the latest ledger with session
-plan, references, verification checks and audit metrics. Machine-readable
-commands use `--json` or `--jsonl`; interactive JSON mode emits one JSON object
-per line. Exit codes are 0 success, 1 execution or
-audit failure, 2 invalid input/unavailable resource, 3 recovery/hash/config
-conflict, and 130 cancellation.
+`context explain|diagnostics`, `test list|show`, and `review`/`transaction`.
+`test run` is side-effecting because it starts a project process; it still uses
+the profile approval policy and records bounded evidence. Machine-readable
+commands use `--json` or `--jsonl`; the latter emits one strict envelope per
+line. Exit codes are 0 success, 1 execution or audit failure, 2 invalid input
+or unavailable resource, 3 recovery/hash/config conflict, and 130
+cancellation.
 
 ## Repository layout
 
@@ -160,13 +192,16 @@ tests/               deterministic offline regression tests
 docs/assignment/     assessment PDF
 docs/research/       research plan and feature report
 docs/demo-script.md  reproducible two-minute demo script
+docs/v008-acceptance-report.md  bounded release acceptance evidence
 docs/goals/          ignored timestamped goal prompts (private)
 ```
 
 See [docs/architecture.md](docs/architecture.md) for data flow and safety
 semantics, [docs/demo-script.md](docs/demo-script.md) for the assessment
 walk-through, [AGENTS.md](AGENTS.md) for repository rules, and
-[docs/VERSIONING.md](docs/VERSIONING.md) for version policy.
+[docs/VERSIONING.md](docs/VERSIONING.md) for version policy. The bounded
+release evidence is summarized in
+[docs/v008-acceptance-report.md](docs/v008-acceptance-report.md).
 
 ## Safety and scope
 

@@ -34,6 +34,10 @@ class InteractiveSession:
     quit: Callable[[], object] = lambda: {"stopped": True}
     output: Callable[[str], None] = print
     json_mode: bool = False
+    # ``json_mode`` is retained for the v0.0.7 event shape.  ``jsonl_mode``
+    # opts into the v0.0.8 command-envelope contract while keeping the old
+    # ``type``/``payload`` aliases additive for scripts that consume them.
+    jsonl_mode: bool = False
     max_queue_items: int = 32
     max_queue_chars: int = 32_000
     _queue: list[str] = field(default_factory=list)
@@ -126,7 +130,16 @@ class InteractiveSession:
                 value = {"error": str(exc)}
             if value is not None:
                 results.append(value)
-                self.output(json.dumps({"type": "interactive_result", "payload": value}, ensure_ascii=False, default=str) if self.json_mode else str(value))
+                if self.jsonl_mode:
+                    success = not (isinstance(value, dict) and value.get("error"))
+                    if success:
+                        record = {"schema_version": 1, "kind": "interactive_result", "ok": True, "command": "chat", "data": value, "type": "interactive_result", "payload": value}
+                    else:
+                        message = str(value.get("message") or value.get("error") or "interactive command failed") if isinstance(value, dict) else str(value)
+                        record = {"schema_version": 1, "kind": "error", "ok": False, "command": "chat", "error": {"code": str(value.get("error", "interactive_failed")) if isinstance(value, dict) else "interactive_failed", "message": message[:2_000]}, "type": "interactive_result", "payload": value}
+                    self.output(json.dumps(record, ensure_ascii=False, default=str, allow_nan=False))
+                else:
+                    self.output(json.dumps({"type": "interactive_result", "payload": value}, ensure_ascii=False, default=str) if self.json_mode else str(value))
             if self.stopped:
                 break
         return results

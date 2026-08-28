@@ -50,7 +50,11 @@ class DemoProvider:
     def health(self) -> dict:
         return {"provider": "demo", "configured": True, "task": self.spec["source"], "capabilities": self.capabilities.to_dict()}
 
-    async def complete(self, messages, tools):
+    async def complete(self, messages, tools, context=None):
+        if context is not None and getattr(context, "cancelled", False):
+            from .protocol import ProviderError
+
+            raise ProviderError("demo provider request cancelled", category="cancelled", retryable=False, request_id=getattr(context, "request_id", None))
         self.calls += 1
         if self.calls == 1:
             available = {schema.get("function", {}).get("name") for schema in tools}

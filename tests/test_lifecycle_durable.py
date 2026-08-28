@@ -5,6 +5,10 @@ import pytest
 
 from forgecode.agent import LifecycleError, RunLifecycle, RunState
 from forgecode.storage import SessionFormatError, SessionStore
+from forgecode.storage import CheckpointStore, TransactionError, TransactionStore
+from forgecode.context import ContextIndex, ContextIndexError
+from forgecode.review import ReviewArtifactError, import_review
+from forgecode.security import WorkspaceGuard, bounded_json_loads
 
 
 def test_lifecycle_has_checked_transitions_and_terminal_states():
@@ -75,6 +79,68 @@ def test_session_read_rejects_non_finite_json_payload(tmp_path: Path):
     assert not result.events and any("non-finite" in issue.message for issue in result.issues)
     with pytest.raises(SessionFormatError, match="non-finite"):
         SessionStore(path).read_with_issues(strict=True)
+
+
+def test_session_read_reports_deep_json_without_recursion_error(tmp_path: Path):
+    """Untrusted nesting is diagnosed during inspection, not process-crashed."""
+    path = tmp_path / "deep.jsonl"
+    # Build a valid event whose payload is far beyond the defensive shape
+    # budget.  The constructor also scans existing lines, so exercise that
+    # path explicitly rather than only calling read_with_issues afterwards.
+    payload = (
+        '{"schema_version":1,"kind":"x","payload":'
+        + ("{\"x\":" * 1_000)
+        + "0"
+        + ("}" * 1_000)
+        + ',"timestamp":"2026-01-01T00:00:00+00:00","run_id":"r","sequence":1}'
+    )
+    path.write_text(payload + "\n", encoding="utf-8")
+
+    store = SessionStore(path)
+    result = store.read_with_issues()
+
+    assert not result.events
+    assert any("nesting" in issue.message for issue in result.issues)
+    with pytest.raises(SessionFormatError, match="nesting"):
+        store.read_with_issues(strict=True)
+
+
+def test_runtime_json_readers_fail_closed_on_deep_nesting(tmp_path: Path):
+    """All durable JSON readers map hostile nesting to their public errors."""
+    nested = "{\"x\":" * 1_000 + "0" + "}" * 1_000
+
+    checkpoint_path = tmp_path / "checkpoint.json"
+    checkpoint_path.write_text(nested, encoding="utf-8")
+    with pytest.raises(ValueError, match="nesting"):
+        CheckpointStore(checkpoint_path).load()
+
+    guard = WorkspaceGuard(tmp_path)
+    manifest_dir = tmp_path / ".forgecode" / "transactions" / "manifests"
+    manifest_dir.mkdir(parents=True)
+    (manifest_dir / "deep.json").write_text(nested, encoding="utf-8")
+    with pytest.raises(TransactionError, match="unreadable|nesting"):
+        TransactionStore(guard).load("deep")
+
+    index_path = tmp_path / ".forgecode" / "context-index.json"
+    index_path.write_text(nested, encoding="utf-8")
+    index = ContextIndex(guard)
+    # A corrupt cache is rebuilt by the normal entries path, but must never
+    # leak the decoder's RecursionError.
+    try:
+        index.entries()
+    except ContextIndexError as exc:
+        assert "nesting" in str(exc).lower() or "read context index" in str(exc).lower()
+
+    artifact = tmp_path / "review.json"
+    artifact.write_text(nested, encoding="utf-8")
+    with pytest.raises(ReviewArtifactError, match="unreadable|nesting"):
+        import_review(artifact, guard)
+
+
+def test_bounded_json_rejects_flat_scalar_floods_before_recursive_decode():
+    value = "[" + ",".join("0" for _ in range(100_001)) + "]"
+    with pytest.raises(ValueError, match="node safety limit"):
+        bounded_json_loads(value)
 
 
 def test_new_store_continues_sequence_after_existing_events(tmp_path: Path):

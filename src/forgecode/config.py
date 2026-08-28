@@ -26,6 +26,9 @@ class ConfigError(ValueError):
     """A configuration file or override is invalid or unsafe."""
 
 
+MAX_CONFIG_BYTES = 1_000_000
+
+
 @dataclass(frozen=True)
 class ModelProfile:
     name: str
@@ -253,10 +256,24 @@ class ConfigLoader:
             raise ConfigError("config.toml path could not be validated") from exc
         try:
             before_stat = self.path.stat()
+            if before_stat.st_size > MAX_CONFIG_BYTES:
+                raise ConfigError(f"config.toml exceeds the {MAX_CONFIG_BYTES}-byte safety limit")
             with self.path.open("rb") as stream:
                 data = tomllib.load(stream)
             after_stat = self.path.stat()
-        except (OSError, tomllib.TOMLDecodeError) as exc:
+            if after_stat.st_size > MAX_CONFIG_BYTES:
+                raise ConfigError(f"config.toml exceeds the {MAX_CONFIG_BYTES}-byte safety limit")
+            # Re-check the alias immediately after parsing.  A replacement
+            # race must never turn a validated local file into a link that is
+            # trusted merely because the parser already returned a value.
+            assert_no_path_alias(self.path, message="config.toml changed to a symlink or junction while it was read")
+        except ConfigError:
+            raise
+        except WorkspaceViolation as exc:
+            raise ConfigError(str(exc)) from exc
+        except (OSError, tomllib.TOMLDecodeError, RecursionError) as exc:
+            if isinstance(exc, RecursionError):
+                raise ConfigError("config.toml nesting exceeds the safety limit") from exc
             raise ConfigError(f"invalid config.toml: {type(exc).__name__}") from exc
         before_identity = (before_stat.st_size, before_stat.st_mtime_ns, getattr(before_stat, "st_ino", 0))
         after_identity = (after_stat.st_size, after_stat.st_mtime_ns, getattr(after_stat, "st_ino", 0))
@@ -374,4 +391,4 @@ def _reject_secret_fields(value: Any, *, _path: str = "config") -> None:
     walk(value, _path, 0)
 
 
-__all__ = ["ConfigError", "ConfigLoader", "EffectiveConfig", "ModelProfile", "Settings", "ToolPolicy", "load_effective_config"]
+__all__ = ["MAX_CONFIG_BYTES", "ConfigError", "ConfigLoader", "EffectiveConfig", "ModelProfile", "Settings", "ToolPolicy", "load_effective_config"]

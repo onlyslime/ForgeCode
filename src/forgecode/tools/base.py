@@ -8,6 +8,7 @@ import math
 
 from ..security.redaction import redact_text, redact_value
 from ..security.workspace import WorkspaceGuard
+from ..models.protocol import CancellationToken
 
 
 class AgentMode(StrEnum):
@@ -39,6 +40,7 @@ class ToolContext:
     secrets: tuple[str, ...] = ()
     deadline_monotonic: float | None = None
     cancellation_requested: Callable[[], bool] | None = None
+    cancellation_token: CancellationToken | None = None
     transaction_store: Any | None = None
     run_id: str = ""
     plan_id: str | None = None
@@ -48,6 +50,7 @@ class ToolContext:
     plan_fingerprint: str = ""
     config_fingerprint: str = ""
     hooks: Any | None = None
+    correlation_id: str | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "mode", AgentMode(self.mode))
@@ -56,13 +59,26 @@ class ToolContext:
             raise ValueError("deadline_monotonic must be a finite number or None")
 
     def remaining_seconds(self, requested: float) -> float:
+        if isinstance(requested, bool) or not isinstance(requested, (int, float)) or not math.isfinite(requested) or requested < 0:
+            raise ValueError("requested timeout must be a finite non-negative number")
         if self.deadline_monotonic is None:
-            return requested
-        return max(0.0, min(requested, self.deadline_monotonic - time.monotonic()))
+            return float(requested)
+        return max(0.0, min(float(requested), self.deadline_monotonic - time.monotonic()))
 
     @property
     def cancelled(self) -> bool:
-        return bool(self.cancellation_requested and self.cancellation_requested())
+        token_cancelled = bool(self.cancellation_token and self.cancellation_token.is_cancelled())
+        try:
+            callback_cancelled = bool(self.cancellation_requested and self.cancellation_requested())
+        except Exception:
+            callback_cancelled = self.cancellation_requested is not None
+        return token_cancelled or callback_cancelled
+
+    @property
+    def cancellation_reason(self) -> str:
+        if self.cancellation_token is not None and self.cancellation_token.is_cancelled():
+            return self.cancellation_token.reason
+        return "cancelled"
 
     def request_approval(self, tool_name: str, arguments: dict[str, Any]) -> bool:
         approved = self.approval is not None and self.approval.approve(tool_name, arguments)
@@ -156,6 +172,11 @@ class ToolRegistry:
         tool = self._tools.get(name)
         if tool is None:
             return ToolResult(False, f"unknown tool: {name}", {"error": "unknown_tool"})
+        # A provider can return a tool call at the same moment another thread
+        # requests cancellation. Check at the executor boundary so a
+        # side-effecting tool is never entered after cancellation was observed.
+        if context.cancelled:
+            return ToolResult(False, f"{name} cancelled before execution", {"error": "cancelled", "cancellation_reason": context.cancellation_reason, "tool": name})
         if context.mode is AgentMode.PLAN and tool.definition.side_effecting:
             return ToolResult(
                 False,
@@ -166,10 +187,13 @@ class ToolRegistry:
             return ToolResult(False, "tool arguments must be an object", {"error": "invalid_arguments"})
         before_hook_issues = ()
         if context.hooks is not None:
-            before_hook_issues = context.hooks.emit("before_tool", {"tool": name, "arguments": arguments, "mode": context.mode.value})
+            hook_correlation = context.correlation_id or f"{context.run_id or 'run'}:tool:{name}"
+            before_hook_issues = context.hooks.emit("before_tool", {"tool": name, "arguments": arguments, "mode": context.mode.value}, cancellation=context.cancellation_token or context.cancellation_requested, correlation_id=hook_correlation)
             blocked = [issue for issue in before_hook_issues if issue.blocked]
             if blocked:
                 return ToolResult(False, f"{name} blocked by lifecycle hook", {"error": "hook_blocked", "hook_issues": [issue.to_dict() for issue in before_hook_issues]})
+            if context.cancelled:
+                return ToolResult(False, f"{name} cancelled before execution", {"error": "cancelled", "cancellation_reason": context.cancellation_reason, "tool": name})
         try:
             result = tool.execute(arguments, context)
             if not isinstance(result, ToolResult):
@@ -184,7 +208,7 @@ class ToolRegistry:
                 metadata = {**safe_metadata, "truncated": True, "original_output_chars": len(safe_output)}
                 final = ToolResult(result.ok, safe_output[: self.max_output_chars] + "\n[tool output truncated]", metadata)
             if context.hooks is not None:
-                after_hook_issues = context.hooks.emit("after_tool", {"tool": name, "ok": final.ok, "output": final.output[:4_000], "metadata": final.metadata})
+                after_hook_issues = context.hooks.emit("after_tool", {"tool": name, "ok": final.ok, "output": final.output[:4_000], "metadata": final.metadata}, cancellation=context.cancellation_token or context.cancellation_requested, correlation_id=context.correlation_id or f"{context.run_id or 'run'}:tool:{name}")
                 if before_hook_issues or after_hook_issues:
                     final = ToolResult(final.ok, final.output, {**final.metadata, "hook_issues": [issue.to_dict() for issue in (*before_hook_issues, *after_hook_issues)]})
                 blocked = [issue for issue in after_hook_issues if issue.blocked]
@@ -198,7 +222,7 @@ class ToolRegistry:
         except Exception as exc:  # tool errors become model context, never process crashes
             final = ToolResult(False, redact_text(f"{type(exc).__name__}: {exc}", context.secrets), {"error": type(exc).__name__})
             if context.hooks is not None:
-                after_hook_issues = context.hooks.emit("after_tool", {"tool": name, "ok": False, "error": type(exc).__name__})
+                after_hook_issues = context.hooks.emit("after_tool", {"tool": name, "ok": False, "error": type(exc).__name__}, cancellation=context.cancellation_token or context.cancellation_requested, correlation_id=context.correlation_id or f"{context.run_id or 'run'}:tool:{name}")
                 if before_hook_issues or after_hook_issues:
                     final = ToolResult(final.ok, final.output, {**final.metadata, "hook_issues": [issue.to_dict() for issue in (*before_hook_issues, *after_hook_issues)]})
             return final

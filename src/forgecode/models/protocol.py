@@ -2,7 +2,100 @@
 
 from dataclasses import dataclass, field, asdict
 import math
-from typing import Any, Protocol, Sequence
+import threading
+import time
+from typing import Any, Callable, Protocol, Sequence
+
+
+class CancellationToken:
+    """Thread-safe cooperative cancellation signal shared by a run.
+
+    Providers and synchronous tools may poll this object without depending on
+    asyncio.  Cancellation is idempotent and carries only a bounded,
+    non-sensitive reason for diagnostics.
+    """
+
+    __slots__ = ("_event", "_lock", "_reason")
+
+    def __init__(self) -> None:
+        self._event = threading.Event()
+        self._lock = threading.Lock()
+        self._reason = "cancelled"
+
+    def cancel(self, reason: str = "cancelled") -> bool:
+        """Set the token; return ``True`` only for the first request."""
+        with self._lock:
+            first = not self._event.is_set()
+            if first:
+                safe_reason = str(reason or "cancelled")[:256]
+                self._reason = safe_reason
+                self._event.set()
+            return first
+
+    def is_cancelled(self) -> bool:
+        return self._event.is_set()
+
+    @property
+    def cancelled(self) -> bool:
+        return self.is_cancelled()
+
+    @property
+    def reason(self) -> str:
+        with self._lock:
+            return self._reason
+
+    def wait(self, timeout: float | None = None) -> bool:
+        """Wait for cancellation, returning whether it was requested."""
+        if timeout is not None:
+            if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or not math.isfinite(timeout) or timeout < 0:
+                raise ValueError("timeout must be a finite non-negative number")
+        return self._event.wait(timeout)
+
+
+@dataclass(frozen=True)
+class ProviderContext:
+    """Deadline and cancellation metadata passed to provider adapters."""
+
+    deadline_monotonic: float | None = None
+    cancellation_token: CancellationToken | None = None
+    cancellation_requested: Callable[[], bool] | None = None
+    request_id: str = ""
+
+    def __post_init__(self) -> None:
+        if self.deadline_monotonic is not None and (
+            isinstance(self.deadline_monotonic, bool)
+            or not isinstance(self.deadline_monotonic, (int, float))
+            or not math.isfinite(self.deadline_monotonic)
+        ):
+            raise ValueError("deadline_monotonic must be a finite number or None")
+        if not isinstance(self.request_id, str) or len(self.request_id) > 256:
+            raise ValueError("request_id must be bounded text")
+        if self.cancellation_requested is not None and not callable(self.cancellation_requested):
+            raise ValueError("cancellation_requested must be callable or None")
+
+    @property
+    def cancelled(self) -> bool:
+        token_cancelled = bool(self.cancellation_token and self.cancellation_token.is_cancelled())
+        try:
+            callback_cancelled = bool(self.cancellation_requested and self.cancellation_requested())
+        except Exception:
+            # A cancellation predicate is untrusted.  A failure to evaluate
+            # it must fail closed instead of allowing a provider request to
+            # continue past an unknown safety boundary.
+            callback_cancelled = self.cancellation_requested is not None
+        return token_cancelled or callback_cancelled
+
+    def remaining_seconds(self, requested: float) -> float:
+        if isinstance(requested, bool) or not isinstance(requested, (int, float)) or not math.isfinite(requested) or requested < 0:
+            raise ValueError("requested timeout must be a finite non-negative number")
+        if self.deadline_monotonic is None:
+            return float(requested)
+        return max(0.0, min(float(requested), self.deadline_monotonic - time.monotonic()))
+
+
+def cancellation_requested(context: ProviderContext | None) -> bool:
+    """Return a defensive cancellation check for optional provider contexts."""
+    return bool(context and context.cancelled)
 
 
 @dataclass(frozen=True)
@@ -102,19 +195,24 @@ def _valid_json_value(value: Any, *, depth: int = 0, budget: list[int] | None = 
 
 
 class ModelProvider(Protocol):
-    async def complete(self, messages: Sequence[Message], tools: Sequence[dict[str, Any]]) -> ModelResponse:
+    async def complete(self, messages: Sequence[Message], tools: Sequence[dict[str, Any]], context: ProviderContext | None = None) -> ModelResponse:
         """Return the next assistant message, possibly containing tool calls."""
 
 
 class ProviderError(RuntimeError):
     """A safe, user-facing model provider or protocol error."""
 
-    def __init__(self, message: str, *, category: str = "provider_error", retryable: bool = False, status_code: int | None = None, attempt: int | None = None):
+    def __init__(self, message: str, *, category: str = "provider_error", retryable: bool = False, status_code: int | None = None, attempt: int | None = None, request_id: str | None = None, unresolved: bool = False):
         super().__init__(message)
         self.category = category
         self.retryable = retryable
         self.status_code = status_code
         self.attempt = attempt
+        self.request_id = request_id
+        # True means a blocking transport/worker may still be running after
+        # the bounded caller returned.  Callers must not treat that attempt
+        # as completed or replay its side effects automatically.
+        self.unresolved = bool(unresolved)
 
 
 @dataclass(frozen=True)

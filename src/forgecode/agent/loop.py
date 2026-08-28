@@ -3,14 +3,18 @@
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
 from dataclasses import dataclass
+from datetime import datetime, timezone
 import hashlib
+import inspect
 import json
+import threading
 import time
 import math
 from typing import Any, Callable
 
-from ..models import Message, ModelProvider, ProviderError, is_valid_response
+from ..models import CancellationToken, Message, ModelProvider, ProviderContext, ProviderError, is_valid_response
 from ..context import RepositoryMapBuilder
 from ..security.redaction import redact_text
 from ..storage import Checkpoint, CheckpointStore, FileFingerprint, SessionStore, bounded
@@ -30,6 +34,10 @@ class AgentConfig:
     provider_timeout_seconds: float = 90.0
     max_tool_calls_per_turn: int = 256
     max_tool_calls_total: int = 512
+    # A cancelled provider task gets a short chance to acknowledge
+    # cancellation.  If it is still running afterwards it is detached and
+    # the run is recovery-required; never wait indefinitely on untrusted code.
+    provider_cleanup_grace_seconds: float = 0.1
 
 
 @dataclass(frozen=True)
@@ -61,6 +69,7 @@ class AgentLoop:
         config: AgentConfig | None = None,
         context_builder: ContextBuilder | None = None,
         on_event: Callable[[str, dict[str, Any]], None] | None = None,
+        cancellation_token: CancellationToken | None = None,
     ):
         self.provider = provider
         self.registry = registry
@@ -68,6 +77,7 @@ class AgentLoop:
         self.config = config or AgentConfig()
         self.context_builder = context_builder or ContextBuilder()
         self.on_event = on_event
+        self.cancellation_token = cancellation_token or context.cancellation_token or CancellationToken()
         self.lifecycle = RunLifecycle()
         self.audit_complete = True
         self.run_id = session.run_id if session else None
@@ -82,12 +92,22 @@ class AgentLoop:
         self._last_event_sequence = 0
         self._last_context_summary = ""
         self._pause_requested = False
+        # Attempt/retry ids are only unique within a provider request.  Some
+        # adapters (and a number of test/fake adapters) restart their counter
+        # for every turn, so using the id by itself can silently drop evidence
+        # for a later request.  Keep the request id in the identity key.
+        self._recorded_provider_attempts: set[tuple[str, str]] = set()
+        self._recorded_provider_retries: set[tuple[str, str]] = set()
+        self._provider_event_counter = 0
+        self._last_provider_unresolved = False
         integer_limits = (self.config.max_steps, self.config.max_repeated_calls, self.config.max_verification_attempts, self.config.max_tool_calls_per_turn, self.config.max_tool_calls_total)
         if any(isinstance(value, bool) or not isinstance(value, int) or value < 1 for value in integer_limits):
             raise ValueError("loop limits must be positive")
-        timeouts = (self.config.total_timeout_seconds, self.config.provider_timeout_seconds)
+        timeouts = (self.config.total_timeout_seconds, self.config.provider_timeout_seconds, self.config.provider_cleanup_grace_seconds)
         if any(isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value <= 0 for value in timeouts):
             raise ValueError("loop timeouts must be positive")
+        if self.config.provider_cleanup_grace_seconds > 5:
+            raise ValueError("provider_cleanup_grace_seconds must be at most 5 seconds")
         original_observer = context.approval_observer
 
         def record_approval(tool_name: str, arguments: dict[str, Any], approved: bool) -> None:
@@ -103,7 +123,11 @@ class AgentLoop:
             self._record("approval", {"tool": tool_name, "arguments": safe_arguments, "approved": approved})
             self._approvals.append({"tool": tool_name, "approved": approved})
 
-        self.context = ToolContext(context.guard, context.approval, approval_observer=record_approval, mode=context.mode, secrets=context.secrets, deadline_monotonic=time.monotonic() + self.config.total_timeout_seconds, cancellation_requested=context.cancellation_requested, transaction_store=context.transaction_store, run_id=context.run_id or (session.run_id if session else ""), plan_id=context.plan_id, plan_item_id=context.plan_item_id, pre_side_effect_check=context.pre_side_effect_check, rules_fingerprint=context.rules_fingerprint, plan_fingerprint=context.plan_fingerprint, config_fingerprint=context.config_fingerprint, hooks=context.hooks)
+        now = time.monotonic()
+        configured_deadline = now + self.config.total_timeout_seconds
+        if context.deadline_monotonic is not None:
+            configured_deadline = min(configured_deadline, context.deadline_monotonic)
+        self.context = ToolContext(context.guard, context.approval, approval_observer=record_approval, mode=context.mode, secrets=context.secrets, deadline_monotonic=configured_deadline, cancellation_requested=context.cancellation_requested, cancellation_token=self.cancellation_token, transaction_store=context.transaction_store, run_id=context.run_id or (session.run_id if session else ""), plan_id=context.plan_id, plan_item_id=context.plan_item_id, pre_side_effect_check=context.pre_side_effect_check, rules_fingerprint=context.rules_fingerprint, plan_fingerprint=context.plan_fingerprint, config_fingerprint=context.config_fingerprint, hooks=context.hooks, correlation_id=context.correlation_id)
 
     def _record(self, kind: str, payload: dict[str, Any]) -> None:
         safe_payload = self._sanitize_session_payload(payload)
@@ -193,6 +217,307 @@ class AgentLoop:
         """Request a cooperative pause at the next provider/tool boundary."""
         self._pause_requested = True
 
+    def cancel(self, reason: str = "cancelled") -> bool:
+        """Request cooperative cancellation of this run.
+
+        The token is safe to signal from another thread (for example a CLI
+        interrupt handler).  Blocking tools poll the same token and the loop
+        observes it at provider/tool boundaries; an in-flight provider is
+        given a bounded context so it can stop assembling transport data.
+        """
+        return self.cancellation_token.cancel(reason)
+
+    def _provider_context(self, step: int) -> ProviderContext:
+        return ProviderContext(
+            deadline_monotonic=self.context.deadline_monotonic,
+            cancellation_token=self.cancellation_token,
+            cancellation_requested=self.context.cancellation_requested,
+            request_id=f"{self.run_id or 'run'}:{step}",
+        )
+
+    async def _complete_provider(self, messages: list[Message], tools: list[dict[str, Any]], provider_context: ProviderContext) -> Any:
+        """Call old two-argument providers and new context-aware adapters."""
+        completer = self.provider.complete
+        signature = None
+        try:
+            signature = inspect.signature(completer)
+            parameters = tuple(signature.parameters.values())
+        except (TypeError, ValueError):
+            parameters = ()
+        if signature is not None and "context" in signature.parameters:
+            return await completer(messages, tools, context=provider_context)
+        if any(parameter.kind is inspect.Parameter.VAR_KEYWORD for parameter in parameters):
+            return await completer(messages, tools, context=provider_context)
+        if any(parameter.kind is inspect.Parameter.VAR_POSITIONAL for parameter in parameters) or len(parameters) >= 3:
+            return await completer(messages, tools, provider_context)
+        return await completer(messages, tools)
+
+    @staticmethod
+    def _consume_provider_future(future: concurrent.futures.Future[Any]) -> None:
+        """Consume a late provider exception after a bounded return."""
+        try:
+            future.exception()
+        except BaseException:
+            return
+
+    def _start_provider_worker(
+        self,
+        messages: list[Message],
+        tools: list[dict[str, Any]],
+        provider_context: ProviderContext,
+    ) -> tuple[concurrent.futures.Future[Any], threading.Thread, Callable[[], None]]:
+        """Run the provider coroutine on a daemon event-loop worker.
+
+        An asyncio task on the caller's loop is not a hard cancellation
+        boundary: a coroutine may catch ``CancelledError`` and keep running,
+        causing ``asyncio.run`` (and some service shutdowns) to wait for it.
+        Isolating the untrusted provider loop in a daemon thread lets the
+        caller return at its deadline while late results remain detached and
+        are never dispatched to tools. Context-aware providers still receive
+        the shared token/deadline and can terminate cooperatively.
+        """
+        result: concurrent.futures.Future[Any] = concurrent.futures.Future()
+        state: dict[str, Any] = {"loop": None, "task": None}
+        ready = threading.Event()
+        cancel_requested = threading.Event()
+
+        def worker() -> None:
+            loop = asyncio.new_event_loop()
+            try:
+                asyncio.set_event_loop(loop)
+                coroutine = self._complete_provider(messages, tools, provider_context)
+                task = loop.create_task(coroutine)
+                state["loop"] = loop
+                state["task"] = task
+                ready.set()
+                if cancel_requested.is_set():
+                    task.cancel()
+                try:
+                    value = loop.run_until_complete(task)
+                except BaseException as exc:
+                    # Provider code is untrusted and may (accidentally or
+                    # deliberately) raise a process-level BaseException such
+                    # as SystemExit.  Never let that escape the worker and
+                    # terminate the host process.  Preserve asyncio
+                    # cancellation so the caller can map it to its stable
+                    # cancelled result; normalize every other BaseException
+                    # to the ordinary provider error boundary.
+                    if isinstance(exc, asyncio.CancelledError):
+                        safe_exc: BaseException = exc
+                    elif isinstance(exc, KeyboardInterrupt):
+                        safe_exc = ProviderError("provider worker interrupted", category="cancelled", retryable=False)
+                    elif isinstance(exc, Exception):
+                        # Preserve ordinary provider exception categories and
+                        # diagnostics; only process-level BaseExceptions need
+                        # normalization at this isolation boundary.
+                        safe_exc = exc
+                    else:
+                        safe_exc = ProviderError("provider worker failed", category="provider_error", retryable=False)
+                    # Mark the task exception as retrieved before closing the
+                    # isolated loop; otherwise asyncio emits an unbounded
+                    # ``Task exception was never retrieved`` diagnostic for
+                    # provider-raised SystemExit/KeyboardInterrupt.
+                    try:
+                        task.exception()
+                    except BaseException:
+                        pass
+                    try:
+                        result.set_exception(safe_exc)
+                    except (concurrent.futures.InvalidStateError, RuntimeError):
+                        pass
+                else:
+                    try:
+                        result.set_result(value)
+                    except (concurrent.futures.InvalidStateError, RuntimeError):
+                        pass
+            finally:
+                # Do not run a potentially unbounded provider cleanup phase.
+                # Cancelling pending tasks before close avoids retaining loop
+                # references, while the daemon thread remains a safe fallback
+                # for providers that ignore cancellation entirely.
+                try:
+                    for pending in asyncio.all_tasks(loop):
+                        pending.cancel()
+                except Exception:
+                    pass
+                asyncio.set_event_loop(None)
+                loop.close()
+
+        def request_cancel() -> None:
+            """Ask the isolated provider task to stop, without blocking."""
+            cancel_requested.set()
+            loop = state.get("loop")
+            task = state.get("task")
+            if loop is not None and task is not None and not task.done():
+                try:
+                    loop.call_soon_threadsafe(task.cancel)
+                except RuntimeError:
+                    pass
+
+        thread = threading.Thread(target=worker, name="forgecode-provider", daemon=True)
+        thread.start()
+        return result, thread, request_cancel
+
+    async def _stop_provider_worker(self, future: concurrent.futures.Future[Any], thread: threading.Thread, request_cancel: Callable[[], None]) -> bool:
+        """Wait a bounded grace and report whether the daemon worker stopped."""
+        request_cancel()
+        deadline = time.monotonic() + self.config.provider_cleanup_grace_seconds
+        while not future.done() and thread.is_alive() and time.monotonic() < deadline:
+            await asyncio.sleep(min(0.01, max(0.0, deadline - time.monotonic())))
+        stopped = not thread.is_alive()
+        if future.done():
+            self._consume_provider_future(future)
+        else:
+            # A future may complete just after the thread check; retaining the
+            # result is harmless and lets the worker publish without touching
+            # the caller's event loop. The caller treats this attempt as
+            # unresolved unless termination was observed.
+            future.add_done_callback(self._consume_provider_future)
+        return stopped
+
+    def _record_provider_events(
+        self,
+        *,
+        unresolved_request_id: str | None = None,
+        error_category: str | None = None,
+        outcome: str | None = None,
+        retryable: bool | None = None,
+    ) -> None:
+        """Persist provider/retry evidence once, including detached attempts.
+
+        Provider adapters expose diagnostic lists for compatibility.  A list
+        can persist across loop turns (and a detached task can mutate an item
+        after this method returns), so snapshot each identity once.  Duplicate
+        identities are not emitted repeatedly; a synthetic unresolved attempt
+        fills the evidence gap when a legacy provider exposes no list at all.
+        """
+        attempts = getattr(self.provider, "attempt_events", ())
+        seen_request = False
+        if isinstance(attempts, (list, tuple)):
+            for raw in attempts:
+                if not isinstance(raw, dict):
+                    continue
+                item = dict(raw)
+                request_id = item.get("request_id")
+                attempt_id = item.get("attempt_id")
+                request_key = str(request_id or "")
+                attempt_key = str(attempt_id or "")
+                if not attempt_key:
+                    attempt_key = json.dumps(item, ensure_ascii=False, sort_keys=True, default=str)[:2_000]
+                if unresolved_request_id and request_id == unresolved_request_id:
+                    seen_request = True
+                    # An in-flight adapter item may not have had a terminal
+                    # outcome before the loop detached it.  Snapshot it as an
+                    # unresolved cancellation.  A detached adapter can race
+                    # this snapshot and publish a late success, so an
+                    # unresolved request always wins over the adapter's
+                    # terminal marker.
+                    item["outcome"] = outcome or "unresolved"
+                    item["error_category"] = error_category or "unresolved"
+                    item["unresolved"] = True
+                    if retryable is not None:
+                        item["retryable"] = bool(retryable)
+                key = (request_key, attempt_key)
+                if key in self._recorded_provider_attempts:
+                    continue
+                self._recorded_provider_attempts.add(key)
+                self._record("provider_attempt", item)
+
+        retries = getattr(self.provider, "retry_events", ())
+        if isinstance(retries, (list, tuple)):
+            for raw in retries:
+                if not isinstance(raw, dict):
+                    continue
+                item = dict(raw)
+                request_key = str(item.get("request_id") or "")
+                attempt_key = str(item.get("attempt_id") or "")
+                if not attempt_key:
+                    attempt_key = json.dumps(item, ensure_ascii=False, sort_keys=True, default=str)[:2_000]
+                key = (request_key, attempt_key)
+                if key in self._recorded_provider_retries:
+                    continue
+                self._recorded_provider_retries.add(key)
+                self._record("provider_retry", item)
+
+        if unresolved_request_id and not seen_request:
+            # Legacy providers have no attempt list.  Record an explicit,
+            # unique unresolved attempt so recovery can distinguish timeout
+            # from a clean provider failure.
+            self._provider_event_counter += 1
+            now = datetime.now(timezone.utc).isoformat()
+            synthetic_id = f"{unresolved_request_id}:unresolved:{self._provider_event_counter}"
+            self._record(
+                "provider_attempt",
+                {
+                    "request_id": unresolved_request_id,
+                    "attempt_id": synthetic_id,
+                    "attempt": self._provider_event_counter,
+                    "protocol": "unknown",
+                    "started_at": now,
+                    "ended_at": now,
+                    "duration_seconds": 0.0,
+                    "outcome": outcome or "unresolved",
+                    "error_category": error_category or "unresolved",
+                    "retryable": bool(retryable) if retryable is not None else False,
+                    "unresolved": True,
+                },
+            )
+
+    async def _await_provider(
+        self,
+        messages: list[Message],
+        tools: list[dict[str, Any]],
+        provider_context: ProviderContext,
+        timeout: float,
+    ) -> Any:
+        """Await a provider while polling cancellation and absolute deadline.
+
+        Legacy providers may expose only the two-argument API and may not poll
+        the token themselves.  Their task is cancelled and detached after a
+        bounded grace period; no response from that task is ever dispatched
+        to tools.  Context-aware adapters receive the same token and can stop
+        their transport cooperatively.
+        """
+        future, worker, request_cancel = self._start_provider_worker(messages, tools, provider_context)
+        deadline = time.monotonic() + timeout
+        self._last_provider_unresolved = False
+        try:
+            while True:
+                if self.context.cancelled:
+                    stopped = await self._stop_provider_worker(future, worker, request_cancel)
+                    self._last_provider_unresolved = not stopped
+                    raise ProviderError("provider request cancelled", category="cancelled", retryable=False, request_id=provider_context.request_id, unresolved=not stopped)
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    stopped = await self._stop_provider_worker(future, worker, request_cancel)
+                    self._last_provider_unresolved = not stopped
+                    raise ProviderError("provider request deadline exceeded", category="deadline_exceeded", retryable=False, request_id=provider_context.request_id, unresolved=not stopped)
+                if future.done():
+                    return future.result()
+                await asyncio.sleep(min(0.01, remaining))
+        except asyncio.CancelledError:
+            stopped = await self._stop_provider_worker(future, worker, request_cancel)
+            self._last_provider_unresolved = not stopped
+            raise
+
+    def _cancelled_result(self, messages: list[Message], verification_ok: bool | None, explored: list[str], *, reason: str | None = None, category: str = "cancelled") -> LoopResult:
+        safe_reason = redact_text(str(reason or self.cancellation_token.reason or "run cancelled")[:1_000], self.context.secrets)
+        unresolved = bool(self._last_provider_unresolved)
+        if not self.lifecycle.terminal:
+            try:
+                # User cancellation remains the stable public ``cancelled``
+                # state for compatibility.  If the provider worker could not
+                # be stopped, the event carries ``unresolved`` evidence and
+                # recovery can inspect it; it must never be reported as a
+                # successful run or replayed automatically.
+                self._transition(RunState.CANCELLED, reason=safe_reason)
+            except LifecycleError:
+                self.lifecycle.state = RunState.CANCELLED
+        self._record("cancellation", {"category": category, "reason": safe_reason, "pending_actions": list(self._pending_actions), "unresolved": unresolved})
+        result = LoopResult(tuple(messages), category, safe_reason, verification_ok, self.context.mode.value, explored=tuple(explored), state=self.lifecycle.state.value, run_id=self.run_id, audit_complete=self.audit_complete, verifications=tuple(self._verification_results))
+        self._record("final", {"stopped_reason": result.stopped_reason, "error": result.error, "state": result.state, "pending_actions": list(self._pending_actions)})
+        return result
+
     def _transition(self, target: RunState, *, reason: str | None = None) -> None:
         previous, current = self.lifecycle.transition(target)
         self._record(
@@ -254,6 +579,15 @@ class AgentLoop:
         total_tool_calls = 0
 
         for step in range(self.config.max_steps):
+            if self.context.cancelled:
+                return self._cancelled_result(messages, verification_ok, explored, reason=self.context.cancellation_reason)
+            if self.context.deadline_monotonic is not None and self.context.deadline_monotonic <= time.monotonic():
+                error_text = "run deadline exceeded before next agent step"
+                self._fail_state("run deadline")
+                self._record("error", {"category": "deadline_exceeded", "message": error_text})
+                result = LoopResult(tuple(messages), "deadline_exceeded", error_text, verification_ok, self.context.mode.value, explored=tuple(explored), state=self.lifecycle.state.value, run_id=self.run_id, audit_complete=self.audit_complete)
+                self._record("final", {"stopped_reason": result.stopped_reason, "error": result.error, "state": result.state})
+                return result
             if self._pause_requested:
                 if not self.lifecycle.terminal:
                     try:
@@ -270,32 +604,55 @@ class AgentLoop:
             provider_started = time.monotonic()
             try:
                 if self.context.hooks is not None:
-                    hook_issues = self.context.hooks.emit("before_model", {"step": step, "message_count": len(request_messages), "tool_count": len(self.registry.schemas(self.context.mode))})
+                    hook_issues = self.context.hooks.emit("before_model", {"step": step, "message_count": len(request_messages), "tool_count": len(self.registry.schemas(self.context.mode)), "run_id": self.run_id, "request_id": f"{self.run_id or 'run'}:{step}"}, cancellation=self.cancellation_token or self.context.cancellation_requested)
                     if any(issue.blocked for issue in hook_issues):
                         raise ProviderError("model request blocked by lifecycle hook", category="hook_blocked")
                 remaining = self.context.remaining_seconds(self.config.provider_timeout_seconds)
                 if remaining <= 0:
                     raise ProviderError("run deadline exceeded before provider request", category="deadline_exceeded")
-                response = await asyncio.wait_for(self.provider.complete(request_messages, self.registry.schemas(self.context.mode)), timeout=remaining)
+                response = await self._await_provider(
+                    request_messages,
+                    self.registry.schemas(self.context.mode),
+                    self._provider_context(step),
+                    remaining,
+                )
                 if self.context.hooks is not None:
-                    hook_issues = self.context.hooks.emit("after_model", {"step": step, "finish_reason": getattr(response, "finish_reason", None), "tool_calls": len(getattr(getattr(response, "message", None), "tool_calls", ()))})
+                    hook_issues = self.context.hooks.emit("after_model", {"step": step, "finish_reason": getattr(response, "finish_reason", None), "tool_calls": len(getattr(getattr(response, "message", None), "tool_calls", ())), "run_id": self.run_id, "request_id": f"{self.run_id or 'run'}:{step}"}, cancellation=self.cancellation_token or self.context.cancellation_requested)
                     if any(issue.blocked for issue in hook_issues):
                         raise ProviderError("model response blocked by lifecycle hook", category="hook_blocked")
-                for retry in getattr(self.provider, "retry_events", ()):
-                    self._record("provider_retry", retry)
+                self._record_provider_events()
             except (KeyboardInterrupt, asyncio.CancelledError):
                 error_text = "agent interrupted by user"
-                if not self.lifecycle.terminal:
-                    try:
-                        self._transition(RunState.CANCELLED, reason="user interruption")
-                    except LifecycleError:
-                        self.lifecycle.state = RunState.CANCELLED
-                self._record("final", {"stopped_reason": "interrupted", "error": error_text})
-                return LoopResult(tuple(messages), "interrupted", error_text, verification_ok, self.context.mode.value, explored=tuple(explored), state=self.lifecycle.state.value, run_id=self.run_id, audit_complete=self.audit_complete)
+                self.cancellation_token.cancel("user interruption")
+                self._record_provider_events(
+                    unresolved_request_id=f"{self.run_id or 'run'}:{step}",
+                    error_category="cancelled",
+                    outcome="interrupted",
+                )
+                return self._cancelled_result(messages, verification_ok, explored, reason=error_text, category="interrupted")
             except ProviderError as exc:
                 error_text = str(exc)
-                for retry in getattr(self.provider, "retry_events", ()):
-                    self._record("provider_retry", retry)
+                self._record_provider_events(
+                    unresolved_request_id=exc.request_id if exc.unresolved else None,
+                    error_category=exc.category,
+                    outcome="unresolved" if exc.unresolved else "error",
+                    retryable=exc.retryable,
+                )
+                if exc.category == "cancelled" or self.context.cancelled:
+                    return self._cancelled_result(messages, verification_ok, explored, reason=error_text, category="cancelled")
+                if exc.category == "deadline_exceeded":
+                    if exc.unresolved:
+                        if not self.lifecycle.terminal:
+                            try:
+                                self._transition(RunState.RECOVERY_REQUIRED, reason="provider worker unresolved after deadline")
+                            except LifecycleError:
+                                self.lifecycle.state = RunState.RECOVERY_REQUIRED
+                    else:
+                        self._fail_state("provider deadline")
+                    self._record("error", {"category": exc.category, "message": error_text})
+                    result = LoopResult(tuple(messages), "deadline_exceeded", error_text, verification_ok, self.context.mode.value, explored=tuple(explored), state=self.lifecycle.state.value, run_id=self.run_id, audit_complete=self.audit_complete)
+                    self._record("final", {"stopped_reason": result.stopped_reason, "error": result.error, "state": result.state})
+                    return result
                 self._fail_state("provider error")
                 self._record("error", {"category": exc.category, "message": error_text})
                 result = LoopResult(tuple(messages), "provider_error", error_text, verification_ok, self.context.mode.value, explored=tuple(explored), state=self.lifecycle.state.value, run_id=self.run_id, audit_complete=self.audit_complete)
@@ -303,7 +660,19 @@ class AgentLoop:
                 return result
             except asyncio.TimeoutError:
                 error_text = "model request exceeded the run/provider deadline"
-                self._fail_state("provider deadline")
+                if self._last_provider_unresolved:
+                    if not self.lifecycle.terminal:
+                        try:
+                            self._transition(RunState.RECOVERY_REQUIRED, reason="provider worker unresolved after deadline")
+                        except LifecycleError:
+                            self.lifecycle.state = RunState.RECOVERY_REQUIRED
+                else:
+                    self._fail_state("provider deadline")
+                self._record_provider_events(
+                    unresolved_request_id=f"{self.run_id or 'run'}:{step}" if self._last_provider_unresolved else None,
+                    error_category="deadline_exceeded",
+                    outcome="unresolved" if self._last_provider_unresolved else "error",
+                )
                 self._record("error", {"category": "deadline_exceeded", "message": error_text})
                 result = LoopResult(tuple(messages), "deadline_exceeded", error_text, verification_ok, self.context.mode.value, explored=tuple(explored), state=self.lifecycle.state.value, run_id=self.run_id, audit_complete=self.audit_complete)
                 self._record("final", {"stopped_reason": result.stopped_reason, "error": error_text})
@@ -323,6 +692,13 @@ class AgentLoop:
                 result = LoopResult(tuple(messages), "invalid_response", error_text, verification_ok, self.context.mode.value, explored=tuple(explored), state=self.lifecycle.state.value, run_id=self.run_id, audit_complete=self.audit_complete)
                 self._record("final", {"stopped_reason": result.stopped_reason, "error": error_text})
                 return result
+
+            # Cancellation may arrive while the provider is assembling its
+            # response. Do not even enqueue model tool calls after that point:
+            # this closes the provider-return/side-effect execution race and
+            # keeps a cancelled response from entering approval or journaling.
+            if self.context.cancelled:
+                return self._cancelled_result(messages, verification_ok, explored, reason=self.context.cancellation_reason)
 
             if not response.message.content and not response.message.tool_calls:
                 error_text = "model returned an empty response"
@@ -462,11 +838,32 @@ class AgentLoop:
                         self._transition(RunState.ACTING, reason="side effect execution")
                 if side_effecting:
                     self._pending_actions.append({"id": call.id, "tool": call.name, "arguments": self._bounded_arguments(call.arguments)})
+                    # Journal the pending action before entering an
+                    # untrusted side-effecting tool. If the process crashes or
+                    # cancellation races the call, recovery can expose the
+                    # unresolved action instead of replaying it.
+                    self._checkpoint(reason=f"pending:{call.name}")
+                    if self.context.cancelled:
+                        return self._cancelled_result(messages, verification_ok, explored, reason=self.context.cancellation_reason)
                 tool_started = time.monotonic()
                 tool_result = self.registry.execute(call.name, call.arguments, self.context)
                 tool_duration = round(time.monotonic() - tool_started, 3)
+                unresolved = False
                 if side_effecting:
-                    self._pending_actions = [item for item in self._pending_actions if item.get("id") != call.id]
+                    metadata = tool_result.metadata if isinstance(tool_result.metadata, dict) else {}
+                    unresolved = bool(
+                        metadata.get("termination_result") == "unresolved"
+                        or metadata.get("unresolved") is True
+                        or (metadata.get("recovery_required") is True)
+                        or (metadata.get("error") in {"transaction_commit_failed", "transaction_prepare_failed"} and metadata.get("rolled_back") is not True)
+                    )
+                    if unresolved:
+                        # Keep the ledger entry until recovery explicitly
+                        # resolves it.  Removing it here would make a
+                        # detached process/partial transaction look complete.
+                        self._record("pending_action_unresolved", {"id": call.id, "tool": call.name, "metadata": self._bounded_arguments(metadata)})
+                    else:
+                        self._pending_actions = [item for item in self._pending_actions if item.get("id") != call.id]
                 if call.name in {"list_files", "read_file", "search", "workspace_summary"}:
                     detail = str(tool_result.metadata.get("path") or call.arguments.get("path") or call.arguments.get("pattern") or call.name)
                     explored.append(f"{call.name}:{detail}"[:500])
@@ -518,6 +915,19 @@ class AgentLoop:
                     result = LoopResult(tuple(messages), "recovery_conflict", conflict_message[:2_000], verification_ok, self.context.mode.value, explored=tuple(explored), state=self.lifecycle.state.value, run_id=self.run_id, audit_complete=self.audit_complete, verifications=tuple(self._verification_results))
                     self._record("final", {"stopped_reason": result.stopped_reason, "error": result.error, "state": result.state})
                     return result
+                if unresolved:
+                    if not self.lifecycle.terminal:
+                        try:
+                            self._transition(RunState.RECOVERY_REQUIRED, reason="side-effect outcome unresolved")
+                        except LifecycleError:
+                            self.lifecycle.state = RunState.RECOVERY_REQUIRED
+                    unresolved_message = (tool_result.output or "side-effect outcome is unresolved")[:2_000]
+                    self._record("recovery_conflict", {"step": step, "id": call.id, "tool": call.name, "error": "unresolved_side_effect", "reason": unresolved_message})
+                    result = LoopResult(tuple(messages), "recovery_conflict", unresolved_message, verification_ok, self.context.mode.value, explored=tuple(explored), state=self.lifecycle.state.value, run_id=self.run_id, audit_complete=self.audit_complete, verifications=tuple(self._verification_results))
+                    self._record("final", {"stopped_reason": result.stopped_reason, "error": result.error, "state": result.state, "pending_actions": list(self._pending_actions)})
+                    return result
+                if self.context.cancelled:
+                    return self._cancelled_result(messages, verification_ok, explored, reason=self.context.cancellation_reason)
                 if side_effecting and self.lifecycle.state is RunState.ACTING:
                     self._transition(RunState.DISCOVERING, reason="tool result recorded")
 

@@ -13,9 +13,13 @@ import os
 from pathlib import Path
 import re
 import tempfile
+import threading
+import time
+from contextlib import contextmanager
 from typing import Any, Iterable
 
 from ..security.redaction import redact_text, redact_value
+from ..security.json import bounded_json_loads
 from ..security.workspace import WorkspaceGuard, WorkspaceViolation, assert_no_path_alias
 from .session import bounded
 
@@ -148,35 +152,122 @@ class CheckpointStore:
         if max_chars < 512:
             raise ValueError("checkpoint max_chars must be at least 512")
         self.max_chars = max_chars
+        self._lock = threading.RLock()
+        self._lock_local = threading.local()
+
+    @contextmanager
+    def _interprocess_lock(self):
+        """Serialize checkpoint writers across threads and processes."""
+        depth = getattr(self._lock_local, "depth", 0)
+        if depth:
+            self._lock_local.depth = depth + 1
+            try:
+                yield
+            finally:
+                self._lock_local.depth = depth
+            return
+        lock_path = Path(str(self.path) + ".lock")
+        try:
+            assert_no_path_alias(lock_path, message="checkpoint lock path is a symlink or junction alias")
+            lock_path.parent.mkdir(parents=True, exist_ok=True)
+            handle = lock_path.open("a+b")
+        except (OSError, WorkspaceViolation) as exc:
+            raise ValueError("cannot open checkpoint lock") from exc
+        acquired = False
+        try:
+            deadline = time.monotonic() + 10.0
+            if os.name == "nt":
+                import msvcrt
+
+                handle.seek(0, os.SEEK_END)
+                if handle.tell() == 0:
+                    handle.write(b"0")
+                    handle.flush()
+                while not acquired:
+                    try:
+                        handle.seek(0)
+                        msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+                        acquired = True
+                    except OSError:
+                        if time.monotonic() >= deadline:
+                            raise ValueError("timed out waiting for checkpoint lock")
+                        time.sleep(0.01)
+            else:
+                import fcntl
+
+                while not acquired:
+                    try:
+                        fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                        acquired = True
+                    except OSError:
+                        if time.monotonic() >= deadline:
+                            raise ValueError("timed out waiting for checkpoint lock")
+                        time.sleep(0.01)
+            self._lock_local.depth = 1
+            yield
+        finally:
+            self._lock_local.depth = 0
+            if acquired:
+                try:
+                    if os.name == "nt":
+                        import msvcrt
+
+                        handle.seek(0)
+                        msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+                    else:
+                        import fcntl
+
+                        fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+                except OSError:
+                    pass
+            handle.close()
 
     def save(self, checkpoint: Checkpoint) -> None:
-        checkpoint.validate()
-        try:
-            assert_no_path_alias(self.path, message="checkpoint path is a symlink or junction alias")
-        except WorkspaceViolation as exc:
-            raise ValueError(str(exc)) from exc
-        payload = bounded(asdict(checkpoint), max_string_chars=20_000, max_items=200)
-        serialized = json.dumps(payload, ensure_ascii=False, allow_nan=False, separators=(",", ":"))
-        if len(serialized) > self.max_chars:
-            raise ValueError("checkpoint exceeds configured size limit")
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        descriptor, name = tempfile.mkstemp(prefix=f".{self.path.name}.", suffix=".tmp", dir=self.path.parent)
-        temporary = Path(name)
-        try:
-            with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as stream:
-                stream.write(serialized)
-                stream.flush()
-                os.fsync(stream.fileno())
-            os.replace(temporary, self.path)
-        finally:
+        with self._lock, self._interprocess_lock():
+            checkpoint.validate()
             try:
-                os.close(descriptor)
-            except OSError:
-                pass
+                assert_no_path_alias(self.path, message="checkpoint path is a symlink or junction alias")
+            except WorkspaceViolation as exc:
+                raise ValueError(str(exc)) from exc
+            payload = bounded(asdict(checkpoint), max_string_chars=20_000, max_items=200)
+            serialized = json.dumps(payload, ensure_ascii=False, allow_nan=False, separators=(",", ":"))
+            if len(serialized) > self.max_chars:
+                raise ValueError("checkpoint exceeds configured size limit")
+            # Compare-and-swap on the persisted sequence.  Equal sequence is
+            # idempotent only when the complete record is unchanged; otherwise
+            # a stale writer could replace newer lifecycle/pending-action data.
+            if self.path.exists():
+                try:
+                    current = self.load()
+                except (FileNotFoundError, ValueError) as exc:
+                    raise ValueError("existing checkpoint is unreadable; refusing overwrite") from exc
+                if checkpoint.sequence < current.sequence:
+                    raise ValueError("checkpoint sequence is older than the persisted checkpoint")
+                if checkpoint.sequence == current.sequence:
+                    current_serialized = json.dumps(bounded(asdict(current), max_string_chars=20_000, max_items=200), ensure_ascii=False, allow_nan=False, separators=(",", ":"))
+                    if serialized != current_serialized:
+                        raise ValueError("checkpoint sequence already contains a different record")
+                    return
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            descriptor, name = tempfile.mkstemp(prefix=f".{self.path.name}.", suffix=".tmp", dir=self.path.parent)
+            temporary = Path(name)
             try:
-                temporary.unlink()
-            except OSError:
-                pass
+                with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as stream:
+                    descriptor = -1
+                    stream.write(serialized)
+                    stream.flush()
+                    os.fsync(stream.fileno())
+                os.replace(temporary, self.path)
+            finally:
+                try:
+                    if descriptor >= 0:
+                        os.close(descriptor)
+                except OSError:
+                    pass
+                try:
+                    temporary.unlink()
+                except OSError:
+                    pass
 
     def load(self) -> Checkpoint:
         try:
@@ -203,7 +294,7 @@ class CheckpointStore:
         except WorkspaceViolation as exc:
             raise ValueError(str(exc)) from exc
         try:
-            raw = json.loads(raw_text, parse_constant=lambda value: (_ for _ in ()).throw(ValueError(f"non-finite JSON value: {value}")))
+            raw = bounded_json_loads(raw_text, parse_constant=lambda value: (_ for _ in ()).throw(ValueError(f"non-finite JSON value: {value}")))
         except (UnicodeError, json.JSONDecodeError, ValueError) as exc:
             raise ValueError(f"invalid checkpoint: {type(exc).__name__}: {exc}") from exc
         if not isinstance(raw, dict):

@@ -12,6 +12,11 @@ Each major phase of work is a persistent goal. When the user starts a goal, pres
 
 When a goal is continued, inspect its prompt and the current plan/state before doing work. Continue the same goal rather than silently restarting or replacing it. Keep working until the user explicitly says to stop, the goal is complete, or an external blocker requires the user's decision. Do not put API keys, tokens, or other secrets in a goal file.
 
+Do not create a new goal prompt or goal file unless the owner explicitly asks
+for one. A request to continue work means continue the active goal. Do not put
+ordinary notes, status reports, research reports, or implementation plans in
+`docs/goals/`; that directory contains timestamped goal prompts only.
+
 ## Version and commit policy
 
 Every commit and release tag uses `vA.B.C`.
@@ -24,7 +29,7 @@ Every commit and release tag uses `vA.B.C`.
 - Commit subjects use `vA.B.C: short description`; tags use the exact version.
 - Before committing, run relevant tests and inspect `git status` for secrets and unintended files.
 
-The current version is `v0.0.7`; the next ordinary commit is `v0.0.8` unless the user explicitly requests an A or B update.
+The current version is `v0.0.8`; the next ordinary commit is `v0.0.9` unless the user explicitly requests an A or B update.
 
 ## Documentation boundaries
 
@@ -33,6 +38,53 @@ The current version is `v0.0.7`; the next ordinary commit is `v0.0.8` unless the
 - `docs/assignment/` stores assessment materials and is tracked.
 - `docs/research/` stores the research plan and report and is tracked.
 - `docs/goals/` stores ignored, timestamped goal prompts only.
+- `docs/strategy/` stores local strategy/status notes and is intentionally
+  ignored; never stage, push, or package its contents unless the owner changes
+  this policy explicitly.
+
+## Efficiency and test execution
+
+Goals and tests must be useful, bounded, and evidence-driven. Do not turn a
+small change into an unbounded repository-wide activity.
+
+- Keep one goal focused on one coherent feature slice or release stage. State
+  its scope, non-goals, completion conditions, stop conditions, affected files,
+  and required checks before doing broad work. Do not expand into Pi P1/P2
+  features while an assessment or release P0 blocker remains.
+- Use impact-based test tiers. After a small change, run the new or modified
+  tests plus directly affected existing tests and a quick compile/import check.
+  After a coherent feature slice, run its related integration/CLI tests. Run
+  the complete `uv run pytest -rs` suite at a milestone, after a shared-core
+  change, before a release, or when the owner explicitly requests it.
+- Do not rerun slow, unchanged integration, cross-process, recovery, or full
+  CLI suites after every minor edit. In particular, existing tests that are
+  unrelated to the changed files may wait for the next feature gate. This is a
+  scheduling rule, not permission to weaken assertions or omit a required
+  release gate.
+- Use `git diff --name-only` and the module/test dependency map to select the
+  smallest justified test set. Prefer targeted pytest paths, `-k`, and `--lf`
+  for feedback; avoid parallel execution when tests share workspaces, locks,
+  sessions, or transaction state.
+- Documentation-only changes normally need link, formatting, and bounded-size
+  checks rather than a full Python regression run. Changes to shared runtime
+  code, security boundaries, persistence, provider protocol, or CLI contracts
+  require their associated regression suites even when the patch is small.
+- Record what was run, what was intentionally not run, the reason, duration,
+  exit code, and any platform-conditional skip. Never describe a focused green
+  run as a full regression pass. Refresh acceptance documents only from a
+  fresh, explicitly identified gate run.
+- Do not repeatedly reread unchanged documents or regenerate duplicate review
+  artifacts. Start from the active goal, the latest state/evidence summary,
+  `git diff`, and the affected modules; reread whole trees only when the
+  change genuinely crosses their boundaries.
+- Give every long-running command and goal a finite step/time budget. If there
+  is no code, test, or state-event progress for a meaningful interval, stop
+  extending the scope and diagnose provider latency, approval waiting, a
+  blocked process, or redundant work. Waiting is not evidence of progress.
+- Keep an auditable distinction between implementation time, test time,
+  provider/network wait, human/approval wait, and repeated work. Prefer a
+  short focused feedback loop and one full release gate over many identical
+  full-suite runs.
 
 ## Engineering rules
 

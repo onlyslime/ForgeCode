@@ -137,6 +137,22 @@ def test_config_rejects_file_changed_during_parse(monkeypatch, tmp_path: Path):
         ConfigLoader(tmp_path).load()
 
 
+def test_config_toml_has_bounded_size_and_recursion_errors_are_structured(monkeypatch, tmp_path: Path):
+    import tomllib
+
+    directory = tmp_path / ".forgecode"
+    directory.mkdir()
+    path = directory / "config.toml"
+    path.write_text("#" + ("x" * 1_000_000), encoding="utf-8")
+    with pytest.raises(ConfigError, match="safety limit"):
+        ConfigLoader(tmp_path).load()
+
+    path.write_text('model = "safe"\n', encoding="utf-8")
+    monkeypatch.setattr(tomllib, "load", lambda _stream: (_ for _ in ()).throw(RecursionError("deep TOML")))
+    with pytest.raises(ConfigError, match="nesting"):
+        ConfigLoader(tmp_path).load()
+
+
 def test_sse_assembler_completes_fragmented_tool_arguments_only_at_done():
     chunks = [
         b'data: {"choices":[{"index":0,"delta":{"role":"assistant","tool_calls":[{"index":0,"id":"c1","function":{"name":"read_file","arguments":"{\\"pa"}}]}}]}\r\n',

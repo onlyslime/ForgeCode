@@ -1,9 +1,12 @@
-# ForgeCode Architecture
+# ForgeCode Architecture (v0.0.8)
 
 ForgeCode is a small provider-neutral local coding agent. The repository owns
 the protocol conversion, conversation history, tool execution, loop
 termination, error propagation, and safety boundary. It does not wrap a
-ready-made agent framework or a hosted file/code-execution product.
+ready-made agent framework or a hosted file/code-execution product. Version
+0.0.8 adds named test profiles, evidence-driven review, cancellation/deadline
+propagation, and a strict machine-output contract without changing that trust
+boundary.
 
 ## Components and data flow
 
@@ -25,6 +28,8 @@ CLI parser/renderer
        -> RepositoryMap/ContextPlan (bounded deterministic snapshot)
        -> ContextIndex (ignored incremental metadata/search cache)
        -> SkillLoader/SkillRegistry + HookRegistry (validated, audited extensions)
+       -> TestProfileLoader/Runner (strict argv profiles + bounded evidence)
+       -> ReviewBuilder (ledger join + deterministic security checks/artifacts)
        -> SessionStore + CheckpointStore (bounded redacted JSONL + fingerprints)
        -> TransactionStore (bounded manifests + ignored content-addressed blobs)
 ```
@@ -164,15 +169,64 @@ hooks are observers by default, fail-closed only when declared, and recursion
 or permission changes are blocked.  Hook and index evidence is appended to the
 same session audit stream.
 
+## Named test profiles and verification evidence
+
+`TestProfileLoader` reads `.forgecode/tests.toml` (with the compatibility name
+`.forgecode/test-profiles.toml`) through a 1,000,000-byte TOML input bound and
+rejects unknown fields, shell-string
+commands, unsafe working directories, credential-bearing environment names,
+non-finite values and oversized quotas.  A profile command, optional setup and
+teardown are argv tuples executed with `shell=False`; only a small inherited
+environment plus an explicit non-secret allow-list is passed to the child.
+Each phase shares one deadline and independent stdout/stderr/total limits.
+Success requires an explicitly listed exit code and successful setup/teardown;
+timeouts, cancellation, unresolved process termination and approval failures
+cannot become a pass.  `test list|show|run` uses `TestProfileRunner` and
+appends a `test_profile_result` event containing digests and bounded previews.
+Interactive `/test` remains a compatibility verifier for ad-hoc commands; it
+uses the shared command policy, approval, timeout, revalidation and session
+evidence path, but does not reinterpret a shell string as a named profile.
+
+`ReviewBuilder` is a deterministic, model-independent evidence join.  It reads
+the selected session and transaction manifests, links plan/reference/context,
+test and hook events, reconstructs bounded diff hunks, and computes rollback
+availability.  Four static checks (secret-shaped text, forbidden paths,
+suspicious commands and Python AST syntax) return explicit `pass`, `fail`,
+`skipped` or `error` statuses with finding ids and budgets.  An audit is passing
+only when durable input is valid, checks do not fail, and no conflict remains.
+`review --export` writes a size-bounded artifact bound to a workspace identity;
+`--import`/`--verify` recompute the artifact and current-file SHA-256 values,
+returning stale/tampered errors instead of accepting altered evidence.  Raw
+session records and transaction backup bytes are never embedded in a report.
+
+## Provider cancellation and machine contracts
+
+`CancellationToken` is shared by the loop, synchronous tools, provider
+adapters, test runner and SSE parser.  A run deadline is clamped at every
+boundary.  Cooperative providers receive `ProviderContext`; a legacy or
+non-cooperative provider runs in a bounded worker, and a result that outlives
+the cleanup grace period is journaled as an unresolved attempt.  Provider
+attempt/retry events carry request and attempt identities, outcome category and
+retryability.  The loop checks cancellation again after a provider returns and
+before dispatching any tool call, so a late response cannot cause a side effect.
+
+Machine-facing commands support a strict JSONL envelope:
+`schema_version`, `kind`, `ok`, `command`, and exactly one of `data` or `error`,
+plus a bounded `exit_code`.  Progress, diagnostics and approval prompts are
+sent to stderr.  Legacy `--json` aliases remain only where existing clients
+depend on them; they cannot overwrite canonical envelope fields.
+
 ## Durable transactions and streaming
 
 Writes and patches prepare a versioned manifest before mutation. Before bytes
 are stored as SHA-256-addressed blobs under ignored `.forgecode/transactions`;
 only hashes and bounded previews reach sessions/review. Commit validates after
-hashes. Undo rechecks every current after hash, obtains approval, restores all
-targets using temporary atomic replacements, and creates a second transaction.
-An external edit, missing/corrupt blob or repeated undo is a conflict and is
-never overwritten with `git reset` or checkout.
+hashes. Manifest, session and checkpoint writers use inter-process locks and
+compare-and-swap/monotonic sequence checks, so a stale process cannot silently
+overwrite newer evidence. Undo rechecks every current after hash, obtains
+approval, restores all targets using temporary atomic replacements, and creates
+a second transaction. An external edit, missing/corrupt blob or repeated undo
+is a conflict and is never overwritten with `git reset` or checkout.
 
 The optional SSE parser bounds bytes/events and assembles content and tool-call
 fragments in memory. A tool call becomes a provider-neutral `ToolCall` only
@@ -189,7 +243,9 @@ sequence. Patches and writes expose transaction ids, before/after hashes and
 bounded previews; approval-time fingerprints prevent overwriting an external
 edit, and in-process failures restore already-written targets. Verification is
 represented by typed results with exit code, streams, timeout, changed files
-and next action, with a finite repair budget.
+and next action, with a finite repair budget. A detached provider/process,
+unresolved hook cleanup or pending side effect moves the run to recovery
+evidence rather than `completed`.
 
 ## Reproducible demo
 

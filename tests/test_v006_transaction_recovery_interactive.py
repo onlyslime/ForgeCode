@@ -70,6 +70,79 @@ def test_undo_rechecks_hash_after_approval_before_writing(tmp_path: Path):
     assert target.read_text(encoding="utf-8") == "external-after-approval"
 
 
+def test_transaction_fail_cannot_overwrite_a_concurrent_commit(tmp_path: Path):
+    """Late failure evidence must not downgrade a committed transaction."""
+    guard = WorkspaceGuard(tmp_path)
+    target = tmp_path / "a.txt"
+    before, after = b"before", b"after"
+    target.write_bytes(after)
+    store_a = TransactionStore(guard)
+    manifest = store_a.prepare(
+        transaction_id="race-tx",
+        run_id="r",
+        tool="write_file",
+        operations=[{"path": "a.txt", "operation": "update", "after_sha256": sha(after), "before_bytes": len(before), "after_bytes": len(after)}],
+        before_bytes={"a.txt": before},
+    )
+    assert manifest.state == "prepared"
+    TransactionStore(guard).commit("race-tx")
+    with pytest.raises(TransactionError, match="committed|state"):
+        store_a.fail("race-tx", "late worker failure")
+    assert store_a.load("race-tx").state == "committed"
+
+
+def test_undo_partial_failure_preserves_external_edit_and_marks_recovery(tmp_path: Path, monkeypatch):
+    """Rollback after a partial undo must never overwrite a new external edit."""
+    import forgecode.storage.transaction as transaction_module
+
+    guard = WorkspaceGuard(tmp_path)
+    first, second = tmp_path / "a.txt", tmp_path / "b.txt"
+    before_a, before_b = b"before-a", b"before-b"
+    after_a, after_b = b"after-a", b"after-b"
+    first.write_bytes(after_a)
+    second.write_bytes(after_b)
+    store = TransactionStore(guard)
+    manifest = store.prepare(
+        transaction_id="partial-undo",
+        run_id="r",
+        tool="write_file",
+        operations=[
+            {"path": "a.txt", "operation": "update", "after_sha256": sha(after_a), "before_bytes": len(before_a), "after_bytes": len(after_a)},
+            {"path": "b.txt", "operation": "update", "after_sha256": sha(after_b), "before_bytes": len(before_b), "after_bytes": len(after_b)},
+        ],
+        before_bytes={"a.txt": before_a, "b.txt": before_b},
+    )
+    store.commit(manifest.transaction_id)
+    original_atomic = transaction_module._atomic_bytes
+    target_paths = {first.resolve(), second.resolve()}
+    writes = []
+    failed_once = False
+
+    def flaky_atomic(path, data, *, mode=None):
+        nonlocal failed_once
+        resolved = Path(path).resolve()
+        if resolved in target_paths:
+            writes.append(resolved)
+            if len(writes) == 1:
+                original_atomic(path, data, mode=mode)
+                # An external process edits the already-restored file before
+                # the second undo operation fails.
+                first.write_bytes(b"external-during-undo")
+                return
+            if not failed_once:
+                failed_once = True
+                raise OSError("simulated second-write failure")
+        return original_atomic(path, data, mode=mode)
+
+    monkeypatch.setattr(transaction_module, "_atomic_bytes", flaky_atomic)
+    with pytest.raises(TransactionError, match="undo failed"):
+        store.undo(manifest.transaction_id, approval=AllowAllApproval(), run_id="u")
+    assert first.read_bytes() == b"external-during-undo"
+    assert store.load(manifest.transaction_id).state == "committed"
+    undo_manifests = [item for item in store.list(limit=20) if item.tool == "undo_transaction"]
+    assert undo_manifests and undo_manifests[0].state == "recovery_required"
+
+
 def test_create_transaction_undo_removes_only_expected_file(tmp_path: Path):
     guard = WorkspaceGuard(tmp_path)
     store = TransactionStore(guard)
@@ -160,6 +233,19 @@ def test_context_rebuilder_marks_legacy_and_checkpoint_sequence_conflicts(tmp_pa
     checkpoint = Checkpoint.create(WorkspaceGuard(tmp_path), run_id="r", state="paused", mode="act", sequence=99)
     rebuilt = SessionContextRebuilder().rebuild(store, checkpoint)
     assert any("checkpoint sequence" in conflict for conflict in rebuilt.conflicts)
+
+
+def test_checkpoint_store_rejects_stale_sequence_overwrite(tmp_path: Path):
+    guard = WorkspaceGuard(tmp_path)
+    path = tmp_path / ".forgecode" / "sessions" / "run.checkpoint.json"
+    store_a = CheckpointStore(path)
+    store_b = CheckpointStore(path)
+    newest = Checkpoint.create(guard, run_id="r", state="paused", mode="act", sequence=10)
+    stale = Checkpoint.create(guard, run_id="r", state="acting", mode="act", sequence=9)
+    store_a.save(newest)
+    with pytest.raises(ValueError, match="older|sequence|stale"):
+        store_b.save(stale)
+    assert store_a.load().sequence == 10 and store_a.load().state == "paused"
 
 
 def test_interactive_dispatch_has_real_commands_fifo_and_never_sends_slash_to_provider():

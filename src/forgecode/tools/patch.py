@@ -420,9 +420,16 @@ class ApplyPatchTool:
         approval_arguments = {"patch": safe_preview, "allow_delete": allow_delete, "transaction_id": transaction_id, "operations": [operation.path for operation in change_operations], "change_plan": asdict(change_plan)}
         if not context.request_approval(self.definition.name, approval_arguments):
             return ToolResult(False, "apply_patch denied by approval policy", {"error": "approval_denied", "approval": "denied", "diff": safe_preview, "transaction_id": transaction_id, "operations": [asdict(op) for op in change_operations], "change_plan": asdict(change_plan)})
+        # The approval callback may request cancellation. Re-check before
+        # transaction preparation and filesystem writes so a late provider or
+        # CLI cancel cannot leak a side effect.
+        if context.cancelled:
+            return ToolResult(False, "apply_patch cancelled after approval", {"error": "cancelled", "approval": "approved", "cancellation_reason": context.cancellation_reason, "diff": safe_preview, "transaction_id": transaction_id, "operations": [asdict(op) for op in change_operations]})
         stale = context.deny_if_stale(self.definition.name)
         if stale:
             return stale
+        if context.cancelled:
+            return ToolResult(False, "apply_patch cancelled before transaction preparation", {"error": "cancelled", "approval": "approved", "cancellation_reason": context.cancellation_reason, "diff": safe_preview, "transaction_id": transaction_id, "operations": [asdict(op) for op in change_operations]})
         # Optimistic concurrency: an approval callback may take time or even
         # modify a target. Never silently overwrite that newer content.
         for operation, target, _original, _updated, before_hash, before_size, before_mtime, _after_bytes in planned:
@@ -451,6 +458,13 @@ class ApplyPatchTool:
                 )
             except Exception as exc:
                 return ToolResult(False, f"transaction could not be prepared: {type(exc).__name__}", {"error": "transaction_prepare_failed", "transaction_id": transaction_id, "diff": safe_preview})
+        if context.cancelled:
+            if transaction_manifest is not None:
+                try:
+                    context.transaction_store.fail(transaction_id, "cancelled before write", recovery_required=False)
+                except Exception:
+                    pass
+            return ToolResult(False, "apply_patch cancelled before write", {"error": "cancelled", "approval": "approved", "cancellation_reason": context.cancellation_reason, "diff": safe_preview, "transaction_id": transaction_id, "operations": [asdict(op) for op in change_operations]})
         written: list[tuple[Any, str | None]] = []
         try:
             for operation, target, _original, updated, _before_hash, _before_size, _before_mtime, _after_bytes in planned:

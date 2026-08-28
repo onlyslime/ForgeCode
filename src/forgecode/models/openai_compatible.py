@@ -12,12 +12,23 @@ import os
 import random
 import math
 import threading
-from typing import Any, Iterable, Protocol, Sequence
+import time
+import uuid
+from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
+from typing import Any, Callable, Iterable, Protocol, Sequence
 from urllib import error, request
 from urllib.parse import urlsplit
 
 from ..security.redaction import redact_text
-from .protocol import Message, ModelCapabilities, ModelResponse, ProviderError, ToolCall
+from ..security.json import bounded_json_loads
+from .protocol import CancellationToken, Message, ModelCapabilities, ModelResponse, ProviderContext, ProviderError, ToolCall
+
+
+class _BoundedOperationTimeout(TimeoutError):
+    """A timeout after which a blocking worker/iterator may still be alive."""
+
+    unresolved = True
 
 
 def _reject_nonfinite(value: str) -> None:
@@ -104,7 +115,20 @@ def _unpack_transport_result(result: Any) -> tuple[Any, Any, dict[str, str]]:
     return status, payload, headers
 
 
-async def _run_sync_bounded(function: Any, *args: Any, timeout: float, **kwargs: Any) -> Any:
+def _is_cancelled(signal: CancellationToken | Callable[[], bool] | None) -> bool:
+    if signal is None:
+        return False
+    if isinstance(signal, CancellationToken):
+        return signal.is_cancelled()
+    try:
+        return bool(signal())
+    except Exception:
+        # A cancellation callback is untrusted; fail closed if it cannot be
+        # evaluated rather than allowing a potentially unsafe continuation.
+        return True
+
+
+async def _run_sync_bounded(function: Any, *args: Any, timeout: float, cancellation: CancellationToken | Callable[[], bool] | None = None, **kwargs: Any) -> Any:
     """Run one blocking transport/parser call with a real async deadline.
 
     ``asyncio.to_thread`` uses the event loop's executor; cancelling it still
@@ -135,12 +159,35 @@ async def _run_sync_bounded(function: Any, *args: Any, timeout: float, **kwargs:
         try:
             value = function(*args, **kwargs)
         except BaseException as exc:
-            notify(result_future.set_exception, exc)
+            # A transport/parser runs outside the caller's event loop and is
+            # untrusted.  Do not let process-level BaseExceptions (notably
+            # SystemExit/KeyboardInterrupt) escape through an awaited future
+            # and terminate the host.  Preserve asyncio cancellation, while
+            # mapping other BaseExceptions to the provider error boundary.
+            if isinstance(exc, (asyncio.CancelledError, ProviderError)):
+                safe_exc: BaseException = exc
+            elif isinstance(exc, Exception):
+                safe_exc = exc
+            else:
+                safe_exc = ProviderError("model transport worker failed", category="transport_error", retryable=False)
+            notify(result_future.set_exception, safe_exc)
         else:
             notify(result_future.set_result, value)
 
     threading.Thread(target=worker, name="forgecode-transport", daemon=True).start()
-    return await asyncio.wait_for(result_future, timeout=timeout)
+    deadline = time.monotonic() + timeout
+    # Shield the detached worker future: cancellation/deadline must return to
+    # the caller without cancelling a future that a late worker may complete.
+    while True:
+        if _is_cancelled(cancellation):
+            raise ProviderError("model request cancelled", category="cancelled", retryable=False, unresolved=True)
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise _BoundedOperationTimeout("bounded operation exceeded timeout")
+        try:
+            return await asyncio.wait_for(asyncio.shield(result_future), timeout=min(0.05, remaining))
+        except asyncio.TimeoutError:
+            continue
 
 
 def _redact(text: str, secret: str | None = None) -> str:
@@ -150,14 +197,14 @@ def _redact(text: str, secret: str | None = None) -> str:
 def _error_message(payload: bytes, secret: str | None) -> str:
     text = payload.decode("utf-8", errors="replace")[:2_000]
     try:
-        parsed = json.loads(text)
+        parsed = bounded_json_loads(text)
         if isinstance(parsed, dict):
             error_data = parsed.get("error")
             if isinstance(error_data, dict):
                 text = str(error_data.get("message") or error_data.get("type") or error_data)
             elif error_data:
                 text = str(error_data)
-    except json.JSONDecodeError:
+    except (json.JSONDecodeError, ValueError):
         pass
     return _redact(text, secret)
 
@@ -220,7 +267,7 @@ def _parse_tool_calls(raw_calls: Any, *, max_calls: int = 64) -> tuple[ToolCall,
             if len(arguments) > 200_000:
                 raise ProviderError(f"tool call {call_id} arguments exceeded the configured size limit", category="response_limit")
             try:
-                arguments = json.loads(arguments or "{}", parse_constant=_reject_nonfinite)
+                arguments = bounded_json_loads(arguments or "{}", parse_constant=_reject_nonfinite)
             except (json.JSONDecodeError, ValueError) as exc:
                 raise ProviderError(f"tool call {call_id} has invalid JSON arguments", category="protocol_error") from exc
         if not isinstance(arguments, dict):
@@ -279,7 +326,7 @@ def parse_chat_completion(payload: dict[str, Any]) -> ModelResponse:
     return ModelResponse(Message(role="assistant", content=content, tool_calls=calls), finish_reason, safe_usage)
 
 
-def _sse_json_events(chunks: Iterable[bytes], *, max_bytes: int = 4_000_000, max_events: int = 2_000) -> tuple[list[dict[str, Any]], bool]:
+def _sse_json_events(chunks: Iterable[bytes], *, max_bytes: int = 4_000_000, max_events: int = 2_000, cancellation: CancellationToken | Callable[[], bool] | None = None) -> tuple[list[dict[str, Any]], bool]:
     """Parse a bounded OpenAI-compatible SSE byte stream.
 
     We decode only complete UTF-8 lines and complete JSON data frames.  A
@@ -289,8 +336,15 @@ def _sse_json_events(chunks: Iterable[bytes], *, max_bytes: int = 4_000_000, max
     buffer = b""
     total = 0
     events: list[dict[str, Any]] = []
+    # Keep a canonical representation in addition to the raw bytes.  Servers
+    # and proxies can replay the same JSON frame with different whitespace or
+    # key ordering; treating that as a new delta could duplicate content or
+    # tool arguments and cross the side-effect boundary.
+    seen_data_frames: set[str] = set()
     done = False
     for chunk in chunks:
+        if _is_cancelled(cancellation):
+            raise ProviderError("stream request cancelled", category="cancelled", retryable=False)
         if not isinstance(chunk, (bytes, bytearray)):
             raise ProviderError("stream transport yielded a non-byte chunk", category="stream_protocol_error")
         total += len(chunk)
@@ -318,11 +372,23 @@ def _sse_json_events(chunks: Iterable[bytes], *, max_bytes: int = 4_000_000, max
                 raise ProviderError("SSE data appeared after [DONE]", category="stream_protocol_error")
             try:
                 decoded = data.decode("utf-8")
-                payload = json.loads(decoded, parse_constant=_reject_nonfinite)
+                payload = bounded_json_loads(decoded, parse_constant=_reject_nonfinite)
             except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as exc:
                 raise ProviderError("malformed SSE JSON frame", category="stream_protocol_error") from exc
             if not isinstance(payload, dict):
                 raise ProviderError("SSE frame must contain a JSON object", category="stream_protocol_error")
+            # A replayed SSE frame would duplicate content/tool arguments and
+            # could trigger an unintended side effect.  Compare canonical JSON
+            # rather than raw bytes so harmless whitespace/key-order changes do
+            # not bypass the duplicate guard. Usage-only frames are covered by
+            # the same check for deterministic diagnostics.
+            try:
+                canonical = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False)
+            except (TypeError, ValueError, OverflowError) as exc:
+                raise ProviderError("SSE frame is not JSON-safe", category="stream_protocol_error") from exc
+            if canonical in seen_data_frames:
+                raise ProviderError("SSE stream repeated a data frame", category="stream_protocol_error")
+            seen_data_frames.add(canonical)
             events.append(payload)
             if len(events) > max_events:
                 raise ProviderError("stream contains too many events", category="response_limit")
@@ -333,7 +399,7 @@ def _sse_json_events(chunks: Iterable[bytes], *, max_bytes: int = 4_000_000, max
     return events, done
 
 
-def assemble_chat_stream(events: Iterable[dict[str, Any]], *, max_content_chars: int = 200_000, max_argument_chars: int = 200_000) -> ModelResponse:
+def assemble_chat_stream(events: Iterable[dict[str, Any]], *, max_content_chars: int = 200_000, max_argument_chars: int = 200_000, cancellation: CancellationToken | Callable[[], bool] | None = None) -> ModelResponse:
     """Assemble deltas and validate complete tool calls before returning."""
     content_parts: list[str] = []
     finish_reason: str | None = None
@@ -341,7 +407,10 @@ def assemble_chat_stream(events: Iterable[dict[str, Any]], *, max_content_chars:
     calls: dict[int, dict[str, Any]] = {}
     order: list[int] = []
     finished = False
+    seen_fragments: set[str] = set()
     for event in events:
+        if _is_cancelled(cancellation):
+            raise ProviderError("stream assembly cancelled", category="cancelled", retryable=False)
         choices = event.get("choices")
         # OpenAI-compatible providers may send a final usage-only frame with
         # choices=[] before [DONE]. It carries no delta and cannot complete a
@@ -388,6 +457,13 @@ def assemble_chat_stream(events: Iterable[dict[str, Any]], *, max_content_chars:
             if not isinstance(raw, dict) or not isinstance(raw.get("index"), int) or isinstance(raw.get("index"), bool):
                 raise ProviderError("stream tool call fragment has no integer index", category="stream_protocol_error")
             call_index = raw["index"]
+            try:
+                fragment_key = json.dumps(raw, ensure_ascii=False, sort_keys=True, allow_nan=False)
+            except (TypeError, ValueError) as exc:
+                raise ProviderError("stream tool call fragment is not JSON-safe", category="stream_protocol_error") from exc
+            if fragment_key in seen_fragments:
+                raise ProviderError("stream repeated a tool call fragment", category="stream_protocol_error")
+            seen_fragments.add(fragment_key)
             if call_index not in calls:
                 if order and call_index <= max(order):
                     raise ProviderError("stream introduced an out-of-order tool index", category="stream_protocol_error")
@@ -440,7 +516,7 @@ def assemble_chat_stream(events: Iterable[dict[str, Any]], *, max_content_chars:
         if call["id"] in seen_ids:
             raise ProviderError("stream repeats a tool call id", category="stream_protocol_error")
         try:
-            arguments = json.loads(call["arguments"] or "{}", parse_constant=_reject_nonfinite)
+            arguments = bounded_json_loads(call["arguments"] or "{}", parse_constant=_reject_nonfinite)
         except (json.JSONDecodeError, ValueError) as exc:
             raise ProviderError("stream tool call has incomplete JSON arguments", category="stream_incomplete") from exc
         if not isinstance(arguments, dict):
@@ -497,6 +573,8 @@ class OpenAICompatibleProvider:
         self.streaming = bool(streaming)
         self.stream_required = bool(stream_required)
         self.retry_events: list[dict[str, Any]] = []
+        self.attempt_events: list[dict[str, Any]] = []
+        self.last_request_id: str | None = None
 
     @property
     def capabilities(self) -> ModelCapabilities:
@@ -523,69 +601,166 @@ class OpenAICompatibleProvider:
             transport=transport,
         )
 
-    async def complete(self, messages: Sequence[Message], tools: Sequence[dict[str, Any]]) -> ModelResponse:
+    async def complete(self, messages: Sequence[Message], tools: Sequence[dict[str, Any]], context: ProviderContext | None = None) -> ModelResponse:
+        request_context = context or ProviderContext()
+        request_id = request_context.request_id or uuid.uuid4().hex
+        self.last_request_id = request_id
+        self.retry_events = []
+        self.attempt_events = []
+        request_started = time.monotonic()
+
+        def check_request() -> None:
+            if request_context.cancelled:
+                raise ProviderError("model request cancelled", category="cancelled", retryable=False, request_id=request_id)
+            if request_context.deadline_monotonic is not None and request_context.remaining_seconds(self.timeout) <= 0:
+                raise ProviderError("model request deadline exceeded", category="deadline_exceeded", retryable=False, request_id=request_id)
+
+        def attempt_started(attempt: int, protocol: str) -> dict[str, Any]:
+            item = {
+                "request_id": request_id,
+                "attempt_id": f"{request_id}:{protocol}:{attempt}",
+                "attempt": attempt,
+                "protocol": protocol,
+                "started_at": datetime.now(timezone.utc).isoformat(),
+                "started_monotonic": time.monotonic(),
+            }
+            self.attempt_events.append(item)
+            return item
+
+        def attempt_finished(item: dict[str, Any], *, outcome: str, error_category: str | None = None, unresolved: bool = False) -> None:
+            # Do not let an intermediate HTTP response marker hide a later
+            # decode/protocol failure. Finishing an attempt is idempotent.
+            if "outcome" in item:
+                return
+            item["ended_at"] = datetime.now(timezone.utc).isoformat()
+            item["duration_seconds"] = round(time.monotonic() - float(item.get("started_monotonic", request_started)), 6)
+            item["outcome"] = outcome
+            if error_category:
+                item["error_category"] = error_category
+            item["unresolved"] = bool(unresolved)
+            item.pop("started_monotonic", None)
+
+        def annotate_error(exc: ProviderError, attempt: int | None = None) -> ProviderError:
+            """Attach bounded request/attempt identity to every provider error."""
+            if exc.request_id is None:
+                exc.request_id = request_id
+            if exc.attempt is None and attempt is not None:
+                exc.attempt = attempt
+            return exc
+
         try:
             tool_payloads = [_tool_schema_to_payload(schema) for schema in tools]
         except AttributeError as exc:
             raise ProviderError("tool schema must be an object", category="protocol_error") from exc
-        body = json.dumps({"model": self.model, "messages": [_message_to_payload(message) for message in messages], "tools": tool_payloads}, ensure_ascii=False, allow_nan=False).encode("utf-8")
+        try:
+            body = json.dumps({"model": self.model, "messages": [_message_to_payload(message) for message in messages], "tools": tool_payloads}, ensure_ascii=False, allow_nan=False).encode("utf-8")
+        except (TypeError, ValueError, OverflowError) as exc:
+            raise ProviderError("model request contains invalid JSON values", category="protocol_error", request_id=request_id) from exc
         if len(body) > self.max_request_bytes:
-            raise ProviderError("model request exceeded the configured size limit", category="request_limit")
+            raise ProviderError("model request exceeded the configured size limit", category="request_limit", request_id=request_id)
         headers = {"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"}
         if self.streaming:
             stream_method = getattr(self.transport, "post_stream", None)
             if stream_method is None:
                 if self.stream_required:
-                    raise ProviderError("streaming is required but transport does not support SSE", category="configuration_error")
+                    raise ProviderError("streaming is required but transport does not support SSE", category="configuration_error", request_id=request_id)
             else:
                 try:
-                    stream_body = json.dumps({"model": self.model, "messages": [_message_to_payload(message) for message in messages], "tools": tool_payloads, "stream": True}, ensure_ascii=False, allow_nan=False).encode("utf-8")
+                    try:
+                        stream_body = json.dumps({"model": self.model, "messages": [_message_to_payload(message) for message in messages], "tools": tool_payloads, "stream": True}, ensure_ascii=False, allow_nan=False).encode("utf-8")
+                    except (TypeError, ValueError, OverflowError) as exc:
+                        raise ProviderError("model request contains invalid JSON values", category="protocol_error", request_id=request_id) from exc
                     if len(stream_body) > self.max_request_bytes:
-                        raise ProviderError("model request exceeded the configured size limit", category="request_limit")
-                    self.retry_events = []
+                        raise ProviderError("model request exceeded the configured size limit", category="request_limit", request_id=request_id)
                     for attempt in range(1, self.max_retries + 2):
+                        check_request()
+                        attempt_info = attempt_started(attempt, "sse")
                         try:
+                            timeout = request_context.remaining_seconds(self.timeout)
+                            if timeout <= 0:
+                                raise ProviderError("model request deadline exceeded", category="deadline_exceeded", request_id=request_id)
                             transport_result = await _run_sync_bounded(
                                 stream_method,
                                 f"{self.base_url}/chat/completions",
                                 {**headers, "Accept": "text/event-stream"},
                                 stream_body,
-                                self.timeout,
-                                timeout=self.timeout,
+                                timeout,
+                                timeout=timeout,
+                                cancellation=request_context.cancellation_token or request_context.cancellation_requested,
                             )
                             status, chunks, response_headers = _unpack_transport_result(transport_result)
+                        except asyncio.CancelledError:
+                            attempt_finished(attempt_info, outcome="cancelled", error_category="cancelled", unresolved=True)
+                            raise
                         except (TimeoutError, error.URLError, OSError) as exc:
-                            if attempt <= self.max_retries:
-                                await self._retry(attempt, "stream_transport_error", str(exc))
+                            unresolved = bool(getattr(exc, "unresolved", False))
+                            attempt_finished(attempt_info, outcome="error", error_category="stream_transport_error", unresolved=unresolved)
+                            # A bounded timeout means the synchronous
+                            # transport worker may still be running. Retrying
+                            # would issue a duplicate request while that
+                            # unresolved attempt can still reach the provider.
+                            # Keep the attempt unresolved and let the caller's
+                            # recovery boundary decide what to do.
+                            if attempt <= self.max_retries and not unresolved:
+                                await self._retry(attempt, "stream_transport_error", str(exc), context=request_context, request_id=request_id)
                                 continue
-                            raise ProviderError(_redact(f"stream request failed: {exc}", self.api_key), category="stream_error", retryable=True, attempt=attempt) from exc
+                            raise ProviderError(_redact(f"stream request failed: {exc}", self.api_key), category="stream_error", retryable=True, attempt=attempt, request_id=request_id, unresolved=unresolved) from exc
+                        except ProviderError as exc:
+                            annotate_error(exc, attempt)
+                            attempt_finished(attempt_info, outcome="error", error_category=exc.category, unresolved=exc.unresolved)
+                            raise
+                        except (AttributeError, NotImplementedError):
+                            attempt_finished(attempt_info, outcome="error", error_category="not_implemented")
+                            raise
+                        except Exception as exc:
+                            attempt_finished(attempt_info, outcome="error", error_category="stream_transport_error")
+                            raise ProviderError(_redact(f"stream request failed: {type(exc).__name__}: {exc}", self.api_key), category="stream_error", retryable=False, attempt=attempt, request_id=request_id) from exc
                         if isinstance(status, bool) or not isinstance(status, int):
-                            raise ProviderError("stream transport returned an invalid HTTP status", category="stream_error", attempt=attempt)
+                            attempt_finished(attempt_info, outcome="error", error_category="stream_error")
+                            raise ProviderError("stream transport returned an invalid HTTP status", category="stream_error", attempt=attempt, request_id=request_id)
                         if status in {408, 429} or 500 <= status <= 599:
                             if attempt <= self.max_retries:
-                                await self._retry(attempt, f"stream_http_{status}", f"HTTP {status}", response_headers.get("retry-after"))
+                                attempt_finished(attempt_info, outcome="retry", error_category=f"stream_http_{status}")
+                                await self._retry(attempt, f"stream_http_{status}", f"HTTP {status}", response_headers.get("retry-after"), context=request_context, request_id=request_id)
                                 continue
                         if status < 200 or status >= 300:
-                            raise ProviderError(f"model returned HTTP {status}", category="http_error", retryable=status in {408, 429} or 500 <= status <= 599, status_code=status, attempt=attempt)
+                            attempt_finished(attempt_info, outcome="error", error_category="http_error")
+                            raise ProviderError(f"model returned HTTP {status}", category="http_error", retryable=status in {408, 429} or 500 <= status <= 599, status_code=status, attempt=attempt, request_id=request_id)
                         try:
+                            timeout = request_context.remaining_seconds(self.timeout)
+                            if timeout <= 0:
+                                raise ProviderError("model request deadline exceeded", category="deadline_exceeded", request_id=request_id)
                             events, _done = await _run_sync_bounded(
                                 _sse_json_events, chunks,
                                 max_bytes=self.max_response_bytes,
-                                timeout=self.timeout,
+                                timeout=timeout,
+                                cancellation=request_context.cancellation_token or request_context.cancellation_requested,
                             )
-                            return assemble_chat_stream(events)
-                        except ProviderError:
+                            response = assemble_chat_stream(events, cancellation=request_context.cancellation_token or request_context.cancellation_requested)
+                            attempt_finished(attempt_info, outcome="success")
+                            return response
+                        except asyncio.CancelledError:
+                            attempt_finished(attempt_info, outcome="cancelled", error_category="cancelled", unresolved=True)
+                            raise
+                        except ProviderError as exc:
+                            annotate_error(exc, attempt)
+                            attempt_finished(attempt_info, outcome="error", error_category=exc.category, unresolved=exc.unresolved)
                             raise
                         except (TimeoutError, error.URLError, OSError) as exc:
-                            if attempt <= self.max_retries:
-                                await self._retry(attempt, "stream_transport_error", str(exc))
+                            unresolved = bool(getattr(exc, "unresolved", False))
+                            attempt_finished(attempt_info, outcome="error", error_category="stream_transport_error", unresolved=unresolved)
+                            if attempt <= self.max_retries and not unresolved:
+                                await self._retry(attempt, "stream_transport_error", str(exc), context=request_context, request_id=request_id)
                                 continue
-                            raise ProviderError(_redact(f"stream request failed: {exc}", self.api_key), category="stream_error", retryable=True, attempt=attempt) from exc
+                            raise ProviderError(_redact(f"stream request failed: {exc}", self.api_key), category="stream_error", retryable=True, attempt=attempt, request_id=request_id, unresolved=unresolved) from exc
+                        except Exception as exc:
+                            attempt_finished(attempt_info, outcome="error", error_category="stream_error")
+                            raise ProviderError(_redact(f"stream request failed: {type(exc).__name__}: {exc}", self.api_key), category="stream_error", retryable=False, attempt=attempt, request_id=request_id) from exc
                 except ProviderError:
                     raise
                 except (AttributeError, NotImplementedError) as exc:
                     if self.stream_required:
-                        raise ProviderError("streaming is required but transport does not implement SSE", category="configuration_error") from exc
+                        raise ProviderError("streaming is required but transport does not implement SSE", category="configuration_error", request_id=request_id) from exc
                     # A transport may expose an optional method that is not
                     # implemented by a particular backend.  In auto/on mode
                     # fall through to the bounded non-stream request; only
@@ -594,56 +769,84 @@ class OpenAICompatibleProvider:
                 except Exception as exc:
                     raise ProviderError(_redact(f"stream request failed: {type(exc).__name__}: {exc}", self.api_key), category="stream_error") from exc
         if self.stream_required:
-            raise ProviderError("streaming is required but no stream was requested", category="configuration_error")
-        self.retry_events = []
+            raise ProviderError("streaming is required but no stream was requested", category="configuration_error", request_id=request_id)
         for attempt in range(1, self.max_retries + 2):
+            check_request()
+            attempt_info = attempt_started(attempt, "json")
             try:
+                timeout = request_context.remaining_seconds(self.timeout)
+                if timeout <= 0:
+                    raise ProviderError("model request deadline exceeded", category="deadline_exceeded", request_id=request_id)
                 transport_result = await _run_sync_bounded(
                     self.transport.post_json,
                     f"{self.base_url}/chat/completions",
                     headers,
                     body,
-                    self.timeout,
-                    timeout=self.timeout,
+                    timeout,
+                    timeout=timeout,
+                    cancellation=request_context.cancellation_token or request_context.cancellation_requested,
                 )
                 status, response_body, response_headers = _unpack_transport_result(transport_result)
+            except asyncio.CancelledError:
+                attempt_finished(attempt_info, outcome="cancelled", error_category="cancelled", unresolved=True)
+                raise
             except (TimeoutError, error.URLError, OSError) as exc:
+                unresolved = bool(getattr(exc, "unresolved", False))
+                attempt_finished(attempt_info, outcome="error", error_category="transport_error", unresolved=unresolved)
                 retryable = True
-                if attempt <= self.max_retries:
-                    await self._retry(attempt, "transport_error", str(exc))
+                if attempt <= self.max_retries and not unresolved:
+                    await self._retry(attempt, "transport_error", str(exc), context=request_context, request_id=request_id)
                     continue
-                raise ProviderError(_redact(f"model request failed: {exc}", self.api_key), category="transport_error", retryable=retryable, attempt=attempt) from exc
+                raise ProviderError(_redact(f"model request failed: {exc}", self.api_key), category="transport_error", retryable=retryable, attempt=attempt, request_id=request_id, unresolved=unresolved) from exc
+            except ProviderError as exc:
+                annotate_error(exc, attempt)
+                attempt_finished(attempt_info, outcome="error", error_category=exc.category, unresolved=exc.unresolved)
+                raise
             except Exception as exc:
-                raise ProviderError(_redact(f"model request failed: {type(exc).__name__}: {exc}", self.api_key), category="transport_error", retryable=False, attempt=attempt) from exc
+                attempt_finished(attempt_info, outcome="error", error_category="transport_error")
+                raise ProviderError(_redact(f"model request failed: {type(exc).__name__}: {exc}", self.api_key), category="transport_error", retryable=False, attempt=attempt, request_id=request_id) from exc
+            if not isinstance(response_body, (bytes, bytearray)):
+                attempt_finished(attempt_info, outcome="error", error_category="transport_error")
+                raise ProviderError("model transport returned a non-byte response", category="transport_error", attempt=attempt, request_id=request_id)
+            if isinstance(status, bool) or not isinstance(status, int):
+                attempt_finished(attempt_info, outcome="error", error_category="transport_error")
+                raise ProviderError("model transport returned an invalid HTTP status", category="transport_error", attempt=attempt, request_id=request_id)
+            retryable_status = status in {408, 429} or 500 <= status <= 599
+            if retryable_status and attempt <= self.max_retries:
+                attempt_finished(attempt_info, outcome="retry", error_category=f"http_{status}")
+                await self._retry(attempt, f"http_{status}", f"HTTP {status}", response_headers.get("retry-after"), context=request_context, request_id=request_id)
+                continue
+            break
+        try:
             if not isinstance(response_body, (bytes, bytearray)):
                 raise ProviderError("model transport returned a non-byte response", category="transport_error", attempt=attempt)
             if isinstance(status, bool) or not isinstance(status, int):
                 raise ProviderError("model transport returned an invalid HTTP status", category="transport_error", attempt=attempt)
-            retryable_status = status in {408, 429} or 500 <= status <= 599
-            if retryable_status and attempt <= self.max_retries:
-                await self._retry(attempt, f"http_{status}", f"HTTP {status}", response_headers.get("retry-after"))
-                continue
-            break
-        if not isinstance(response_body, (bytes, bytearray)):
-            raise ProviderError("model transport returned a non-byte response", category="transport_error")
-        if isinstance(status, bool) or not isinstance(status, int):
-            raise ProviderError("model transport returned an invalid HTTP status", category="transport_error")
-        if len(response_body) > self.max_response_bytes:
-            raise ProviderError("model response exceeded the configured size limit", category="response_limit")
-        if status < 200 or status >= 300:
-            raise ProviderError(f"model returned HTTP {status}: {_error_message(response_body, self.api_key)}", category="http_error", retryable=status in {408, 429} or 500 <= status <= 599, status_code=status, attempt=attempt)
-        try:
-            payload = json.loads(response_body.decode("utf-8"), parse_constant=_reject_nonfinite)
-        except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as exc:
-            raise ProviderError("model returned malformed JSON", category="protocol_error") from exc
-        if not isinstance(payload, dict):
-            raise ProviderError("model response must be a JSON object", category="protocol_error")
-        if payload.get("error"):
-            safe_message = _redact(str(payload.get("error"))[:2_000], self.api_key)
-            raise ProviderError(f"model returned an error object: {safe_message}", category="provider_error", attempt=attempt)
-        return parse_chat_completion(payload)
+            if len(response_body) > self.max_response_bytes:
+                raise ProviderError("model response exceeded the configured size limit", category="response_limit", attempt=attempt, request_id=request_id)
+            if status < 200 or status >= 300:
+                raise ProviderError(f"model returned HTTP {status}: {_error_message(response_body, self.api_key)}", category="http_error", retryable=status in {408, 429} or 500 <= status <= 599, status_code=status, attempt=attempt, request_id=request_id)
+            try:
+                payload = bounded_json_loads(response_body.decode("utf-8"), parse_constant=_reject_nonfinite)
+            except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as exc:
+                raise ProviderError("model returned malformed JSON", category="protocol_error", attempt=attempt, request_id=request_id) from exc
+            if not isinstance(payload, dict):
+                raise ProviderError("model response must be a JSON object", category="protocol_error", attempt=attempt, request_id=request_id)
+            if payload.get("error"):
+                safe_message = _redact(str(payload.get("error"))[:2_000], self.api_key)
+                raise ProviderError(f"model returned an error object: {safe_message}", category="provider_error", attempt=attempt, request_id=request_id)
+            try:
+                response = parse_chat_completion(payload)
+            except ProviderError as exc:
+                raise ProviderError(str(exc), category=exc.category, retryable=exc.retryable, status_code=exc.status_code, attempt=attempt, request_id=request_id) from exc
+            attempt_finished(attempt_info, outcome="success")
+            return response
+        except ProviderError as exc:
+            annotate_error(exc, attempt)
+            attempt_finished(attempt_info, outcome="error", error_category=exc.category, unresolved=exc.unresolved)
+            raise
 
-    async def _retry(self, attempt: int, category: str, reason: str, retry_after: str | None = None) -> None:
+    async def _retry(self, attempt: int, category: str, reason: str, retry_after: str | None = None, *, context: ProviderContext | None = None, request_id: str | None = None) -> None:
         # Jitter prevents synchronized clients while the cap keeps tests and
         # interactive use bounded. Do not retry local side effects here.
         delay = min(4.0, self.retry_base_delay * (2 ** (attempt - 1)))
@@ -653,12 +856,36 @@ class OpenAICompatibleProvider:
                 if math.isfinite(advertised) and advertised >= 0:
                     delay = min(4.0, advertised)
             except (AttributeError, TypeError, ValueError):
-                pass
+                try:
+                    retry_at = parsedate_to_datetime(str(retry_after).strip())
+                    if retry_at.tzinfo is None:
+                        retry_at = retry_at.replace(tzinfo=timezone.utc)
+                    advertised = (retry_at - datetime.now(timezone.utc)).total_seconds()
+                    if math.isfinite(advertised) and advertised >= 0:
+                        delay = min(4.0, advertised)
+                except (TypeError, ValueError, OverflowError):
+                    pass
         jitter = random.SystemRandom().uniform(0, delay * 0.25) if delay else 0.0
-        wait = delay + jitter
-        event = {"attempt": attempt, "next_attempt": attempt + 1, "category": category, "delay_seconds": round(wait, 3), "reason": _redact(reason, self.api_key)}
+        wait = min(4.0, delay + jitter)
+        event = {"request_id": request_id, "attempt_id": f"{request_id}:{category}:{attempt}" if request_id else None, "attempt": attempt, "next_attempt": attempt + 1, "category": category, "delay_seconds": round(wait, 3), "reason": _redact(reason, self.api_key)}
         if retry_after is not None:
             event["retry_after"] = _redact(str(retry_after)[:64], self.api_key)
         self.retry_events.append(event)
         if wait:
-            await asyncio.sleep(wait)
+            remaining = context.remaining_seconds(wait) if context is not None else wait
+            if remaining <= 0:
+                raise ProviderError("model request deadline exceeded during retry backoff", category="deadline_exceeded", retryable=False, attempt=attempt, request_id=request_id)
+            if context is None or context.cancellation_token is None and context.cancellation_requested is None:
+                await asyncio.sleep(remaining)
+                return
+            # Poll the token in short intervals so a cancelled retry does not
+            # sleep for the entire advertised delay.
+            deadline = time.monotonic() + remaining
+            signal = context.cancellation_token or context.cancellation_requested
+            while True:
+                if _is_cancelled(signal):
+                    raise ProviderError("model request cancelled during retry backoff", category="cancelled", retryable=False, attempt=attempt, request_id=request_id)
+                left = deadline - time.monotonic()
+                if left <= 0:
+                    break
+                await asyncio.sleep(min(0.05, left))

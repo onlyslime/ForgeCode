@@ -1,10 +1,11 @@
-# ForgeCode durability design (v0.0.7)
+# ForgeCode durability design (v0.0.8)
 
 This document records the v0.0.5 reliability baseline, v0.0.6 durable
-extensions, and v0.0.7 context/extension work. It is a design contract for the
-v0.0.7 release and its tests, with runtime evidence recorded in the capability
-trace and release report; it is not a claim that a feature exists before its
-acceptance test passes.
+extensions, and v0.0.7 context/extension work. Version 0.0.8 adds strict test
+profiles, evidence-driven review, cancellation propagation and machine-output
+contracts. This is a design contract for the v0.0.8 release and its tests,
+with runtime evidence recorded in the capability trace and acceptance report;
+it is not a claim that a feature exists before its acceptance test passes.
 
 ## Run lifecycle
 
@@ -59,8 +60,11 @@ recovery conflict.
 Provider retries are limited to transport failures, HTTP 408/429 and 5xx.
 They use bounded exponential backoff with jitter and emit one event per
 attempt. A provider request may be retried because it has no local side
-effect. A local tool call is never automatically replayed. Tool call ids and
-fingerprints are tracked independently.
+effect. A local tool call is never automatically replayed. Attempt evidence is
+identified by the pair `(request_id, attempt_id)` so a provider that reuses a
+per-turn id cannot hide a later request. If a worker times out or ignores
+cancellation, its request is forced to `unresolved` even when a late success
+marker arrives; recovery must inspect it explicitly.
 
 ## Change transactions
 
@@ -76,10 +80,13 @@ disk failure or a hostile concurrent writer; these limits remain explicit.
 In v0.0.6+, exact before bytes are written before mutation to content-addressed
 blobs under ignored `.forgecode/transactions`. A bounded manifest links
 before/after hashes, operation, run/plan ids, approval and verification.
-Review and undo reopen this ledger in a new process. Undo requires the current
-after hash, fresh approval and all-target prevalidation; it creates a new
-transaction and marks the parent undone. Corrupt/missing blobs, external
-edits and repeated undo fail closed.
+Manifest writers use a cross-process lock and compare-and-swap state/sequence
+checks; a stale writer cannot replace a newer record. Review and undo reopen
+this ledger in a new process. Undo requires the current after hash, fresh
+approval and all-target prevalidation; it creates a new transaction and marks
+the parent undone. Corrupt/missing blobs, external edits and repeated undo fail
+closed. Partial restoration records each operation and leaves unrelated
+external edits untouched.
 
 ## Context and repository map
 
@@ -104,6 +111,45 @@ original JSONL prefix. Context rebuild uses validated events/checkpoints and
 treats previous tool calls only as evidence. Completed sessions are
 inspect-only; explicit forks receive a new run id and parent sequence.
 
+## Test-profile evidence
+
+`.forgecode/tests.toml` is parsed as a strict schema (the input is capped at
+1,000,000 bytes and parser recursion failures are reported as structured
+configuration errors). Commands, setup and
+teardown are argv arrays and run with `shell=False`; cwd must resolve inside the
+workspace, inherited environment variables are reduced to a safe baseline, and
+only an explicit non-secret allow-list may be added. Every phase shares the
+profile deadline and bounded stream quotas. A profile passes only when setup,
+main, teardown and the expected exit-code check all succeed. Approval denial,
+Plan mode, cancellation, timeout, failed cleanup or unresolved termination are
+recorded as non-passing `TestEvidence` and (when a session is supplied) a
+`test_profile_result` event. Full stdout/stderr are represented by digests;
+only redacted previews are persisted.
+
+## Evidence-driven review and artifacts
+
+`ReviewBuilder` reads validated session events and transaction manifests and
+joins plan, references, context-index, test-profile, hook and diff evidence.
+Its deterministic checks report explicit status and budgets for secret-shaped
+text, forbidden paths, suspicious commands and Python syntax. A report is
+passing only if the source records are complete, all applicable checks pass and
+there are no hash or recovery conflicts. Exported artifacts contain relative
+paths, event references and SHA-256 values—not raw session lines or backup
+bytes—and are bound to a workspace identity. Import/verify recomputes both the
+artifact digest and current file digests, returning stale/tampered rather than
+silently accepting changed evidence.
+
+## Cancellation, cleanup and machine output
+
+`CancellationToken` and a monotonic deadline are propagated through providers,
+test phases, synchronous tools and SSE chunk assembly. A detached or
+non-cooperative provider is bounded by a cleanup grace period; its attempt is
+marked unresolved and cannot authorize a tool dispatch. Hook callbacks have a
+bounded timeout and optional cleanup; unresolved fail-closed cleanup becomes a
+recovery issue, and cleanup executes at most once. New CLI JSONL commands use
+the envelope `schema_version/kind/ok/command` plus exactly one `data` or
+`error`; diagnostics and prompts go to stderr, preserving parseable stdout.
+
 ## Commands and verification
 
 Commands retain the five stable risk classes. Hard-block patterns are checked
@@ -114,7 +160,9 @@ whole process tree on Windows and POSIX and failure to terminate is reported.
 
 Verification uses a typed result and the same command policy. Plan mode never
 executes verification. Act repair attempts are bounded, and file fingerprints
-are compared around verification so external edits become conflicts.
+are compared around verification so external edits become conflicts. Named
+profiles use the stricter argv runner described above; the legacy shell-string
+verifier remains for backwards-compatible agent `--verify` commands.
 
 ## Compatibility and exit codes
 
@@ -122,3 +170,6 @@ Schema v1 readers accept legacy audit events for inspection/export but legacy
 data cannot authorize a side effect. CLI exit codes are: 0 success/read-only
 inspection, 1 run failure, 2 invalid input/configuration, 3 recovery conflict,
 and 130 cancellation. Text and JSON modes share the same application services.
+For new machine commands, `--jsonl` emits one strict envelope per line; a
+failure has `ok=false` and an `error` object instead of a simultaneous success
+`data` object. Legacy `--json` aliases are retained only for existing clients.

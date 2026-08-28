@@ -68,10 +68,14 @@ def _bounded(value: str, limit: int = _MAX_COMMAND_OUTPUT_CHARS) -> tuple[str, b
     return (value[:limit] + ("\n[output truncated]" if len(value) > limit else ""), len(value) > limit)
 
 
-def _terminate_process_tree(process: subprocess.Popen) -> None:
-    """Best-effort process-tree termination after a timeout."""
+def _terminate_process_tree(process: subprocess.Popen) -> bool:
+    """Best-effort process-tree termination after a timeout.
+
+    Return whether the process is known to have exited.  A detached/unresolved
+    process is never represented as a successful command result.
+    """
     if process.poll() is not None:
-        return
+        return True
     if os.name == "nt":
         try:
             subprocess.run(
@@ -80,19 +84,24 @@ def _terminate_process_tree(process: subprocess.Popen) -> None:
                 timeout=5,
                 check=False,
             )
-            return
+            return process.poll() is not None
         except (OSError, subprocess.TimeoutExpired):
             pass
     else:
         try:
             os.killpg(process.pid, signal.SIGKILL)
-            return
+            return process.poll() is not None
         except OSError:
             pass
     try:
         process.kill()
     except OSError:
         pass
+    try:
+        process.wait(timeout=1)
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return process.poll() is not None
 
 
 class DenyAllApproval:
@@ -133,6 +142,8 @@ class ShellTool:
         if hard_blocked:
             return ToolResult(False, f"command blocked by safety policy ({'; '.join(reasons)})", {"error": "risk_blocked", **risk_metadata, "command": command})
         approval = context.approval or self.approval
+        if context.cancelled:
+            return ToolResult(False, "run_command cancelled before execution", {"error": "cancelled", "approval": "not_requested", "termination_result": "not_started", "cancellation_reason": context.cancellation_reason, **risk_metadata})
         approval_arguments = {**arguments, "_risk": risk, "_risk_reasons": list(reasons)}
         if context.approval is not None:
             approved = context.request_approval(self.definition.name, approval_arguments)
@@ -140,9 +151,13 @@ class ShellTool:
             approved = approval.approve(self.definition.name, approval_arguments)
         if not approved:
             return ToolResult(False, "run_command denied by approval policy", {"error": "approval_denied", "approval": "denied", **risk_metadata})
+        if context.cancelled:
+            return ToolResult(False, "run_command cancelled after approval", {"error": "cancelled", "approval": "approved", "termination_result": "not_started", "cancellation_reason": context.cancellation_reason, **risk_metadata})
         stale = context.deny_if_stale(self.definition.name)
         if stale:
             return stale
+        if context.cancelled:
+            return ToolResult(False, "run_command cancelled before process start", {"error": "cancelled", "approval": "approved", "termination_result": "not_started", "cancellation_reason": context.cancellation_reason, **risk_metadata})
         timeout_value = arguments.get("timeout_seconds", 30)
         if isinstance(timeout_value, bool) or not isinstance(timeout_value, (int, float)):
             raise ValueError("timeout_seconds must be a number")
@@ -152,6 +167,8 @@ class ShellTool:
         effective_timeout = context.remaining_seconds(timeout)
         if effective_timeout <= 0:
             return ToolResult(False, "command skipped because the run deadline has expired", {"error": "deadline_exceeded", "timed_out": True, "started_at": started_at, "ended_at": datetime.now(timezone.utc).isoformat(), **risk_metadata})
+        if context.cancelled:
+            return ToolResult(False, "run_command cancelled before process start", {"error": "cancelled", "approval": "approved", "termination_result": "not_started", "cancellation_reason": context.cancellation_reason, **risk_metadata})
         environment = {
             name: value
             for name, value in os.environ.items()
@@ -175,17 +192,26 @@ class ShellTool:
                 env=environment,
                 **process_options,
             )
+            if context.cancelled:
+                terminated = _terminate_process_tree(process)
+                try:
+                    final_stdout, final_stderr = process.communicate(timeout=5)
+                except subprocess.TimeoutExpired:
+                    final_stdout, final_stderr = "", ""
+                stdout, stdout_truncated = _bounded(_text(final_stdout))
+                stderr, stderr_truncated = _bounded(_text(final_stderr))
+                return ToolResult(False, f"[stdout]\n{stdout}\n[stderr]\n{stderr}\ncommand cancelled", {"error": "cancelled", "timed_out": False, "termination_result": "requested" if terminated else "unresolved", "cancellation_reason": context.cancellation_reason, "command": command, "approval": "approved", "stdout": stdout, "stderr": stderr, "exit_code": process.returncode, "duration_seconds": round(time.monotonic() - started, 3), "started_at": started_at, "ended_at": datetime.now(timezone.utc).isoformat(), "truncated": stdout_truncated or stderr_truncated, **risk_metadata})
             deadline = time.monotonic() + effective_timeout
             while True:
                 if context.cancelled:
-                    _terminate_process_tree(process)
+                    terminated = _terminate_process_tree(process)
                     try:
                         final_stdout, final_stderr = process.communicate(timeout=5)
                     except subprocess.TimeoutExpired:
                         final_stdout, final_stderr = "", ""
                     stdout, stdout_truncated = _bounded(_text(final_stdout))
                     stderr, stderr_truncated = _bounded(_text(final_stderr))
-                    return ToolResult(False, f"[stdout]\n{stdout}\n[stderr]\n{stderr}\ncommand cancelled", {"error": "cancelled", "timed_out": False, "termination_result": "requested", "command": command, "approval": "approved", "stdout": stdout, "stderr": stderr, "exit_code": process.returncode, "duration_seconds": round(time.monotonic() - started, 3), "started_at": started_at, "ended_at": datetime.now(timezone.utc).isoformat(), "truncated": stdout_truncated or stderr_truncated, **risk_metadata})
+                    return ToolResult(False, f"[stdout]\n{stdout}\n[stderr]\n{stderr}\ncommand cancelled", {"error": "cancelled", "timed_out": False, "termination_result": "requested" if terminated else "unresolved", "cancellation_reason": context.cancellation_reason, "command": command, "approval": "approved", "stdout": stdout, "stderr": stderr, "exit_code": process.returncode, "duration_seconds": round(time.monotonic() - started, 3), "started_at": started_at, "ended_at": datetime.now(timezone.utc).isoformat(), "truncated": stdout_truncated or stderr_truncated, **risk_metadata})
                 remaining = deadline - time.monotonic()
                 if remaining <= 0:
                     raise subprocess.TimeoutExpired(command, effective_timeout)
@@ -196,7 +222,7 @@ class ShellTool:
                     continue
         except subprocess.TimeoutExpired as exc:
             assert process is not None
-            _terminate_process_tree(process)
+            terminated = _terminate_process_tree(process)
             try:
                 final_stdout, final_stderr = process.communicate(timeout=5)
             except subprocess.TimeoutExpired:
@@ -204,7 +230,7 @@ class ShellTool:
             stdout, stdout_truncated = _bounded(_text(final_stdout) or _text(exc.stdout))
             stderr, stderr_truncated = _bounded(_text(final_stderr) or _text(exc.stderr))
             output = f"[stdout]\n{stdout}\n[stderr]\n{stderr}\ncommand timed out after {effective_timeout:g}s"
-            return ToolResult(False, output, {"error": "timeout", "timed_out": True, "termination_result": "requested", "command": command, "approval": "approved", "stdout": stdout, "stderr": stderr, "exit_code": process.returncode, "duration_seconds": round(time.monotonic() - started, 3), "started_at": started_at, "ended_at": datetime.now(timezone.utc).isoformat(), "truncated": stdout_truncated or stderr_truncated, **risk_metadata})
+            return ToolResult(False, output, {"error": "timeout", "timed_out": True, "termination_result": "requested" if terminated else "unresolved", "command": command, "approval": "approved", "stdout": stdout, "stderr": stderr, "exit_code": process.returncode, "duration_seconds": round(time.monotonic() - started, 3), "started_at": started_at, "ended_at": datetime.now(timezone.utc).isoformat(), "truncated": stdout_truncated or stderr_truncated, **risk_metadata})
         except OSError as exc:
             return ToolResult(False, f"command could not start: {exc}", {"error": "execution_error", "command": command, "approval": "approved", "duration_seconds": round(time.monotonic() - started, 3), "started_at": started_at, "ended_at": datetime.now(timezone.utc).isoformat(), **risk_metadata})
         stdout, stdout_truncated = _bounded(_text(stdout_value))

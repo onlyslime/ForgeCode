@@ -1,30 +1,29 @@
-# ForgeCode v0.0.7 capability trace
+# ForgeCode v0.0.8 capability trace
 
-This document is the implementation trace for the v0.0.7 release (building on
-v0.0.6). It is
-intentionally evidence-oriented: a capability is considered complete only
-when its source, tests, and a runnable CLI/fresh-workspace scenario agree.
+This document is the implementation trace for the v0.0.8 release (building on
+v0.0.7). It is intentionally evidence-oriented: a capability is considered
+complete only when its source, tests, and a runnable CLI/fresh-workspace
+scenario agree. Runtime records remain bounded and are not committed.
 
 ## Scope mapping
 
-| Capability family | v0.0.6 baseline | v0.0.7 target/source | Evidence status |
+| Capability family | Earlier baseline | v0.0.8 target/source | Evidence status |
 | --- | --- | --- | --- |
-| Provider-neutral loop, tool schemas, Plan/Act gate | `agent/loop.py`, `tools/base.py` | Preserve and integrate rule/reference/plan context | baseline regression + new integration tests |
-| Workspace-safe read/write/patch/command | `security/workspace.py`, `tools/*` | Preserve; ledger will add durable evidence | baseline regression + transaction tests |
-| Session JSONL/checkpoint/recovery | `storage/session.py`, `storage/checkpoint.py` | Rebuilder, compaction, fork and pending-action semantics | preserved from v0.0.6 |
-| Scoped project rules | `rules.py` | AGENTS.md discovery, scope, digest, diagnostics | preserved from v0.0.6 |
-| Explicit references and Git context | `references.py` | files/directories, bounded content, read-only Git | preserved from v0.0.6 |
-| Structured plan | `plan.py` | schema, DAG, revision, status, evidence, stale | preserved from v0.0.6 |
-| Interactive session | interactive service/REPL | slash commands including skills | v0.0.7 extension |
-| Durable transaction/undo | in-process rollback metadata | persistent ledger, ignored backups, hash-checked undo | v0.0.6 implementation |
-| Typed config/profile/policy | environment-only `Settings` | TOML + precedence + redacted `config show/validate` | v0.0.6 implementation |
-| Streaming | synchronous Chat Completions | bounded SSE assembly and safe fallback | v0.0.6 implementation |
-| Verification/observability | bounded verifier and session events | shared evidence aggregator and fault injection | v0.0.6 implementation |
-| Incremental context index/search | repository map only | `context/index.py`: digest-checked JSON cache, deterministic search and CLI | v0.0.7 implementation + `tests/test_v007_extensions.py` |
-| Skills and extension manifest | interactive slash commands | `skills.py`: strict Markdown/manifest loader and read-only registry | v0.0.7 implementation + extension tests |
-| Lifecycle hooks | approval observers | `hooks.py`, ToolRegistry/AgentLoop before/after events | v0.0.7 implementation + hook tests |
-| Provider capabilities/health | provider call only | `ModelCapabilities`, `provider health`, offline diagnostics | v0.0.7 implementation + provider tests |
-| F23-F27 research extensions | intentionally out of scope | IDE/autocomplete, browser/computer control, cloud/worktrees, multi-agent/background orchestration, enterprise governance | post-v0.0.6 |
+| Provider-neutral loop, tool schemas, Plan/Act gate | `agent/loop.py`, `tools/base.py` | Preserve rule/reference/plan context and add cancellation checks before dispatch | regression + `test_cancellation_hardening.py` |
+| Workspace-safe read/write/patch/command | `security/workspace.py`, `tools/*` | Apply the same path/approval boundary to profiles, reports and extension caches | workspace, patch and race tests |
+| Session JSONL/checkpoint/recovery | `storage/session.py`, `storage/checkpoint.py` | Cross-process locks/CAS, pending-action and unresolved recovery evidence | lifecycle + recovery tests |
+| Scoped rules, references and structured plans | `rules.py`, `references.py`, `plan.py` | Preserve fingerprints and stale handoff checks | rules/reference/plan regression |
+| Interactive session | interactive service/REPL | Keep `/plan`, `/test`, `/review`, `/compact`, `/undo` and extension commands on shared services | interactive regression |
+| Durable transaction/undo | persistent ledger baseline | Hash-checked partial undo, external-edit protection and review linkage | transaction/recovery tests |
+| Typed config/profile/policy | TOML config baseline | Strict named `.forgecode/tests.toml` argv profiles with quotas and expected exits | `tests/test_test_profiles.py`, CLI profile tests |
+| Verification and test evidence | bounded shell verifier | `TestProfileRunner` setup/main/teardown, cancellation and digest-bounded `test_profile_result` | profile + cancellation tests |
+| Streaming and provider resilience | bounded Chat Completions/SSE | Deadline/cancellation propagation, retry attempts and unresolved worker records | provider/SSE hardening tests |
+| Incremental context index/search | repository map and v0.0.7 index | Symbol extraction, line/language/glob filters, exclusion explanations and stale diagnostics | `test_context_extensions_deep.py`, hardening tests |
+| Skills and extension manifest | strict Markdown/manifest loader | Precedence, schema migration, state enable/disable/remove/restore and executable boundaries | extension deep/hardening tests |
+| Lifecycle hooks | approval observers | Correlation ids, timeout/cleanup history and fail-closed recovery evidence | hook extension tests |
+| Evidence-driven review/security | transaction review baseline | Stable report joining session/plan/context/transaction/test/hook/diff plus four deterministic checks and signed artifacts | `review.py`, review/CLI tests |
+| CLI machine contract | mixed legacy JSON output | Strict JSONL envelope with mutually exclusive `data`/`error`, stderr diagnostics and exit-code mapping | `test_cli_machine_contract.py` |
+| F23-F27 research extensions | intentionally out of scope | IDE/autocomplete, browser/computer control, cloud/worktrees, multi-agent/background orchestration, enterprise governance | explicit post-release boundary |
 
 ## Trust and data boundaries
 
@@ -48,10 +47,11 @@ kinds such as `rules_discovered`, `references_resolved`, `plan_created`,
 `plan_approved`, `context_compacted`, `transaction_committed`,
 `transaction_undo`, `verification`, `recovery_conflict` and `stream_error`.
 
-v0.0.7 also records bounded `context_index`, `context_index_error` and
-`hook_event` evidence. Provider capability metadata is diagnostic only; index
-digests are revalidated before snippets are returned, and skills/hooks cannot
-grant permissions.
+v0.0.8 additionally records `test_profile_result`, `provider_attempt`,
+`provider_retry`, `review` and bounded recovery/unresolved evidence. Provider
+capability metadata is diagnostic only; index digests are revalidated before
+snippets are returned, profiles cannot pass after cancellation/timeout, and
+skills/hooks cannot grant permissions.
 
 The compatible exit-code baseline remains: `0` success/inspect-only success,
 `1` execution/provider/verification or incomplete-audit failure, `2` invalid
@@ -60,14 +60,17 @@ cooperative user cancellation.
 
 ## Acceptance record template
 
-Each fresh scenario records command, exit code, run/plan/transaction ids,
-changed paths, before/after/undo SHA-256, event sequence and verification
-exit code.  Runtime records stay under ignored `.forgecode/` or `tmp/` and
-are never staged.
+Each fresh scenario records a bounded command (or profile name), exit code,
+run/plan/transaction/report ids, changed paths, before/after/undo SHA-256,
+event sequence, check statuses, and verification exit code. Runtime records
+stay under ignored `.forgecode/` or `tmp/` and are never staged; acceptance
+notes contain no private absolute paths, credentials, goal prompts, raw session
+lines or backup bytes.
 
 The release acceptance uses deterministic offline cases for calculator, JSON,
-interactive Plan/Act, compaction, resume/fork, hash conflicts, undo and broken
-SSE. The final release-gate run covers 224 deterministic cases. Six symlink-alias
-tests are platform-conditional and are skipped only when the current Windows
-process lacks symlink creation permission; this Windows process reported all six
-skips for that reason.
+interactive Plan/Act, named test profiles, compaction, resume/fork, hash
+conflicts, undo, cancellation, unresolved providers, review export/verify and
+broken SSE. The release-gate count is recorded in
+`docs/v008-acceptance-report.md` after the final test run. Symlink-alias tests
+are platform-conditional and are skipped only when the current Windows process
+lacks symlink creation permission; the report records the exact skip reason.

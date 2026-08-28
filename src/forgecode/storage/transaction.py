@@ -16,9 +16,12 @@ from pathlib import Path
 import stat
 import tempfile
 import threading
+import time
+from contextlib import contextmanager
 from typing import Any, Iterable
 
-from ..security.workspace import WorkspaceGuard, WorkspaceViolation
+from ..security.json import bounded_json_loads
+from ..security.workspace import WorkspaceGuard, WorkspaceViolation, assert_no_path_alias
 
 TRANSACTION_SCHEMA_VERSION = 1
 MAX_MANIFEST_BYTES = 1_000_000
@@ -128,7 +131,10 @@ class TransactionManifest:
         if self.verification is not None:
             if not isinstance(self.verification, dict):
                 raise TransactionError("verification must be an object")
-            encoded = json.dumps(self.verification, ensure_ascii=False, allow_nan=False, separators=(",", ":"))
+            try:
+                encoded = json.dumps(self.verification, ensure_ascii=False, allow_nan=False, separators=(",", ":"))
+            except (TypeError, ValueError, OverflowError, RecursionError) as exc:
+                raise TransactionError(f"verification evidence is not serializable: {type(exc).__name__}") from exc
             if len(encoded.encode("utf-8")) > 40_000:
                 raise TransactionError("verification evidence exceeds size limit")
 
@@ -190,7 +196,14 @@ def _digest(data: bytes) -> str:
 
 
 def _atomic_bytes(path: Path, data: bytes, *, mode: int | None = None) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
+    path = Path(path)
+    try:
+        assert_no_path_alias(path.parent, message="transaction write directory is a symlink or junction alias")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        assert_no_path_alias(path.parent, message="transaction write directory is a symlink or junction alias")
+        assert_no_path_alias(path, message="transaction target is a symlink or junction alias")
+    except WorkspaceViolation:
+        raise
     descriptor, temporary_name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".forgecode.tmp", dir=path.parent)
     temporary = Path(temporary_name)
     try:
@@ -201,6 +214,9 @@ def _atomic_bytes(path: Path, data: bytes, *, mode: int | None = None) -> None:
             os.fsync(stream.fileno())
         if mode is not None:
             os.chmod(temporary, stat.S_IMODE(mode))
+        assert_no_path_alias(temporary, message="transaction temporary path is a symlink or junction alias")
+        assert_no_path_alias(path.parent, message="transaction write directory is a symlink or junction alias")
+        assert_no_path_alias(path, message="transaction target is a symlink or junction alias")
         os.replace(temporary, path)
     finally:
         if descriptor >= 0:
@@ -224,18 +240,98 @@ class TransactionStore:
         if self.root == guard.root:
             raise TransactionError("transaction root cannot be workspace root")
         self._lock = threading.RLock()
+        # ``_lock`` protects one Python process.  The small re-entrant wrapper
+        # below adds an advisory OS lock so separate ForgeCode workers cannot
+        # race a manifest transition or backup write.
+        self._lock_local = threading.local()
         self.last_list_issues: tuple[str, ...] = ()
+
+    @contextmanager
+    def _mutation_lock(self):
+        """Serialize transaction mutations across threads and processes."""
+        depth = getattr(self._lock_local, "depth", 0)
+        if depth:
+            self._lock_local.depth = depth + 1
+            try:
+                yield
+            finally:
+                self._lock_local.depth = depth
+            return
+        lock_path = self.root / ".ledger.lock"
+        try:
+            assert_no_path_alias(lock_path, message="transaction lock path is a symlink or junction alias")
+            lock_path.parent.mkdir(parents=True, exist_ok=True)
+            handle = lock_path.open("a+b")
+        except (OSError, WorkspaceViolation) as exc:
+            raise TransactionError("cannot open transaction lock") from exc
+        acquired = False
+        try:
+            deadline = time.monotonic() + 10.0
+            if os.name == "nt":
+                import msvcrt
+
+                handle.seek(0, os.SEEK_END)
+                if handle.tell() == 0:
+                    handle.write(b"0")
+                    handle.flush()
+                while not acquired:
+                    try:
+                        handle.seek(0)
+                        msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+                        acquired = True
+                    except OSError:
+                        if time.monotonic() >= deadline:
+                            raise TransactionError("timed out waiting for transaction lock")
+                        time.sleep(0.01)
+            else:
+                import fcntl
+
+                while not acquired:
+                    try:
+                        fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                        acquired = True
+                    except OSError:
+                        if time.monotonic() >= deadline:
+                            raise TransactionError("timed out waiting for transaction lock")
+                        time.sleep(0.01)
+            self._lock_local.depth = 1
+            yield
+        finally:
+            self._lock_local.depth = 0
+            if acquired:
+                try:
+                    if os.name == "nt":
+                        import msvcrt
+
+                        handle.seek(0)
+                        msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+                    else:
+                        import fcntl
+
+                        fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+                except OSError:
+                    pass
+            handle.close()
 
     def _manifest_path(self, transaction_id: str) -> Path:
         if not isinstance(transaction_id, str) or not re_safe_id(transaction_id):
             raise TransactionError("invalid transaction id")
         path = self.manifest_dir / f"{transaction_id}.json"
-        return self.guard.resolve(path)
+        try:
+            return self.guard.resolve(path)
+        except WorkspaceViolation as exc:
+            # Persisted runtime entries are untrusted.  Keep the public
+            # transaction API's error boundary stable even when a manifest
+            # is replaced by a symlink/junction between enumeration and load.
+            raise TransactionError("transaction manifest path is unsafe") from exc
 
     def _blob_path(self, digest: str) -> Path:
         if not _is_digest(digest):
             raise TransactionError("invalid backup digest")
-        return self.guard.resolve(self.blob_dir / digest)
+        try:
+            return self.guard.resolve(self.blob_dir / digest)
+        except WorkspaceViolation as exc:
+            raise TransactionError("transaction blob path is unsafe") from exc
 
     def _validate_runtime_dirs(self) -> None:
         """Validate runtime directories before enumeration or accounting.
@@ -259,10 +355,48 @@ class TransactionStore:
         self._validate_runtime_dirs()
         total = 0
         if self.root.exists():
-            for directory, _names, files in os.walk(self.root, followlinks=False):
+            def reject_walk_error(exc: OSError) -> None:
+                # Quota accounting is part of the transaction safety
+                # boundary.  Silently skipping an unreadable runtime entry
+                # could undercount retained bytes and permit an unsafe write.
+                raise TransactionError("transaction runtime path is unreadable") from exc
+
+            for directory, names, files in os.walk(self.root, topdown=True, followlinks=False, onerror=reject_walk_error):
+                directory_path = Path(directory)
+                try:
+                    resolved_directory = self.guard.resolve(directory_path)
+                except (OSError, ValueError, WorkspaceViolation) as exc:
+                    raise TransactionError("transaction runtime path is unsafe") from exc
+                if resolved_directory != directory_path.absolute():
+                    raise TransactionError("transaction runtime path is unsafe")
+                # ``followlinks=False`` prevents traversal but does not make
+                # a symlink/junction directory safe.  Reject aliases instead
+                # of allowing them to hide bytes outside the workspace.
+                for name in names:
+                    candidate = directory_path / name
+                    try:
+                        resolved = self.guard.resolve(candidate)
+                    except (OSError, ValueError, WorkspaceViolation) as exc:
+                        raise TransactionError("transaction runtime path is unsafe") from exc
+                    if resolved != candidate.absolute():
+                        raise TransactionError("transaction runtime path is unsafe")
                 for name in files:
-                    try: total += (Path(directory) / name).stat().st_size
-                    except OSError: continue
+                    candidate = directory_path / name
+                    try:
+                        resolved = self.guard.resolve(candidate)
+                        if resolved != candidate.absolute():
+                            raise TransactionError("transaction runtime path is unsafe")
+                        # Use lstat after validation so a raced alias cannot
+                        # make quota accounting follow a target outside the
+                        # guarded runtime tree.
+                        metadata = candidate.lstat()
+                        if not stat.S_ISREG(metadata.st_mode):
+                            raise TransactionError("transaction runtime entry is not a regular file")
+                        total += metadata.st_size
+                    except TransactionError:
+                        raise
+                    except (OSError, ValueError, WorkspaceViolation) as exc:
+                        raise TransactionError("transaction runtime path is unsafe") from exc
                     if total > self.max_total_bytes:
                         return total
         return total
@@ -274,8 +408,8 @@ class TransactionStore:
         except (TypeError, ValueError, OverflowError) as exc:
             raise TransactionError(f"transaction manifest is not serializable: {type(exc).__name__}") from exc
 
-    def prepare(self, *, transaction_id: str, run_id: str, tool: str, operations: Iterable[dict[str, Any]], before_bytes: dict[str, bytes | None], preview: str = "", plan_id: str | None = None, plan_item_id: str | None = None) -> TransactionManifest:
-        with self._lock:
+    def prepare(self, *, transaction_id: str, run_id: str, tool: str, operations: Iterable[dict[str, Any]], before_bytes: dict[str, bytes | None], preview: str = "", plan_id: str | None = None, plan_item_id: str | None = None, parent_transaction_id: str | None = None) -> TransactionManifest:
+        with self._lock, self._mutation_lock():
             if self._manifest_path(transaction_id).exists():
                 raise TransactionError("transaction id already exists")
             if not isinstance(run_id, str) or not re_safe_id(run_id):
@@ -329,7 +463,19 @@ class TransactionStore:
             if not built:
                 raise TransactionError("transaction must contain at least one operation")
             safe_preview = preview[:MAX_PREVIEW_CHARS] + ("\n[preview truncated]" if len(preview) > MAX_PREVIEW_CHARS else "") if isinstance(preview, str) else ""
-            manifest = TransactionManifest(transaction_id, run_id, datetime.now(timezone.utc).isoformat(), tool, "prepared", tuple(built), safe_preview, "approved", plan_id, plan_item_id)
+            manifest = TransactionManifest(
+                transaction_id,
+                run_id,
+                datetime.now(timezone.utc).isoformat(),
+                tool,
+                "prepared",
+                tuple(built),
+                safe_preview,
+                "approved",
+                plan_id,
+                plan_item_id,
+                parent_transaction_id=parent_transaction_id,
+            )
             manifest_bytes = self._manifest_bytes(manifest)
             if len(manifest_bytes) > MAX_MANIFEST_BYTES:
                 raise TransactionError("transaction manifest exceeds size limit")
@@ -357,6 +503,10 @@ class TransactionStore:
             return manifest
 
     def commit(self, transaction_id: str) -> TransactionManifest:
+        with self._lock, self._mutation_lock():
+            return self._commit_unlocked(transaction_id)
+
+    def _commit_unlocked(self, transaction_id: str) -> TransactionManifest:
         manifest = self.load(transaction_id)
         if manifest.state != "prepared":
             raise TransactionError(f"cannot commit transaction in state {manifest.state}")
@@ -365,20 +515,72 @@ class TransactionStore:
             if current != operation.after_sha256:
                 raise TransactionError(f"transaction after hash mismatch: {operation.path}")
         committed = replace(manifest, state="committed")
-        self._save(committed)
+        self._save_cas(committed, expected=manifest)
         return committed
 
     def fail(self, transaction_id: str, error: str, *, recovery_required: bool = False) -> TransactionManifest:
+        with self._lock, self._mutation_lock():
+            return self._fail_unlocked(transaction_id, error, recovery_required=recovery_required)
+
+    def _fail_unlocked(self, transaction_id: str, error: str, *, recovery_required: bool = False) -> TransactionManifest:
         manifest = self.load(transaction_id)
+        if manifest.state != "prepared":
+            raise TransactionError(f"cannot fail transaction in state {manifest.state}")
         failed = replace(manifest, state="recovery_required" if recovery_required else "failed", error=str(error)[:1_000])
-        self._save(failed)
+        self._save_cas(failed, expected=manifest)
         return failed
+
+    def _mark_recovery(self, transaction_id: str, error: str) -> TransactionManifest | None:
+        """Durably mark an interrupted transaction as needing recovery.
+
+        ``fail()`` intentionally accepts only a prepared manifest: callers
+        must not use a late error to downgrade a transaction that has already
+        been committed.  Undo has one exceptional crash window, however: its
+        side effects and child manifest may be committed before the parent
+        manifest can be finalized.  In that window the child is no longer
+        prepared, so the ordinary failure transition cannot record the
+        uncertainty.  This private, CAS-guarded transition is used only by
+        that recovery path and never overwrites a newer concurrent record.
+
+        A ``None`` result means the manifest disappeared or changed while we
+        were recording evidence.  The original exception remains the public
+        failure; callers must treat the missing marker as unresolved too.
+        """
+        try:
+            with self._lock, self._mutation_lock():
+                manifest = self.load(transaction_id)
+                if manifest.state == "recovery_required":
+                    return manifest
+                # An ``undone`` child is already finalized and does not need
+                # promotion.  Never downgrade it merely because a caller
+                # observed a late exception.
+                if manifest.state == "undone":
+                    return manifest
+                updated = replace(manifest, state="recovery_required", error=str(error)[:1_000])
+                self._save_cas(updated, expected=manifest)
+                return updated
+        except Exception:
+            return None
 
     def _save(self, manifest: TransactionManifest) -> None:
         data = self._manifest_bytes(manifest)
         if len(data) > MAX_MANIFEST_BYTES:
             raise TransactionError("transaction manifest exceeds size limit")
         _atomic_bytes(self._manifest_path(manifest.transaction_id), data)
+
+    def _save_cas(self, manifest: TransactionManifest, *, expected: TransactionManifest | None = None) -> None:
+        """Save a manifest only if the on-disk predecessor is unchanged."""
+        path = self._manifest_path(manifest.transaction_id)
+        if expected is not None:
+            try:
+                assert_no_path_alias(path, message="transaction manifest path is a symlink or junction alias")
+                current_bytes = path.read_bytes()
+                assert_no_path_alias(path, message="transaction manifest path is a symlink or junction alias")
+            except (OSError, WorkspaceViolation) as exc:
+                raise TransactionError("transaction manifest disappeared during update") from exc
+            if current_bytes != self._manifest_bytes(expected):
+                raise TransactionError("transaction manifest changed concurrently")
+        self._save(manifest)
 
     def load(self, transaction_id: str) -> TransactionManifest:
         path = self._manifest_path(transaction_id)
@@ -390,7 +592,8 @@ class TransactionStore:
                 raise TransactionError("transaction manifest exceeds size limit")
             if (before_stat.st_size, before_stat.st_mtime_ns, getattr(before_stat, "st_ino", 0)) != (after_stat.st_size, after_stat.st_mtime_ns, getattr(after_stat, "st_ino", 0)):
                 raise TransactionError("transaction manifest changed while it was read")
-            raw = json.loads(raw_bytes, parse_constant=_reject_nonfinite_json)
+            assert_no_path_alias(path, message="transaction manifest path is a symlink or junction alias")
+            raw = bounded_json_loads(raw_bytes, parse_constant=_reject_nonfinite_json)
         except FileNotFoundError as exc:
             raise TransactionError(f"transaction not found: {transaction_id}") from exc
         except (OSError, UnicodeError, json.JSONDecodeError, ValueError) as exc:
@@ -457,16 +660,20 @@ class TransactionStore:
         return payload
 
     def attach_verification(self, transaction_id: str, verification: dict[str, Any]) -> TransactionManifest:
+        with self._lock, self._mutation_lock():
+            return self._attach_verification_unlocked(transaction_id, verification)
+
+    def _attach_verification_unlocked(self, transaction_id: str, verification: dict[str, Any]) -> TransactionManifest:
         manifest = self.load(transaction_id)
         try:
-            safe = json.loads(json.dumps(verification, ensure_ascii=False, default=str, allow_nan=False))
+            safe = bounded_json_loads(json.dumps(verification, ensure_ascii=False, default=str, allow_nan=False))
             encoded = json.dumps(safe, ensure_ascii=False, allow_nan=False)
-        except (TypeError, ValueError) as exc:
+        except (TypeError, ValueError, OverflowError, RecursionError) as exc:
             raise TransactionError(f"verification evidence is not serializable: {type(exc).__name__}") from exc
         if len(encoded) > 40_000:
             safe = {"truncated": True, "preview": encoded[:39_000]}
         updated = replace(manifest, verification=safe)
-        self._save(updated)
+        self._save_cas(updated, expected=manifest)
         return updated
 
     def preview_undo(self, transaction_id: str = "latest") -> UndoPreview:
@@ -501,6 +708,10 @@ class TransactionStore:
         return UndoPreview(manifest.transaction_id, not conflicts, tuple(conflicts), preview, tuple(reverse))
 
     def undo(self, transaction_id: str, *, approval: Any, run_id: str, plan_id: str | None = None, plan_item_id: str | None = None) -> TransactionManifest:
+        with self._lock, self._mutation_lock():
+            return self._undo_unlocked(transaction_id, approval=approval, run_id=run_id, plan_id=plan_id, plan_item_id=plan_item_id)
+
+    def _undo_unlocked(self, transaction_id: str, *, approval: Any, run_id: str, plan_id: str | None = None, plan_item_id: str | None = None) -> TransactionManifest:
         preview = self.preview_undo(transaction_id)
         if not preview.available:
             raise TransactionError("undo conflict: " + "; ".join(preview.conflicts))
@@ -531,51 +742,163 @@ class TransactionStore:
             data = self._read_blob(reverse.backup_sha256) if reverse.backup_sha256 else None
             target_bytes[reverse.path] = data
             raw_operations.append(asdict(reverse))
-        undo_manifest = self.prepare(transaction_id=undo_id, run_id=run_id, tool="undo_transaction", operations=raw_operations, before_bytes=before_map, preview=preview.preview, plan_id=plan_id, plan_item_id=plan_item_id)
-        written: list[tuple[Path, bytes | None, int | None]] = []
+        # Persist the parent link in the *prepared* child manifest.  A process
+        # crash between the child commit and parent update must still leave a
+        # discoverable relation; adding this field after commit created an
+        # unjoinable window in the old implementation.
+        undo_manifest = self.prepare(
+            transaction_id=undo_id,
+            run_id=run_id,
+            tool="undo_transaction",
+            operations=raw_operations,
+            before_bytes=before_map,
+            preview=preview.preview,
+            plan_id=plan_id,
+            plan_item_id=plan_item_id,
+            parent_transaction_id=original.transaction_id,
+        )
+        # Keep the digest we intended to leave after each write.  If an
+        # external process changes a file while a multi-file undo is in
+        # progress, rollback must skip that path instead of restoring stale
+        # bytes over the external edit.
+        written: list[tuple[str, Path, bytes | None, int | None, str | None]] = []
+        undo_committed = False
         try:
             for reverse in preview.operations:
                 path = self.guard.resolve(reverse.path)
                 old = path.read_bytes() if path.is_file() else None
                 old_mode = path.stat().st_mode if path.exists() else None
-                written.append((path, old, old_mode))
+                # Revalidate immediately before the side effect.  The
+                # approval-time check above is intentionally not sufficient.
+                current_digest = _digest(old) if old is not None else None
+                if current_digest != reverse.before_sha256:
+                    raise TransactionError(f"undo conflict: {reverse.path} changed before write")
                 data = target_bytes[reverse.path]
+                expected_target = reverse.after_sha256
+                written.append((reverse.path, path, old, old_mode, expected_target))
                 if data is None:
                     if path.exists(): path.unlink()
                 else:
                     _atomic_bytes(path, data, mode=reverse.mode)
-            undo_manifest = self.commit(undo_id)
-            undo_manifest = replace(undo_manifest, parent_transaction_id=original.transaction_id)
-            self._save(undo_manifest)
-            self._save(replace(original, state="undone", rolled_back_by=undo_id))
+                observed = self._current_digest(reverse.path)
+                if observed != expected_target:
+                    raise TransactionError(f"undo conflict: {reverse.path} changed during write")
+            # ``commit`` is the point at which the child transaction becomes
+            # durable evidence that all target bytes equal the undo result.
+            # If a fault is reported after the CAS write, inspect the ledger
+            # before deciding whether it is safe to restore the old bytes.
+            try:
+                undo_manifest = self.commit(undo_id)
+                undo_committed = True
+            except Exception:
+                try:
+                    undo_committed = self.load(undo_id).state == "committed"
+                except Exception:
+                    undo_committed = False
+                raise
+            self._save_cas(replace(original, state="undone", rolled_back_by=undo_id), expected=original)
             return undo_manifest
         except Exception as exc:
-            recovery_required = False
-            for path, data, mode in reversed(written):
+            if not undo_committed:
+                # A CAS implementation may have persisted the committed
+                # child and raised while returning (for example, a crash
+                # injection after fsync).  Never roll files back in that
+                # case: doing so would contradict durable child evidence.
                 try:
+                    undo_committed = self.load(undo_id).state == "committed"
+                except Exception:
+                    undo_committed = False
+            if undo_committed:
+                reason = f"{type(exc).__name__}: {exc}"
+                # If both records made it to their terminal states despite a
+                # late exception, the operation is safely complete and can be
+                # reported idempotently.  This handles an exception raised
+                # after an atomic manifest replacement rather than hiding a
+                # successful undo behind a false failure.
+                try:
+                    observed_child = self.load(undo_id)
+                    observed_parent = self.load(original.transaction_id)
+                    if (
+                        observed_child.state == "committed"
+                        and observed_child.parent_transaction_id == original.transaction_id
+                        and observed_parent.state == "undone"
+                        and observed_parent.rolled_back_by == undo_id
+                    ):
+                        return observed_child
+                except Exception:
+                    pass
+                # The bytes are already the undo target.  Mark both sides as
+                # recovery-required where CAS still proves they are the
+                # records we observed; do not attempt a compensating write.
+                self._mark_recovery(undo_id, f"undo committed; metadata reconciliation required: {reason}")
+                self._mark_recovery(original.transaction_id, f"undo child {undo_id} committed; parent linkage requires recovery: {reason}")
+                raise TransactionError(f"undo recovery conflict: {type(exc).__name__}: {exc}") from exc
+            recovery_required = False
+            for relative, path, data, mode, expected_target in reversed(written):
+                try:
+                    # Only restore our own expected output.  A digest mismatch
+                    # means another actor touched the file; preserve it and
+                    # leave durable recovery evidence for an operator.
+                    if self._current_digest(relative) != expected_target:
+                        recovery_required = True
+                        continue
                     if data is None:
                         if path.exists(): path.unlink()
-                    else: _atomic_bytes(path, data, mode=mode)
-                except OSError:
+                    else:
+                        _atomic_bytes(path, data, mode=mode)
+                except (OSError, TransactionError, WorkspaceViolation):
                     recovery_required = True
-            try: self.fail(undo_id, f"{type(exc).__name__}: {exc}", recovery_required=recovery_required)
-            except Exception: pass
+            error = f"{type(exc).__name__}: {exc}"
+            if recovery_required:
+                # The ordinary prepared->failed transition records a clean
+                # rollback.  If any target could not be proven restored, use
+                # the explicit recovery marker; it also handles the window
+                # where commit() already moved the undo manifest to
+                # ``committed`` before parent finalization failed.
+                self._mark_recovery(undo_id, error)
+            else:
+                try:
+                    self.fail(undo_id, error, recovery_required=False)
+                except Exception:
+                    # A commit/CAS may have won a race just before the
+                    # exception was observed.  Do not leave a committed
+                    # child looking successful after its effects were rolled
+                    # back; promote it to recovery evidence when possible.
+                    self._mark_recovery(undo_id, error)
             raise TransactionError(f"undo failed: {type(exc).__name__}: {exc}") from exc
 
     def _current_digest(self, relative: str) -> str | None:
         path = self.guard.resolve(relative)
-        if not path.exists(): return None
-        if not path.is_file(): raise TransactionError(f"transaction path is not a file: {relative}")
-        return _digest(path.read_bytes())
+        try:
+            assert_no_path_alias(path, message="transaction target is a symlink or junction alias")
+            if not path.exists(): return None
+            if not path.is_file(): raise TransactionError(f"transaction path is not a file: {relative}")
+            before = path.stat()
+            data = path.read_bytes()
+            after = path.stat()
+            assert_no_path_alias(path, message="transaction target is a symlink or junction alias")
+        except FileNotFoundError:
+            return None
+        except WorkspaceViolation as exc:
+            raise TransactionError("transaction target path is unsafe") from exc
+        if (before.st_size, before.st_mtime_ns, getattr(before, "st_ino", 0)) != (after.st_size, after.st_mtime_ns, getattr(after, "st_ino", 0)):
+            raise TransactionError(f"transaction target changed while it was read: {relative}")
+        return _digest(data)
 
     def _read_blob(self, digest: str | None) -> bytes:
         if digest is None: raise TransactionError("backup blob is missing")
         try:
             path = self._blob_path(digest)
+            assert_no_path_alias(path, message="transaction blob path is a symlink or junction alias")
             before_stat = path.stat()
+            if not path.is_file() or before_stat.st_size > self.max_total_bytes:
+                raise TransactionError("backup blob is not a regular file or exceeds retention limit")
             data = path.read_bytes()
             after_stat = path.stat()
-        except OSError as exc: raise TransactionError("backup blob is missing or unreadable") from exc
+            assert_no_path_alias(path, message="transaction blob path is a symlink or junction alias")
+        except TransactionError:
+            raise
+        except (OSError, WorkspaceViolation) as exc: raise TransactionError("backup blob is missing or unreadable") from exc
         if (before_stat.st_size, before_stat.st_mtime_ns, getattr(before_stat, "st_ino", 0)) != (after_stat.st_size, after_stat.st_mtime_ns, getattr(after_stat, "st_ino", 0)):
             raise TransactionError("backup blob changed while it was read")
         if _digest(data) != digest: raise TransactionError("backup blob failed hash validation")

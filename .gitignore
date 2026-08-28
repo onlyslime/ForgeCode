@@ -33,6 +33,9 @@ sessions/
 # Persistent goal prompts (kept locally, never committed)
 docs/goals/*
 
+# Local strategy and status notes (kept locally, never committed)
+docs/strategy/
+
 # OS and editor files
 .DS_Store
 Thumbs.db

@@ -21,6 +21,7 @@ from typing import Any, Iterable, Iterator
 import uuid
 
 from ..security.redaction import redact_value
+from ..security.json import bounded_json_loads as _decode_bounded_json
 from ..security.workspace import WorkspaceViolation, assert_no_path_alias
 
 
@@ -34,6 +35,14 @@ class SessionFormatError(ValueError):
 
 def _reject_nonfinite_json(value: str) -> None:
     raise ValueError(f"non-finite JSON value is not allowed: {value}")
+
+
+def _bounded_json_loads(value: str) -> Any:
+    """Decode one bounded JSON value and normalize recursion failures."""
+    try:
+        return _decode_bounded_json(value, parse_constant=_reject_nonfinite_json)
+    except ValueError as exc:
+        raise SessionFormatError(str(exc)) from exc
 
 
 @dataclass(frozen=True)
@@ -168,7 +177,37 @@ class SessionStore:
         self.mode = mode
         self._lock = threading.RLock()
         self._next_sequence = self._discover_next_sequence()
+        # Full-stream validation is deliberately performed before appending
+        # to an existing log, but rereading the complete stream for every
+        # event makes a short run unnecessarily expensive (especially on
+        # Windows, where each read also walks reparse-point metadata).  Keep
+        # the metadata observed after the last validated append.  The
+        # interprocess lock serializes writers; a size/mtime/ctime/inode
+        # change from another writer invalidates this cache and forces the
+        # complete consistency scan again.  This is an optimization only:
+        # read/inspection paths always perform their full validation.
+        self._validated_signature: tuple[int, int, int, int, int] | None = None
         self.last_read_issues: tuple[SessionReadIssue, ...] = ()
+
+    def _file_signature(self) -> tuple[int, int, int, int, int] | None:
+        """Return a bounded identity for the session stream, or ``None``.
+
+        ``st_ino``/``st_dev`` distinguish replacement files while size and
+        nanosecond timestamps detect ordinary external appends/edits.  A
+        failed stat is treated as changed so the caller takes the conservative
+        validation path.
+        """
+        try:
+            stat = self.path.stat()
+        except OSError:
+            return None
+        return (
+            int(getattr(stat, "st_dev", 0)),
+            int(getattr(stat, "st_ino", 0)),
+            int(stat.st_size),
+            int(getattr(stat, "st_mtime_ns", 0)),
+            int(getattr(stat, "st_ctime_ns", 0)),
+        )
 
     def _discover_next_sequence(self) -> int:
         if not self.path.is_file():
@@ -179,7 +218,7 @@ class SessionStore:
             with self.path.open(encoding="utf-8") as stream:
                 for line in stream:
                     try:
-                        raw = json.loads(line, parse_constant=_reject_nonfinite_json)
+                        raw = _bounded_json_loads(line)
                         sequence = raw.get("sequence", 0) if isinstance(raw, dict) else 0
                         if isinstance(raw, dict) and "sequence" not in raw:
                             legacy_count += 1
@@ -199,7 +238,7 @@ class SessionStore:
         try:
             with self.path.open(encoding="utf-8") as stream:
                 for line in stream:
-                    raw = json.loads(line, parse_constant=_reject_nonfinite_json)
+                    raw = _bounded_json_loads(line)
                     value = raw.get("run_id") if isinstance(raw, dict) else None
                     if isinstance(value, str) and value:
                         return value
@@ -218,15 +257,26 @@ class SessionStore:
         if not isinstance(payload, dict):
             raise ValueError("event payload must be an object")
         with self._lock, self._interprocess_lock():
-            # Another process may have appended since this store was created;
-            # recalculate the sequence while holding the OS-level lock so two
-            # writers cannot emit duplicate sequence numbers.
-            self._next_sequence = max(self._next_sequence, self._discover_next_sequence())
+            # Validate the lexical path before any metadata lookup.  In
+            # particular, do not let the signature stat follow a symlink or
+            # junction that was swapped in by an untrusted writer.
             try:
                 assert_no_path_alias(self.path, message="session path is a symlink or junction alias")
             except WorkspaceViolation as exc:
                 raise SessionFormatError(str(exc)) from exc
-            self._validate_append_target()
+            # Another process may have appended since this store was created;
+            # recalculate the sequence while holding the OS-level lock so two
+            # writers cannot emit duplicate sequence numbers.
+            current_signature = self._file_signature()
+            # A failed stat is represented by ``None`` and must be treated as
+            # changed (``None == None`` would otherwise accidentally bypass
+            # the conservative validation path for a newly created or
+            # temporarily unavailable stream).
+            stream_changed = current_signature is None or current_signature != self._validated_signature
+            if stream_changed:
+                self._next_sequence = max(self._next_sequence, self._discover_next_sequence())
+            if stream_changed:
+                self._validate_append_target()
             # Normalize first so cyclic containers and non-JSON values cannot
             # recurse through the redaction walker or reach json.dumps.
             safe_payload = bounded(redact_value(bounded(payload), self.secrets))
@@ -250,12 +300,25 @@ class SessionStore:
                         high = middle - 1
                 event = SessionEvent.create(kind.strip(), best_payload, run_id=self.run_id, sequence=sequence, mode=selected_mode, operation_id=operation_id, outcome=outcome, error_code=error_code)
                 serialized = json.dumps(asdict(event), ensure_ascii=False, allow_nan=False, separators=(",", ":"))
+                # The configured bound also applies to the envelope itself.
+                # Very small limits (the constructor intentionally accepts
+                # values down to 128 for compatibility) cannot represent a
+                # valid v1 event, even after payload truncation.  Refuse the
+                # append instead of writing a line that every subsequent read
+                # would classify as corrupt/oversized.
+                if len(serialized) > self.max_event_chars:
+                    raise ValueError("max_event_chars is too small for the event envelope")
             self.path.parent.mkdir(parents=True, exist_ok=True)
             with self.path.open("a", encoding="utf-8", newline="\n") as stream:
                 stream.write(serialized + "\n")
                 stream.flush()
                 os.fsync(stream.fileno())
             self._next_sequence += 1
+            # Capture the post-write identity while still holding the
+            # interprocess lock.  A following append by this store can skip a
+            # redundant full scan; another process changes the signature and
+            # is validated conservatively on its next append.
+            self._validated_signature = self._file_signature()
             return event
 
     @contextmanager
@@ -344,6 +407,12 @@ class SessionStore:
             raise SessionFormatError("cannot append with a different or mixed run id")
 
     def read_with_issues(self, *, strict: bool = False) -> SessionReadResult:
+        # A read is an observation boundary.  Even when the stream's
+        # metadata appears unchanged, a caller may have discovered an
+        # in-place corruption or may be racing an external writer.  Force the
+        # next append to perform the conservative full validation; a clean
+        # append will establish a new cache signature after its atomic write.
+        self._validated_signature = None
         events: list[SessionEvent] = []
         event_lines: list[int] = []
         issues: list[SessionReadIssue] = []
@@ -374,7 +443,11 @@ class SessionStore:
                 return SessionReadResult((), (issue,))
             raw_bytes = self.path.read_bytes()
             after_stat = self.path.stat()
-        except (OSError, UnicodeError) as exc:
+            # Revalidate the directory entry after the bytes are captured.
+            # An alias swap during a review/inspection must become a
+            # structured issue, never a trusted late stream.
+            assert_no_path_alias(self.path, message="session path is a symlink or junction alias")
+        except (OSError, UnicodeError, WorkspaceViolation) as exc:
             issue = SessionReadIssue(0, f"cannot read session: {type(exc).__name__}: {exc}")
             self.last_read_issues = (issue,)
             if strict:
@@ -415,7 +488,7 @@ class SessionStore:
                         raise SessionFormatError(f"line {line_number}: {issue.message}")
                     break
                 try:
-                    raw = json.loads(line, parse_constant=_reject_nonfinite_json)
+                    raw = _bounded_json_loads(line)
                     if not isinstance(raw, dict):
                         raise SessionFormatError("event must be an object")
                     if "schema_version" not in raw:

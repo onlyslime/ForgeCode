@@ -245,9 +245,15 @@ class WriteFileTool:
         approval_arguments = {"path": path_value, "content": preview, "transaction_id": transaction_id, "operation": "update" if before_exists else "create"}
         if not context.request_approval(self.definition.name, approval_arguments):
             return ToolResult(False, "write_file denied by approval policy", {"error": "approval_denied", "approval": "denied", "transaction_id": transaction_id})
+        # Approval callbacks are untrusted and may race with cancellation.
+        # Never prepare a transaction or touch the target after cancellation.
+        if context.cancelled:
+            return ToolResult(False, "write_file cancelled after approval", {"error": "cancelled", "approval": "approved", "cancellation_reason": context.cancellation_reason, "transaction_id": transaction_id, "path": path_value})
         stale = context.deny_if_stale(self.definition.name)
         if stale:
             return stale
+        if context.cancelled:
+            return ToolResult(False, "write_file cancelled before transaction preparation", {"error": "cancelled", "approval": "approved", "cancellation_reason": context.cancellation_reason, "transaction_id": transaction_id, "path": path_value})
         current_exists = path.exists()
         current_hash = hashlib.sha256(path.read_bytes()).hexdigest() if current_exists and path.is_file() else None
         current_stat = path.stat() if current_exists else None
@@ -270,6 +276,13 @@ class WriteFileTool:
                 )
             except Exception as exc:
                 return ToolResult(False, f"transaction could not be prepared: {type(exc).__name__}", {"error": "transaction_prepare_failed", "transaction_id": transaction_id})
+        if context.cancelled:
+            if transaction_manifest is not None:
+                try:
+                    context.transaction_store.fail(transaction_id, "cancelled before write", recovery_required=False)
+                except Exception:
+                    pass
+            return ToolResult(False, "write_file cancelled before write", {"error": "cancelled", "approval": "approved", "cancellation_reason": context.cancellation_reason, "transaction_id": transaction_id, "path": path_value})
         try:
             path.parent.mkdir(parents=True, exist_ok=True)
             descriptor, temporary_name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".forgecode.tmp", dir=path.parent)
