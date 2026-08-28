@@ -96,6 +96,20 @@ def session_list(*, workspace: str | None = None, state: str | None = None, limi
     return list(stream([request], raise_for_status=raise_for_status))
 
 
+def session_tree(*, workspace: str | None = None, limit: int = 200, request_id: str | int | None = None, raise_for_status: bool = False) -> list[dict[str, Any]]:
+    """Return bounded parent/child session metadata through the RPC contract."""
+    if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 200:
+        raise ValueError("limit must be between 1 and 200")
+    params: dict[str, Any] = {"limit": limit}
+    if workspace is not None:
+        if not isinstance(workspace, str) or not workspace or len(workspace) > 1_000 or any(ch in workspace for ch in "\r\n"):
+            raise ValueError("workspace must be bounded newline-safe text")
+        params["workspace"] = workspace
+    request = {"method": "session.tree", "params": params}
+    if request_id is not None: request["id"] = request_id
+    return list(stream([request], raise_for_status=raise_for_status))
+
+
 def stream(requests: Iterable[dict[str, Any]], *, raise_for_status: bool = False, max_items: int = 1024, max_response_bytes: int = 2_000_000) -> Iterable[dict[str, Any]]:
     """Process JSON-compatible RPC requests in order."""
     if isinstance(max_items, bool) or max_items < 1 or max_items > 100_000:
@@ -130,7 +144,7 @@ def stream(requests: Iterable[dict[str, Any]], *, raise_for_status: bool = False
         yield envelope
 
 
-__all__ = ["ForgeCodeError", "invoke", "session_result", "session_wait", "session_list", "stream"]
+__all__ = ["ForgeCodeError", "invoke", "session_result", "session_wait", "session_list", "session_tree", "stream"]
 
 
 class EmbeddedSession:

@@ -44,6 +44,9 @@ the handle/workspace and returning the same `session.result` envelope with the
 existing typed error and response-size limits.
 It is also exported as `forgecode.session_result_embedded` for callers that
 use the package-level embedding API.
+Python embedding also exposes `session_list()` and `session_tree()` (including
+the package-level `session_list_embedded` and `session_tree_embedded` aliases)
+with the same bounded limit, state, and workspace validation as Node.
 The Node `invokeStream` helper similarly caps diagnostic stderr via
 `maxStderrBytes` (256 KiB by default), and `interactive` retains only a
 bounded `maxEvents` window (2,048 by default).

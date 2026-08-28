@@ -14,6 +14,8 @@ slice.
   RPC parameters; this compatibility fix remains grouped under v0.0.33.
 - Aligned direct workspace options across Node session open/status/result/wait,
   events, control, inspect, and run helpers; grouped under v0.0.33.
+- Added Python `session_tree()` and `session_tree_embedded` for parity with the
+  CLI, RPC, and Node session-tree discovery contract; grouped under v0.0.33.
 
 ## v0.0.32 — 2026-08-29
 
