@@ -64,6 +64,19 @@ def test_session_normalizes_odd_values_and_redacts_nested_secrets(tmp_path: Path
     assert "circular" in event.payload["cycle"][0]
 
 
+def test_session_read_rejects_non_finite_json_payload(tmp_path: Path):
+    path = tmp_path / "nonfinite.jsonl"
+    path.write_text(
+        '{"kind":"x","payload":{"value":NaN},"timestamp":"2026-01-01T00:00:00+00:00",'
+        '"schema_version":1,"run_id":"run","sequence":1}\n',
+        encoding="utf-8",
+    )
+    result = SessionStore(path).read_with_issues()
+    assert not result.events and any("non-finite" in issue.message for issue in result.issues)
+    with pytest.raises(SessionFormatError, match="non-finite"):
+        SessionStore(path).read_with_issues(strict=True)
+
+
 def test_new_store_continues_sequence_after_existing_events(tmp_path: Path):
     path = tmp_path / "run.jsonl"
     first = SessionStore(path, run_id="run-1")

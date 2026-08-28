@@ -11,11 +11,13 @@ import json
 import os
 import random
 import math
+import threading
 from typing import Any, Iterable, Protocol, Sequence
 from urllib import error, request
+from urllib.parse import urlsplit
 
 from ..security.redaction import redact_text
-from .protocol import Message, ModelResponse, ProviderError, ToolCall
+from .protocol import Message, ModelCapabilities, ModelResponse, ProviderError, ToolCall
 
 
 def _reject_nonfinite(value: str) -> None:
@@ -50,10 +52,10 @@ def _validate_json_value(value: Any, *, depth: int = 0, budget: list[int] | None
 
 
 class JsonTransport(Protocol):
-    def post_json(self, url: str, headers: dict[str, str], body: bytes, timeout: float) -> tuple[int, bytes]:
+    def post_json(self, url: str, headers: dict[str, str], body: bytes, timeout: float) -> tuple[int, bytes] | tuple[int, bytes, dict[str, str]]:
         """Send a JSON POST and return status code plus response bytes."""
 
-    def post_stream(self, url: str, headers: dict[str, str], body: bytes, timeout: float) -> tuple[int, Iterable[bytes]]:
+    def post_stream(self, url: str, headers: dict[str, str], body: bytes, timeout: float) -> tuple[int, Iterable[bytes]] | tuple[int, Iterable[bytes], dict[str, str]]:
         """Optional SSE transport. Implementations may omit this method."""
 
 
@@ -64,7 +66,81 @@ class UrllibTransport:
             with request.urlopen(http_request, timeout=timeout) as response:
                 return response.status, response.read()
         except error.HTTPError as exc:
-            return exc.code, exc.read()
+            return exc.code, exc.read(), dict(exc.headers.items()) if exc.headers else {}
+
+    def post_stream(self, url: str, headers: dict[str, str], body: bytes, timeout: float) -> tuple[int, Iterable[bytes], dict[str, str]]:
+        """Open a streaming response and keep it alive for the iterator."""
+        http_request = request.Request(url, data=body, headers=headers, method="POST")
+        try:
+            response = request.urlopen(http_request, timeout=timeout)
+        except error.HTTPError as exc:
+            return exc.code, iter((exc.read(),)), dict(exc.headers.items()) if exc.headers else {}
+        response_headers = dict(response.headers.items()) if response.headers else {}
+
+        def chunks() -> Iterable[bytes]:
+            try:
+                while True:
+                    chunk = response.readline()
+                    if not chunk:
+                        break
+                    yield chunk
+            finally:
+                response.close()
+
+        return response.status, chunks(), response_headers
+
+
+def _unpack_transport_result(result: Any) -> tuple[Any, Any, dict[str, str]]:
+    """Accept legacy ``(status, payload)`` and optional header-bearing results."""
+    if not isinstance(result, tuple) or len(result) not in {2, 3}:
+        raise ProviderError("model transport returned an invalid response tuple", category="transport_error")
+    status, payload = result[0], result[1]
+    raw_headers = result[2] if len(result) == 3 else {}
+    if raw_headers is None:
+        raw_headers = {}
+    if not isinstance(raw_headers, dict):
+        raise ProviderError("model transport returned invalid response headers", category="transport_error")
+    headers = {str(key).lower(): str(value) for key, value in raw_headers.items() if isinstance(key, str)}
+    return status, payload, headers
+
+
+async def _run_sync_bounded(function: Any, *args: Any, timeout: float, **kwargs: Any) -> Any:
+    """Run one blocking transport/parser call with a real async deadline.
+
+    ``asyncio.to_thread`` uses the event loop's executor; cancelling it still
+    makes ``asyncio.run`` wait for a misbehaving worker during shutdown.  A
+    daemon thread lets the caller return at the configured deadline while the
+    untrusted blocking operation is detached.  The worker never receives
+    authorization or mutable agent state, and late results are discarded.
+    """
+    loop = asyncio.get_running_loop()
+    result_future: asyncio.Future[Any] = loop.create_future()
+
+    def publish(callback: Any, value: Any) -> None:
+        try:
+            if not result_future.done():
+                callback(value)
+        except RuntimeError:
+            # The event loop may have closed after a timeout/cancellation.
+            return
+
+    def notify(callback: Any, value: Any) -> None:
+        try:
+            loop.call_soon_threadsafe(publish, callback, value)
+        except RuntimeError:
+            # The loop may be closed after the bounded wait returned.
+            return
+
+    def worker() -> None:
+        try:
+            value = function(*args, **kwargs)
+        except BaseException as exc:
+            notify(result_future.set_exception, exc)
+        else:
+            notify(result_future.set_result, value)
+
+    threading.Thread(target=worker, name="forgecode-transport", daemon=True).start()
+    return await asyncio.wait_for(result_future, timeout=timeout)
 
 
 def _redact(text: str, secret: str | None = None) -> str:
@@ -242,8 +318,8 @@ def _sse_json_events(chunks: Iterable[bytes], *, max_bytes: int = 4_000_000, max
                 raise ProviderError("SSE data appeared after [DONE]", category="stream_protocol_error")
             try:
                 decoded = data.decode("utf-8")
-                payload = json.loads(decoded)
-            except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+                payload = json.loads(decoded, parse_constant=_reject_nonfinite)
+            except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as exc:
                 raise ProviderError("malformed SSE JSON frame", category="stream_protocol_error") from exc
             if not isinstance(payload, dict):
                 raise ProviderError("SSE frame must contain a JSON object", category="stream_protocol_error")
@@ -389,6 +465,16 @@ class OpenAICompatibleProvider:
             raise ProviderError("FORGECODE_MODEL is not configured", category="configuration_error")
         if not base_url:
             raise ProviderError("FORGECODE_BASE_URL is empty", category="configuration_error")
+        if not isinstance(base_url, str) or len(base_url) > 512 or any(character.isspace() for character in base_url):
+            raise ProviderError("FORGECODE_BASE_URL is invalid", category="configuration_error")
+        try:
+            parsed_url = urlsplit(base_url)
+            hostname = parsed_url.hostname
+            _ = parsed_url.port
+        except ValueError as exc:
+            raise ProviderError("FORGECODE_BASE_URL is invalid", category="configuration_error") from exc
+        if parsed_url.scheme not in {"http", "https"} or not parsed_url.netloc or hostname is None or parsed_url.username is not None or parsed_url.password is not None or parsed_url.query or parsed_url.fragment:
+            raise ProviderError("FORGECODE_BASE_URL must be a credential-free http(s) URL", category="configuration_error")
         if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or not math.isfinite(timeout) or timeout <= 0:
             raise ValueError("timeout must be positive")
         if isinstance(max_response_bytes, bool) or not isinstance(max_response_bytes, int) or max_response_bytes < 1:
@@ -411,6 +497,22 @@ class OpenAICompatibleProvider:
         self.streaming = bool(streaming)
         self.stream_required = bool(stream_required)
         self.retry_events: list[dict[str, Any]] = []
+
+    @property
+    def capabilities(self) -> ModelCapabilities:
+        return ModelCapabilities(streaming=self.streaming, max_input_chars=self.max_request_bytes, max_output_chars=self.max_response_bytes)
+
+    def health(self) -> dict[str, Any]:
+        """Return offline configuration diagnostics; never performs a request."""
+        return {
+            "provider": "openai-compatible",
+            "model": self.model,
+            "base_url": self.base_url,
+            "configured": bool(self.api_key and self.model and self.base_url),
+            "streaming": self.streaming,
+            "stream_required": self.stream_required,
+            "capabilities": self.capabilities.to_dict(),
+        }
 
     @classmethod
     def from_environment(cls, *, transport: JsonTransport | None = None) -> "OpenAICompatibleProvider":
@@ -443,7 +545,15 @@ class OpenAICompatibleProvider:
                     self.retry_events = []
                     for attempt in range(1, self.max_retries + 2):
                         try:
-                            status, chunks = await asyncio.to_thread(stream_method, f"{self.base_url}/chat/completions", {**headers, "Accept": "text/event-stream"}, stream_body, self.timeout)
+                            transport_result = await _run_sync_bounded(
+                                stream_method,
+                                f"{self.base_url}/chat/completions",
+                                {**headers, "Accept": "text/event-stream"},
+                                stream_body,
+                                self.timeout,
+                                timeout=self.timeout,
+                            )
+                            status, chunks, response_headers = _unpack_transport_result(transport_result)
                         except (TimeoutError, error.URLError, OSError) as exc:
                             if attempt <= self.max_retries:
                                 await self._retry(attempt, "stream_transport_error", str(exc))
@@ -453,12 +563,16 @@ class OpenAICompatibleProvider:
                             raise ProviderError("stream transport returned an invalid HTTP status", category="stream_error", attempt=attempt)
                         if status in {408, 429} or 500 <= status <= 599:
                             if attempt <= self.max_retries:
-                                await self._retry(attempt, f"stream_http_{status}", f"HTTP {status}")
+                                await self._retry(attempt, f"stream_http_{status}", f"HTTP {status}", response_headers.get("retry-after"))
                                 continue
                         if status < 200 or status >= 300:
                             raise ProviderError(f"model returned HTTP {status}", category="http_error", retryable=status in {408, 429} or 500 <= status <= 599, status_code=status, attempt=attempt)
                         try:
-                            events, _done = await asyncio.to_thread(_sse_json_events, chunks, max_bytes=self.max_response_bytes)
+                            events, _done = await _run_sync_bounded(
+                                _sse_json_events, chunks,
+                                max_bytes=self.max_response_bytes,
+                                timeout=self.timeout,
+                            )
                             return assemble_chat_stream(events)
                         except ProviderError:
                             raise
@@ -484,7 +598,15 @@ class OpenAICompatibleProvider:
         self.retry_events = []
         for attempt in range(1, self.max_retries + 2):
             try:
-                status, response_body = await asyncio.to_thread(self.transport.post_json, f"{self.base_url}/chat/completions", headers, body, self.timeout)
+                transport_result = await _run_sync_bounded(
+                    self.transport.post_json,
+                    f"{self.base_url}/chat/completions",
+                    headers,
+                    body,
+                    self.timeout,
+                    timeout=self.timeout,
+                )
+                status, response_body, response_headers = _unpack_transport_result(transport_result)
             except (TimeoutError, error.URLError, OSError) as exc:
                 retryable = True
                 if attempt <= self.max_retries:
@@ -499,7 +621,7 @@ class OpenAICompatibleProvider:
                 raise ProviderError("model transport returned an invalid HTTP status", category="transport_error", attempt=attempt)
             retryable_status = status in {408, 429} or 500 <= status <= 599
             if retryable_status and attempt <= self.max_retries:
-                await self._retry(attempt, f"http_{status}", f"HTTP {status}")
+                await self._retry(attempt, f"http_{status}", f"HTTP {status}", response_headers.get("retry-after"))
                 continue
             break
         if not isinstance(response_body, (bytes, bytearray)):
@@ -511,8 +633,8 @@ class OpenAICompatibleProvider:
         if status < 200 or status >= 300:
             raise ProviderError(f"model returned HTTP {status}: {_error_message(response_body, self.api_key)}", category="http_error", retryable=status in {408, 429} or 500 <= status <= 599, status_code=status, attempt=attempt)
         try:
-            payload = json.loads(response_body.decode("utf-8"))
-        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            payload = json.loads(response_body.decode("utf-8"), parse_constant=_reject_nonfinite)
+        except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as exc:
             raise ProviderError("model returned malformed JSON", category="protocol_error") from exc
         if not isinstance(payload, dict):
             raise ProviderError("model response must be a JSON object", category="protocol_error")
@@ -521,13 +643,22 @@ class OpenAICompatibleProvider:
             raise ProviderError(f"model returned an error object: {safe_message}", category="provider_error", attempt=attempt)
         return parse_chat_completion(payload)
 
-    async def _retry(self, attempt: int, category: str, reason: str) -> None:
+    async def _retry(self, attempt: int, category: str, reason: str, retry_after: str | None = None) -> None:
         # Jitter prevents synchronized clients while the cap keeps tests and
         # interactive use bounded. Do not retry local side effects here.
         delay = min(4.0, self.retry_base_delay * (2 ** (attempt - 1)))
+        if retry_after is not None:
+            try:
+                advertised = float(retry_after.strip())
+                if math.isfinite(advertised) and advertised >= 0:
+                    delay = min(4.0, advertised)
+            except (AttributeError, TypeError, ValueError):
+                pass
         jitter = random.SystemRandom().uniform(0, delay * 0.25) if delay else 0.0
         wait = delay + jitter
         event = {"attempt": attempt, "next_attempt": attempt + 1, "category": category, "delay_seconds": round(wait, 3), "reason": _redact(reason, self.api_key)}
+        if retry_after is not None:
+            event["retry_after"] = _redact(str(retry_after)[:64], self.api_key)
         self.retry_events.append(event)
         if wait:
             await asyncio.sleep(wait)

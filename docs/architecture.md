@@ -23,6 +23,8 @@ CLI parser/renderer
             -> write_file/apply_patch (approved atomic writes)
             -> run_command (risk + approval + timeout)
        -> RepositoryMap/ContextPlan (bounded deterministic snapshot)
+       -> ContextIndex (ignored incremental metadata/search cache)
+       -> SkillLoader/SkillRegistry + HookRegistry (validated, audited extensions)
        -> SessionStore + CheckpointStore (bounded redacted JSONL + fingerprints)
        -> TransactionStore (bounded manifests + ignored content-addressed blobs)
 ```
@@ -142,6 +144,25 @@ or rewrites original JSONL. `SessionContextRebuilder` reconstructs bounded
 provider-neutral messages and evidence. Recorded tool calls are descriptions,
 not instructions, so resume never replays them. Completed sessions are
 inspect-only unless explicitly forked to a new run id with a parent link.
+
+### Incremental context index and extensions
+
+`ContextIndex` is a local JSON cache under `.forgecode/context-index.json`.
+It records relative path, size, mtime, SHA-256, language, line count, symbols
+and sensitive/binary flags.  Rebuilds are deterministic and atomic; malformed
+or stale entries are diagnosed/rebuilt, and snippets are returned only after a
+fresh digest check.  `context index|search|show|clear` are read-only CLI
+operations.  The index is a cache rather than authorization and is never
+committed or sent as an unbounded model prompt.
+
+`SkillManifest` and `SkillLoader` accept explicitly located Markdown or
+manifest files with strict ids, semantic versions, schemas, side-effect levels,
+approval requirements and quotas.  Markdown skills can enrich a prompt; an
+executable skill has no executor unless an application supplies one after
+approval.  `HookRegistry` provides bounded before/after tool and model events;
+hooks are observers by default, fail-closed only when declared, and recursion
+or permission changes are blocked.  Hook and index evidence is appended to the
+same session audit stream.
 
 ## Durable transactions and streaming
 

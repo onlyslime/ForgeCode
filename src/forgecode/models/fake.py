@@ -1,6 +1,6 @@
 """Deterministic providers used for offline demonstrations and tests."""
 
-from .protocol import Message, ModelResponse, ToolCall
+from .protocol import Message, ModelCapabilities, ModelResponse, ToolCall
 
 
 _DEMO_TASKS = {
@@ -42,6 +42,13 @@ class DemoProvider:
         self.spec = _DEMO_TASKS[task]
         self.calls = 0
         self.plan_mode = False
+
+    @property
+    def capabilities(self) -> ModelCapabilities:
+        return ModelCapabilities(streaming=False, json_mode=False, max_input_chars=200_000, max_output_chars=20_000)
+
+    def health(self) -> dict:
+        return {"provider": "demo", "configured": True, "task": self.spec["source"], "capabilities": self.capabilities.to_dict()}
 
     async def complete(self, messages, tools):
         self.calls += 1

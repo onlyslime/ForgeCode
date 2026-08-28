@@ -264,3 +264,25 @@ def test_stream_transient_http_error_retries_before_success():
     response = __import__("asyncio").run(provider.complete([Message("user", "hi")], []))
     assert response.message.content == "ok" and transport.calls == 2
     assert provider.retry_events and provider.retry_events[0]["category"] == "stream_http_503"
+
+
+def test_provider_honors_bounded_retry_after_header_from_transport():
+    class RetryAfterTransport:
+        def __init__(self):
+            self.calls = 0
+
+        def post_json(self, *_args):
+            self.calls += 1
+            if self.calls == 1:
+                return 429, b'{"error":{"message":"busy"}}', {"Retry-After": "0"}
+            return 200, b'{"choices":[{"finish_reason":"stop","message":{"role":"assistant","content":"ok"}}]}'
+
+    transport = RetryAfterTransport()
+    provider = __import__("forgecode.models", fromlist=["OpenAICompatibleProvider"]).OpenAICompatibleProvider(
+        api_key="key", base_url="https://example.test/v1", model="m", transport=transport,
+        retry_base_delay=1,
+    )
+    response = __import__("asyncio").run(provider.complete([Message("user", "hi")], []))
+    assert response.message.content == "ok" and transport.calls == 2
+    assert provider.retry_events[0]["retry_after"] == "0"
+    assert provider.retry_events[0]["delay_seconds"] < 0.1

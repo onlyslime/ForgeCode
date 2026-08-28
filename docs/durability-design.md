@@ -1,8 +1,10 @@
-# ForgeCode durability design (v0.0.6)
+# ForgeCode durability design (v0.0.7)
 
-This document records the v0.0.5 reliability baseline and its v0.0.6 durable
-extensions. It is a design contract for the code and tests, not a claim that a
-feature exists before its acceptance test passes.
+This document records the v0.0.5 reliability baseline, v0.0.6 durable
+extensions, and v0.0.7 context/extension work. It is a design contract for the
+v0.0.7 release and its tests, with runtime evidence recorded in the capability
+trace and release report; it is not a claim that a feature exists before its
+acceptance test passes.
 
 ## Run lifecycle
 
@@ -71,7 +73,7 @@ Process-visible failures trigger reverse-order restoration and a rollback
 event. Standard file APIs cannot guarantee atomicity across a machine crash,
 disk failure or a hostile concurrent writer; these limits remain explicit.
 
-In v0.0.6, exact before bytes are written before mutation to content-addressed
+In v0.0.6+, exact before bytes are written before mutation to content-addressed
 blobs under ignored `.forgecode/transactions`. A bounded manifest links
 before/after hashes, operation, run/plan ids, approval and verification.
 Review and undo reopen this ledger in a new process. Undo requires the current
@@ -86,6 +88,16 @@ basic `.gitignore`, limits file count and bytes, reports omissions/errors, and
 sorts all outputs. Context selection ranks current intent, checkpoints,
 failures, pending calls, verification and relevant repository entries before
 old conversation. Omissions are visible metadata, never silent.
+
+The v0.0.7 `ContextIndex` is an ignored, atomically replaced JSON cache. Each
+entry carries a digest and metadata; search re-reads and re-hashes a file before
+returning a snippet, so an edited or renamed file becomes a miss rather than
+stale model context. Corrupt indexes are rebuilt with a diagnostic report.
+`SkillLoader` validates manifest ids, versions, schemas, permissions and
+quotas. Markdown skills are read-only prompt data; executable entries require
+an explicit executor and approval. `HookRegistry` records bounded lifecycle
+observations and fail-closed errors without permitting recursion or authority
+changes.
 
 Compaction appends a deterministic factual summary and never rewrites the
 original JSONL prefix. Context rebuild uses validated events/checkpoints and

@@ -25,6 +25,10 @@ MAX_MANIFEST_BYTES = 1_000_000
 MAX_PREVIEW_CHARS = 20_000
 
 
+def _reject_nonfinite_json(value: str) -> None:
+    raise ValueError(f"non-finite JSON value is not allowed: {value}")
+
+
 class TransactionError(ValueError):
     """Transaction data is missing, corrupt, unsafe, or conflicting."""
 
@@ -386,11 +390,12 @@ class TransactionStore:
                 raise TransactionError("transaction manifest exceeds size limit")
             if (before_stat.st_size, before_stat.st_mtime_ns, getattr(before_stat, "st_ino", 0)) != (after_stat.st_size, after_stat.st_mtime_ns, getattr(after_stat, "st_ino", 0)):
                 raise TransactionError("transaction manifest changed while it was read")
-            raw = json.loads(raw_bytes)
+            raw = json.loads(raw_bytes, parse_constant=_reject_nonfinite_json)
         except FileNotFoundError as exc:
             raise TransactionError(f"transaction not found: {transaction_id}") from exc
-        except (OSError, UnicodeError, json.JSONDecodeError) as exc:
-            raise TransactionError(f"transaction manifest is unreadable: {type(exc).__name__}") from exc
+        except (OSError, UnicodeError, json.JSONDecodeError, ValueError) as exc:
+            detail = str(exc).replace("\r", " ").replace("\n", " ")[:200]
+            raise TransactionError(f"transaction manifest is unreadable: {type(exc).__name__}: {detail}") from exc
         if not isinstance(raw, dict):
             raise TransactionError("transaction manifest must be an object")
         manifest = TransactionManifest.from_dict(raw)
@@ -453,8 +458,11 @@ class TransactionStore:
 
     def attach_verification(self, transaction_id: str, verification: dict[str, Any]) -> TransactionManifest:
         manifest = self.load(transaction_id)
-        safe = json.loads(json.dumps(verification, ensure_ascii=False, default=str))
-        encoded = json.dumps(safe, ensure_ascii=False)
+        try:
+            safe = json.loads(json.dumps(verification, ensure_ascii=False, default=str, allow_nan=False))
+            encoded = json.dumps(safe, ensure_ascii=False, allow_nan=False)
+        except (TypeError, ValueError) as exc:
+            raise TransactionError(f"verification evidence is not serializable: {type(exc).__name__}") from exc
         if len(encoded) > 40_000:
             safe = {"truncated": True, "preview": encoded[:39_000]}
         updated = replace(manifest, verification=safe)

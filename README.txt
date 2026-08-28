@@ -16,5 +16,5 @@ resume/fork；持久事务 ledger、ignored 原始备份和 hash 冲突保护的
 typed TOML profile 与安全 SSE tool-call 组装。Plan 不执行副作用，断流不执行工具，
 恢复/撤销冲突返回退出码 3且不会覆盖外部编辑。
 
-版本 v0.0.6；最后一次全套离线测试为 189 passed、6 skipped，跳过项均因当前 Windows 进程无符号链接创建权限。
+版本 v0.0.7；离线测试、索引和技能功能均可按 README 命令验证。跳过项均因当前 Windows 进程无符号链接创建权限。
 本项目是启发式审批边界而非操作系统沙箱；暂不包含 IDE、浏览器、云执行和多代理。

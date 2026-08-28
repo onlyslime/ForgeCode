@@ -2,11 +2,14 @@
 
 import argparse
 import asyncio
+import json
+import json as jsonlib
 import os
 from pathlib import Path
 import shlex
 import subprocess
 import sys
+import re
 import uuid
 from typing import Any
 
@@ -15,7 +18,8 @@ from ..agent import AgentConfig, AgentLoop, ContextCompactor, RunState, SessionC
 from .interactive_service import InteractiveSession
 from .run_service import RunService
 from .session_service import aggregate_events
-from ..context import RepositoryMapBuilder
+from ..context import ContextIndex, ContextIndexError, RepositoryMapBuilder
+from ..skills import SkillError, SkillExecutor, SkillInvocation, SkillLoader, SkillRegistry
 from ..config import ConfigError, ConfigLoader, Settings
 from ..references import ReferenceResolver, parse_references
 from ..rules import RuleEngine
@@ -26,6 +30,7 @@ from ..security.redaction import redact_text
 from ..security.workspace import WorkspaceGuard
 from ..storage import Checkpoint, CheckpointStore, RecoveryConflict, SessionFormatError, SessionStore
 from ..tools import AgentMode, AllowAllApproval, DenyAllApproval, InteractiveApproval, ToolContext, build_default_registry
+from ..hooks import Hook, HookRegistry
 
 
 def _approval_output(json_mode: bool):
@@ -43,6 +48,27 @@ def _parser() -> argparse.ArgumentParser:
     doctor_parser.add_argument("--json", action="store_true", default=argparse.SUPPRESS, dest="json")
     tools_parser = subparsers.add_parser("tools", help="list built-in tool schemas")
     tools_parser.add_argument("--json", action="store_true", default=argparse.SUPPRESS, dest="json")
+    skills_parser = subparsers.add_parser("skills", aliases=["skill"], help="discover and inspect local skills")
+    skills_parser.add_argument("--json", action="store_true", default=argparse.SUPPRESS, dest="json")
+    skills_parser.add_argument("--jsonl", action="store_true", default=argparse.SUPPRESS, dest="jsonl")
+    skills_sub = skills_parser.add_subparsers(dest="skills_action", required=False)
+    skills_list = skills_sub.add_parser("list", help="list discovered skills")
+    skills_list.add_argument("--json", action="store_true", default=argparse.SUPPRESS, dest="json")
+    skills_list.add_argument("--jsonl", action="store_true", default=argparse.SUPPRESS, dest="jsonl")
+    skills_check = skills_sub.add_parser("check", help="validate skill manifests")
+    skills_check.add_argument("--json", action="store_true", default=argparse.SUPPRESS, dest="json")
+    skills_check.add_argument("--jsonl", action="store_true", default=argparse.SUPPRESS, dest="jsonl")
+    skills_show = skills_sub.add_parser("show", help="show one skill manifest and bounded content")
+    skills_show.add_argument("skill_id")
+    skills_show.add_argument("--include-content", action="store_true")
+    skills_show.add_argument("--json", action="store_true", default=argparse.SUPPRESS, dest="json")
+    skills_show.add_argument("--jsonl", action="store_true", default=argparse.SUPPRESS, dest="jsonl")
+    skills_run = skills_sub.add_parser("run", help="invoke a Markdown or explicitly approved executable skill")
+    skills_run.add_argument("skill_id")
+    skills_run.add_argument("--input", dest="skill_input", default="{}", help="bounded JSON object passed to the skill")
+    skills_run.add_argument("--approve", action="store_true", help="explicitly approve a side-effecting skill")
+    skills_run.add_argument("--json", action="store_true", default=argparse.SUPPRESS, dest="json")
+    skills_run.add_argument("--jsonl", action="store_true", default=argparse.SUPPRESS, dest="jsonl")
     rules_parser = subparsers.add_parser("rules", help="show bounded scoped project rules")
     rules_sub = rules_parser.add_subparsers(dest="rules_action", required=False)
     rules_show = rules_sub.add_parser("show", help="show rule sources and combined context")
@@ -62,6 +88,10 @@ def _parser() -> argparse.ArgumentParser:
     config_validate = config_sub.add_parser("validate", help="validate ignored TOML and environment config")
     config_validate.add_argument("--profile")
     config_validate.add_argument("--json", action="store_true", default=argparse.SUPPRESS, dest="json")
+    provider_parser = subparsers.add_parser("provider", help="inspect provider configuration without making a request")
+    provider_sub = provider_parser.add_subparsers(dest="provider_action", required=False)
+    provider_health = provider_sub.add_parser("health", help="show bounded provider capabilities and configuration")
+    provider_health.add_argument("--json", action="store_true", default=argparse.SUPPRESS, dest="json")
     transaction_parser = subparsers.add_parser("transaction", aliases=["review", "rollback"], help="review or safely undo a recorded transaction")
     transaction_parser.add_argument("transaction_id", nargs="?", default="latest")
     transaction_parser.add_argument("--execute", action="store_true", help="execute undo after approval")
@@ -79,6 +109,30 @@ def _parser() -> argparse.ArgumentParser:
     inspect_parser.add_argument("--task", default="repository inspection", help="task used to rank relevant files")
     inspect_parser.add_argument("--budget-chars", type=int, default=20_000)
     inspect_parser.add_argument("--json", action="store_true", default=argparse.SUPPRESS, dest="json")
+    context_parser = subparsers.add_parser("context", help="build and search the bounded local context index")
+    context_parser.add_argument("--json", action="store_true", default=argparse.SUPPRESS, dest="json")
+    context_parser.add_argument("--jsonl", action="store_true", default=argparse.SUPPRESS, dest="jsonl")
+    context_sub = context_parser.add_subparsers(dest="context_action", required=False)
+    context_index_parser = context_sub.add_parser("index", help="build or incrementally refresh the context index")
+    context_index_parser.add_argument("--rebuild", action="store_true")
+    context_index_parser.add_argument("--json", action="store_true", default=argparse.SUPPRESS, dest="json")
+    context_index_parser.add_argument("--jsonl", action="store_true", default=argparse.SUPPRESS, dest="jsonl")
+    context_search_parser = context_sub.add_parser("search", help="search indexed repository text and symbols")
+    context_search_parser.add_argument("query", nargs="?", default="")
+    context_search_parser.add_argument("--glob")
+    context_search_parser.add_argument("--regex")
+    context_search_parser.add_argument("--symbol")
+    context_search_parser.add_argument("--path")
+    context_search_parser.add_argument("--max-results", type=int, default=50)
+    context_search_parser.add_argument("--context-lines", type=int, default=1)
+    context_search_parser.add_argument("--json", action="store_true", default=argparse.SUPPRESS, dest="json")
+    context_search_parser.add_argument("--jsonl", action="store_true", default=argparse.SUPPRESS, dest="jsonl")
+    context_show_parser = context_sub.add_parser("show", help="show index metadata and bounded entries")
+    context_show_parser.add_argument("--json", action="store_true", default=argparse.SUPPRESS, dest="json")
+    context_show_parser.add_argument("--jsonl", action="store_true", default=argparse.SUPPRESS, dest="jsonl")
+    context_clear_parser = context_sub.add_parser("clear", help="delete the local context index")
+    context_clear_parser.add_argument("--json", action="store_true", default=argparse.SUPPRESS, dest="json")
+    context_clear_parser.add_argument("--jsonl", action="store_true", default=argparse.SUPPRESS, dest="jsonl")
     sessions_parser = subparsers.add_parser("sessions", help="list bounded local session records")
     sessions_parser.add_argument("--limit", type=int, default=50)
     sessions_parser.add_argument("--json", action="store_true", default=argparse.SUPPRESS, dest="json")
@@ -127,6 +181,7 @@ def _parser() -> argparse.ArgumentParser:
     run_parser.add_argument("--dry-run", "--inspect", action="store_true", help="inspect a resume without executing side effects")
     run_parser.add_argument("--force-recovery", action="store_true", help="explicitly acknowledge checkpoint conflicts (still requires approval)")
     run_parser.add_argument("--json", action="store_true", default=argparse.SUPPRESS, dest="json")
+    run_parser.add_argument("--jsonl", action="store_true", default=argparse.SUPPRESS, dest="jsonl", help="emit one machine-readable event/result object per line")
     return parser
 
 
@@ -189,6 +244,36 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"{key}: {value}")
         return 0
 
+    if command == "provider":
+        action = getattr(args, "provider_action", None) or "health"
+        if action != "health":
+            print("unknown provider action", file=sys.stderr)
+            return 2
+        effective = settings.effective
+        payload = {
+            "provider": effective.provider if effective else "openai-compatible",
+            "profile": settings.profile,
+            "model": settings.model,
+            "base_url": redact_text(settings.base_url),
+            "configured": bool(settings.model and os.getenv(settings.api_key_env, "")),
+            "streaming": effective.streaming if effective else "auto",
+            "capabilities": {
+                "tool_calling": True,
+                "json_mode": False,
+                "streaming": bool(effective and effective.streaming in {"on", "required"}),
+                "max_input_chars": 4_000_000,
+                "max_output_chars": 4_000_000,
+            },
+            "network_request": False,
+        }
+        if args.json:
+            import json
+            print(json.dumps(payload, ensure_ascii=False))
+        else:
+            print(f"provider={payload['provider']} model={payload['model'] or '<unset>'} configured={payload['configured']}")
+            print(f"streaming={payload['streaming']} network_request=false")
+        return 0
+
     if command == "rules":
         action = args.rules_action or "show"
         try:
@@ -211,6 +296,105 @@ def main(argv: list[str] | None = None) -> int:
             if getattr(args, "include_text", False) and rules.text:
                 print(rules.render())
         return 0 if not any(item.severity == "error" for item in rules.diagnostics) else 1
+
+    if command in {"skills", "skill"}:
+        loader = SkillLoader(guard)
+        skills = loader.discover()
+        registry_skills = SkillRegistry(skills)
+        action = getattr(args, "skills_action", None) or "list"
+        try:
+            if action == "check":
+                payload = {"valid": not loader.errors, "skills": [item.to_dict() for item in skills], "errors": list(loader.errors)}
+                code = 0 if not loader.errors else 1
+            elif action == "show":
+                skill = registry_skills.get(args.skill_id)
+                payload = skill.to_dict(include_content=bool(args.include_content))
+                code = 0
+            elif action == "run":
+                try:
+                    skill_arguments = jsonlib.loads(args.skill_input, parse_constant=lambda value: (_ for _ in ()).throw(ValueError(f"non-finite JSON value: {value}")))
+                except (TypeError, jsonlib.JSONDecodeError, ValueError) as exc:
+                    raise SkillError("--input must be a valid finite JSON object") from exc
+                if not isinstance(skill_arguments, dict):
+                    raise SkillError("--input must be a JSON object")
+                invocation = registry_skills.invoke(args.skill_id, skill_arguments, executor=SkillExecutor(guard), approved=bool(args.approve))
+                payload = invocation.to_dict()
+                code = 0 if invocation.ok else 1
+            else:
+                payload = {"skills": [item.to_dict() for item in skills], "errors": list(loader.errors)}
+                code = 0 if not loader.errors else 1
+        except (SkillError, OSError, ValueError) as exc:
+            payload = {"ok": False, "error": _redact_display(str(exc))}
+            code = 2
+        if getattr(args, "json", False) or getattr(args, "jsonl", False):
+            import json
+            if getattr(args, "jsonl", False) and action == "list":
+                for item in payload.get("skills", []):
+                    print(json.dumps({"type": "skill", **item}, ensure_ascii=False, default=str))
+                if payload.get("errors"):
+                    print(json.dumps({"type": "errors", "errors": payload["errors"]}, ensure_ascii=False))
+            else:
+                print(json.dumps(payload, ensure_ascii=False, default=str))
+        else:
+            if payload.get("ok") is False:
+                print("skills failed: " + payload["error"], file=sys.stderr)
+            elif action == "show":
+                manifest = payload["manifest"]
+                print(f"{manifest['id']} {manifest['version']}: {manifest['description']}")
+                if "content" in payload:
+                    print(payload["content"])
+            elif action == "run":
+                print(payload.get("output", payload.get("error", "")))
+            else:
+                for item in payload.get("skills", []):
+                    manifest = item["manifest"]
+                    print(f"{manifest['id']} {manifest['version']} side_effect={manifest['side_effect']} path={item['path']}")
+                for error_message in payload.get("errors", []):
+                    print("error: " + error_message, file=sys.stderr)
+        return code
+
+    if command == "context":
+        action = getattr(args, "context_action", None) or "show"
+        index = ContextIndex(guard)
+        try:
+            if action == "index":
+                payload = index.ensure() if not getattr(args, "rebuild", False) else index.build(rebuild=True)
+                payload = payload.to_dict()
+            elif action == "search":
+                index.ensure()
+                matches = index.search(args.query, glob=args.glob, regex=args.regex, symbol=args.symbol, path=args.path, max_results=args.max_results, context_lines=args.context_lines)
+                payload = {"query": args.query, "count": len(matches), "results": [item.to_dict() for item in matches], "stale": list(index.last_search_issues), "index": index.show()}
+            elif action == "clear":
+                payload = {"cleared": index.clear(), "path": index.guard.relative(index.path)}
+            else:
+                index.ensure()
+                payload = index.show()
+            code = 0
+        except (ContextIndexError, OSError, UnicodeError, ValueError) as exc:
+            payload = {"ok": False, "error": _redact_display(str(exc))}
+            code = 2
+        if getattr(args, "json", False) or getattr(args, "jsonl", False):
+            import json
+            if getattr(args, "jsonl", False) and action == "search":
+                for item in payload.get("results", []):
+                    print(json.dumps({"type": "context_result", **item}, ensure_ascii=False, default=str))
+                print(json.dumps({"type": "context_summary", "query": payload.get("query", ""), "count": payload.get("count", 0), "stale": payload.get("stale", [])}, ensure_ascii=False))
+            else:
+                print(json.dumps(payload, ensure_ascii=False, default=str))
+        else:
+            if payload.get("ok") is False:
+                print("context failed: " + payload["error"], file=sys.stderr)
+            elif action == "search":
+                for item in payload.get("results", []):
+                    print(f"{item['path']}:{item['line']} [{item['reason']}]\n{item['snippet']}")
+                print(f"matches={payload['count']}")
+            elif action == "index":
+                print(f"index={payload['path']} files={payload['files']} added={payload['added']} updated={payload['updated']} removed={payload['removed']} omitted={payload['omitted']}")
+                for error_message in payload.get("errors", []):
+                    print("error: " + error_message, file=sys.stderr)
+            else:
+                print(f"index={payload['path']} files={payload['counts']['files']} fingerprint={payload['fingerprint'][:16]}")
+        return code
 
     if command == "plan":
         prompt = " ".join(args.prompt).strip()
@@ -271,6 +455,28 @@ def main(argv: list[str] | None = None) -> int:
                     payload = {"ok": True, "transaction_id": undone.transaction_id, "parent_transaction_id": manifest.transaction_id, "state": undone.state}
             else:
                 payload = store.review(transaction_id)
+            if command == "review":
+                # Review is a bounded evidence aggregator, not a model
+                # opinion.  Join the ledger result with the latest session's
+                # plan, references, verification and audit metrics when
+                # available; missing/corrupt session data is surfaced.
+                try:
+                    session_path = _resolve_session_reference(guard, workspace, Path("latest"))
+                    session_result = SessionStore(session_path).read_with_issues()
+                    plan_events = [event for event in session_result.events if event.kind in {"plan_created", "plan_updated"}]
+                    reference_events = [event for event in session_result.events if event.kind == "references_resolved"]
+                    verification_events = [event for event in session_result.events if event.kind in {"verification_result", "transaction_verification", "command_result"}]
+                    payload["review"] = {
+                        "session": session_path.stem,
+                        "issues": [issue.__dict__ for issue in session_result.issues],
+                        "plan": plan_events[-1].payload.get("plan") if plan_events else None,
+                        "references": reference_events[-1].payload if reference_events else None,
+                        "checks": [event.payload for event in verification_events[-20:]],
+                        "metrics": aggregate_events(session_result.events),
+                        "audit_complete": not session_result.issues and not any(event.kind == "session_error" for event in session_result.events),
+                    }
+                except (OSError, ValueError):
+                    payload["review"] = {"session": None, "issues": ["latest session unavailable"], "audit_complete": False}
         except (TransactionError, OSError, ValueError) as exc:
             payload = {"ok": False, "error": _redact_display(str(exc))}
             if args.json:
@@ -288,6 +494,12 @@ def main(argv: list[str] | None = None) -> int:
                 print(payload["preview"])
             if payload.get("conflicts"):
                 print("conflicts: " + "; ".join(payload["conflicts"]))
+        if command == "review":
+            review_payload = payload.get("review") if isinstance(payload, dict) else None
+            if isinstance(review_payload, dict) and not review_payload.get("audit_complete", False):
+                return 1
+            if isinstance(payload, dict) and payload.get("store_issues"):
+                return 1
         return 0
 
     if command in {"chat", "start"}:
@@ -330,9 +542,21 @@ def main(argv: list[str] | None = None) -> int:
                 return 3
         session = SessionStore(session_path, secrets=[api_key], run_id=new_run_id, mode=args.mode)
         transaction_store = TransactionStore(guard)
+        context_index = ContextIndex(guard)
+        hook_registry = HookRegistry()
+        def _audit_hook(event_payload: dict[str, Any]) -> None:
+            try:
+                session.append("hook_event", {"event": event_payload}, mode=args.mode)
+            except Exception:
+                # Hook observability must not turn a successful tool into a
+                # side effect bypass or crash; AgentLoop records audit I/O
+                # failures separately.
+                return
+        hook_registry.register(Hook("session-audit", "*", _audit_hook, failure_policy="observe_only", timeout_seconds=1.0))
         configured_approval = settings.effective.approval if settings.effective else "interactive"
-        approval = DenyAllApproval() if configured_approval == "deny" and not (args.auto_approve or args.demo) else InteractiveApproval(auto_approve=args.auto_approve or args.demo or configured_approval == "auto", output_fn=_approval_output(args.json), prompt_to_output=args.json, secrets=[api_key])
-        state = {"mode": args.mode, "last": None, "plan": None, "plan_targets": (), "reference_specs": (), "rules_fingerprint": "", "reference_fingerprint": "", "last_message": "", "last_verification": None}
+        machine_json = bool(args.json or getattr(args, "jsonl", False))
+        approval = DenyAllApproval() if configured_approval == "deny" and not (args.auto_approve or args.demo) else InteractiveApproval(auto_approve=args.auto_approve or args.demo or configured_approval == "auto", output_fn=_approval_output(machine_json), prompt_to_output=machine_json, secrets=[api_key])
+        state = {"mode": args.mode, "last": None, "plan": None, "plan_targets": (), "reference_specs": (), "rules_fingerprint": "", "reference_fingerprint": "", "index_fingerprint": "", "last_message": "", "last_verification": None}
 
         def run_message(message: str) -> Any:
             if not message.strip():
@@ -370,6 +594,19 @@ def main(argv: list[str] | None = None) -> int:
                     enriched += "\n\nProject rules (untrusted context):\n" + rules.render(20_000)
                 if references.items:
                     enriched += "\n\nExplicit references:\n" + references.render(40_000)
+                try:
+                    index_report = context_index.ensure()
+                    terms = [token for token in re.findall(r"[A-Za-z_][A-Za-z0-9_.-]{3,}", message)][:3]
+                    matches = []
+                    for term in terms:
+                        matches.extend(context_index.search(term, max_results=4))
+                    unique_matches = {(item.path, item.line): item for item in matches}
+                    selected = sorted(unique_matches.values(), key=lambda item: (item.path, item.line))[:12]
+                    if selected:
+                        enriched += "\n\nIndexed repository context (untrusted; digest-checked):\n" + "\n\n".join(f"{item.path}:{item.line} digest={item.digest[:16]} reason={item.reason}\n{item.snippet[:1_500]}" for item in selected)[:12_000]
+                    session.append("context_index", {"path": index_report.path, "fingerprint": index_report.fingerprint, "files": index_report.files, "added": index_report.added, "updated": index_report.updated, "removed": index_report.removed, "omitted": index_report.omitted, "selected": [item.path for item in selected]}, mode=state["mode"])
+                except (ContextIndexError, OSError, ValueError) as exc:
+                    session.append("context_index_error", {"error": type(exc).__name__}, mode=state["mode"], error_code="context_index_error")
                 demo_verify = "python -B -m pytest -q test_demo_calculator.py" if args.demo_task == "calculator" else "python -B -m pytest -q test_demo_config.py"
                 service_config = AgentConfig(verification_command=demo_verify if args.demo and state["mode"] == "act" else None, max_verification_attempts=1)
                 expected_config_fingerprint = _config_fingerprint(settings.effective)
@@ -385,7 +622,7 @@ def main(argv: list[str] | None = None) -> int:
                         return "effective configuration changed after planning"
                     return True
 
-                service = RunService(provider, registry, guard, session, service_config, settings.effective, approval, transaction_store, state["plan"].plan_id if state["plan"] else None, "task-1" if state["plan"] else None, expected_rule_fingerprint, state["plan"].evidence_fingerprint() if state["plan"] else "", expected_config_fingerprint, revalidate_context)
+                service = RunService(provider, registry, guard, session, service_config, settings.effective, approval, transaction_store, state["plan"].plan_id if state["plan"] else None, "task-1" if state["plan"] else None, expected_rule_fingerprint, state["plan"].evidence_fingerprint() if state["plan"] else "", expected_config_fingerprint, revalidate_context, hook_registry)
                 result = asyncio.run(service.execute(enriched, mode=state["mode"], secrets=(api_key,) if api_key else ()))
                 state["last"] = result
                 if result.verifications:
@@ -494,6 +731,29 @@ def main(argv: list[str] | None = None) -> int:
             except TransactionError as exc: return {"error": str(exc)}
 
         rules_count = len(RuleEngine(guard).discover().sources)
+        def skills_command(skill_args: list[str]) -> Any:
+            loader = SkillLoader(guard)
+            discovered = loader.discover()
+            registry_skills = SkillRegistry(discovered)
+            if not skill_args:
+                return {"skills": [item.to_dict() for item in discovered], "errors": list(loader.errors)}
+            try:
+                skill = registry_skills.get(skill_args[0])
+            except SkillError as exc:
+                return {"ok": False, "error": "unknown_skill", "message": _redact_display(str(exc), [api_key])}
+            requested_approval = len(skill_args) > 1 and skill_args[1] == "--approve"
+            if requested_approval and state["mode"] != "act" and skill.manifest.side_effect != "read_only":
+                invocation = SkillInvocation(skill.manifest.id, skill.manifest.version, False, "side-effecting skills are unavailable in plan mode", "mode_denied", skill.manifest.side_effect)
+            else:
+                approved = False
+                if requested_approval:
+                    approved = approval.approve("skill", {"skill_id": skill.manifest.id, "version": skill.manifest.version, "side_effect": skill.manifest.side_effect})
+                invocation = registry_skills.invoke(skill.manifest.id, executor=SkillExecutor(guard), approved=approved)
+            try:
+                session.append("skill_invocation", {"skill_id": invocation.skill_id, "version": invocation.version, "ok": invocation.ok, "error": invocation.error, "permission": invocation.permission, "approved": requested_approval}, mode=state["mode"], outcome="completed" if invocation.ok else "failed", error_code=invocation.error)
+            except Exception:
+                pass
+            return invocation.to_dict()
         def quit_session() -> Any:
             try:
                 last_result = state.get("last")
@@ -515,7 +775,7 @@ def main(argv: list[str] | None = None) -> int:
             except Exception as exc:
                 return {"stopped": True, "checkpointed": False, "error": f"checkpoint failed: {type(exc).__name__}"}
 
-        interactive = InteractiveSession(run_message, status=status, plan=plan_command, set_mode=set_mode, review=review, test=test_command, compact=compact, undo=undo_command, rules=lambda: RuleEngine(guard).discover().to_dict(), files=lambda: RepositoryMapBuilder(guard).build().to_dict(), quit=quit_session, output=print, json_mode=args.json)
+        interactive = InteractiveSession(run_message, status=status, plan=plan_command, set_mode=set_mode, review=review, test=test_command, compact=compact, undo=undo_command, rules=lambda: RuleEngine(guard).discover().to_dict(), files=lambda: RepositoryMapBuilder(guard).build().to_dict(), skills=skills_command, quit=quit_session, output=print, json_mode=args.json)
         if args.json:
             import json
             print(json.dumps({"type": "interactive_header", "run_id": session.run_id, "workspace": ".", "mode": state["mode"], "profile": settings.profile, "rules": rules_count, "budget": settings.effective.context_budget_chars if settings.effective else 60_000}, ensure_ascii=False))
@@ -539,9 +799,17 @@ def main(argv: list[str] | None = None) -> int:
 
     if command == "doctor":
         effective = settings.effective
+        provider_health = {
+            "provider": effective.provider if effective else "openai-compatible",
+            "configured": bool(settings.model and os.getenv(settings.api_key_env, "")),
+            "model": settings.model,
+            "base_url": redact_text(settings.base_url),
+            "streaming": effective.streaming if effective else "auto",
+            "capabilities": {"tool_calling": True, "json_mode": False, "streaming": bool(effective and effective.streaming in {"on", "required"}), "max_input_chars": 4_000_000, "max_output_chars": 4_000_000},
+        }
         if args.json:
             import json
-            print(json.dumps({"version": __version__, "workspace": ".", "profile": settings.profile, "model": settings.model, "configured": bool(settings.model), "config_sources": list(effective.sources) if effective else ["environment"], "streaming": effective.streaming if effective else "auto", "tools": list(registry.names()), "status": "ready"}, ensure_ascii=False))
+            print(json.dumps({"version": __version__, "workspace": ".", "profile": settings.profile, "model": settings.model, "configured": bool(settings.model), "config_sources": list(effective.sources) if effective else ["environment"], "streaming": effective.streaming if effective else "auto", "tools": list(registry.names()), "provider_health": provider_health, "status": "ready"}, ensure_ascii=False))
             return 0
         print(f"ForgeCode v{__version__}")
         print("workspace: .")
@@ -549,6 +817,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"model: {settings.model or 'not configured (framework-only mode)'}")
         print("config sources: " + ", ".join(effective.sources if effective else ("environment",)))
         print("tools: " + ", ".join(registry.names()))
+        print(f"provider health: {'configured' if provider_health['configured'] else 'offline/unconfigured'}")
         print("status: ready")
         return 0
 
@@ -760,8 +1029,9 @@ def main(argv: list[str] | None = None) -> int:
                     print("task input cancelled", file=sys.stderr)
                     return 130
         api_key = os.getenv("FORGECODE_API_KEY", "")
+        machine_json = bool(args.json or getattr(args, "jsonl", False))
         configured_approval = settings.effective.approval if settings.effective else "interactive"
-        approval = DenyAllApproval() if configured_approval == "deny" and not (args.auto_approve or args.demo) else InteractiveApproval(auto_approve=args.auto_approve or args.demo or configured_approval == "auto", output_fn=_approval_output(args.json), prompt_to_output=args.json, secrets=[api_key])
+        approval = DenyAllApproval() if configured_approval == "deny" and not (args.auto_approve or args.demo) else InteractiveApproval(auto_approve=args.auto_approve or args.demo or configured_approval == "auto", output_fn=_approval_output(machine_json), prompt_to_output=machine_json, secrets=[api_key])
         new_run_id = uuid.uuid4().hex
         try:
             if args.resume:
@@ -918,6 +1188,30 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"forgecode run failed: context sources unavailable ({type(exc).__name__})", file=sys.stderr)
             return 2
         transaction_store = TransactionStore(guard)
+        hook_registry = HookRegistry()
+        def _audit_hook(event_payload: dict[str, Any]) -> None:
+            try:
+                session.append("hook_event", {"event": event_payload}, mode=args.mode)
+            except Exception:
+                return
+        hook_registry.register(Hook("session-audit", "*", _audit_hook, failure_policy="observe_only", timeout_seconds=1.0))
+        context_index = ContextIndex(guard)
+        indexed_context = ""
+        try:
+            index_report = context_index.ensure()
+            index_terms = [token for token in re.findall(r"[A-Za-z_][A-Za-z0-9_.-]{3,}", prompt)][:3]
+            indexed_matches = []
+            for term in index_terms:
+                indexed_matches.extend(context_index.search(term, max_results=4, context_lines=1))
+            unique_matches = {(item.path, item.line): item for item in indexed_matches}
+            selected_matches = sorted(unique_matches.values(), key=lambda item: (item.path, item.line))[:12]
+            if selected_matches:
+                indexed_context = "\n\nIndexed repository context (untrusted; digest-checked):\n" + "\n\n".join(
+                    f"{item.path}:{item.line} digest={item.digest[:16]} reason={item.reason}\n{item.snippet[:1_500]}" for item in selected_matches
+                )[:12_000]
+            session.append("context_index", {"path": index_report.path, "fingerprint": index_report.fingerprint, "files": index_report.files, "added": index_report.added, "updated": index_report.updated, "removed": index_report.removed, "omitted": index_report.omitted, "selected": [item.path for item in selected_matches]}, mode=args.mode)
+        except (ContextIndexError, OSError, ValueError) as exc:
+            session.append("context_index_error", {"error": type(exc).__name__}, mode=args.mode, error_code="context_index_error")
         plan = TaskPlan(task=prompt, mode=args.mode, rules_fingerprint=rule_set.fingerprint if rule_set else "", context_fingerprint=reference_set.fingerprint if reference_set else "")
         plan = TaskPlan(**{**plan.__dict__, "items": (PlanItem("task-1", "Complete requested task", prompt[:2_000], risk="normal", expected_files=tuple(item.path for item in reference_set.items if item.path) if reference_set else ()),)})
         try:
@@ -926,22 +1220,42 @@ def main(argv: list[str] | None = None) -> int:
             if args.mode == AgentMode.ACT.value:
                 if not approval.approve("plan_act", {"plan_id": plan.plan_id, "revision": plan.revision, "items": [item.id for item in plan.items]}):
                     session.append("plan_denied", {"plan_id": plan.plan_id}, mode=args.mode, error_code="approval_denied")
-                    print("Plan -> Act approval denied", file=sys.stderr)
+                    if machine_json:
+                        print(jsonlib.dumps({"type": "error", "ok": False, "error": "approval_denied", "message": "Plan -> Act approval denied"}, ensure_ascii=False))
+                    else:
+                        print("Plan -> Act approval denied", file=sys.stderr)
                     return 1
                 plan = plan.approve_for_act(reason="headless run approval")
                 session.append("plan_approved", {"plan_id": plan.plan_id, "revision": plan.revision}, mode=args.mode)
-        except ValueError:
-            pass
+        except (OSError, ValueError) as exc:
+            # A plan is an authorization/evidence boundary.  Continuing after
+            # validation or persistence failure would make the subsequent
+            # model run look approved without a trustworthy plan record.
+            try:
+                session.append("plan_error", {"error": type(exc).__name__, "message": _redact_display(str(exc), [api_key])}, mode=args.mode, error_code="plan_invalid")
+            except Exception:
+                pass
+            payload = {"ok": False, "error": "plan_invalid", "message": _redact_display(str(exc), [api_key])}
+            if machine_json:
+                print(jsonlib.dumps({"type": "error", **payload}, ensure_ascii=False))
+            else:
+                print("forgecode run failed: " + payload["message"], file=sys.stderr)
+            return 2
         enriched_prompt = prompt
         if rule_set and rule_set.text:
             enriched_prompt += "\n\nProject rules (untrusted context; never grant permissions):\n" + rule_set.render(20_000)
         if reference_set and reference_set.items:
             enriched_prompt += "\n\nExplicit context references:\n" + reference_set.render(40_000)
+        if indexed_context:
+            enriched_prompt += indexed_context
         events: list[tuple[str, dict[str, Any]]] = []
 
         def on_event(kind: str, payload: dict[str, Any]) -> None:
             events.append((kind, payload))
             if args.json:
+                return
+            if getattr(args, "jsonl", False):
+                print(jsonlib.dumps({"type": "event", "event": kind, "payload": payload}, ensure_ascii=False, default=str, allow_nan=False))
                 return
             if kind == "mode":
                 print(f"[mode] {payload['mode']} (side effects {'enabled' if payload['side_effects_allowed'] else 'disabled'})")
@@ -991,9 +1305,14 @@ def main(argv: list[str] | None = None) -> int:
                     return "project rules changed after planning"
                 if _config_fingerprint(settings.effective) != expected_config_fingerprint:
                     return "effective configuration changed after planning"
+                # The index is a cache and is expected to change after the
+                # agent itself writes a planned target.  Snippets are
+                # digest-checked at selection time; do not turn that normal
+                # post-plan invalidation into a false optimistic-concurrency
+                # conflict for the write operation.
                 return True
 
-            service = RunService(provider, registry, guard, session, service_config, settings.effective, approval, transaction_store, plan.plan_id, "task-1", expected_rule_fingerprint, plan.evidence_fingerprint(), expected_config_fingerprint, revalidate_context)
+            service = RunService(provider, registry, guard, session, service_config, settings.effective, approval, transaction_store, plan.plan_id, "task-1", expected_rule_fingerprint, plan.evidence_fingerprint(), expected_config_fingerprint, revalidate_context, hook_registry)
             result = asyncio.run(service.execute(enriched_prompt, mode=args.mode, secrets=tuple(secret for secret in (api_key,) if secret), on_event=on_event))
             try:
                 updated_plan = plan.update_status("task-1", "in_progress", evidence={"run_id": result.run_id})
@@ -1002,10 +1321,15 @@ def main(argv: list[str] | None = None) -> int:
             except (OSError, ValueError):
                 pass
         except (ProviderError, ValueError, OSError) as exc:
-            print(f"forgecode run failed: {_redact_display(str(exc), [api_key])}", file=sys.stderr)
+            error_code = getattr(exc, "category", "run_failed")
+            error_message = _redact_display(str(exc), [api_key])
+            if machine_json:
+                print(jsonlib.dumps({"type": "error", "ok": False, "error": "run_failed", "category": error_code, "message": error_message}, ensure_ascii=False))
+            else:
+                print(f"forgecode run failed: {error_message}", file=sys.stderr)
             return 1
 
-        if not args.json:
+        if not machine_json:
             print(f"[final] stop={result.stopped_reason} verification={result.verification_ok}")
             print(f"[mode] {result.mode}")
             if result.plan_summary is not None:
@@ -1025,9 +1349,8 @@ def main(argv: list[str] | None = None) -> int:
             if diff:
                 print("[diff]")
                 print(_redact_display(diff, [api_key])[:8_000])
-        if args.json:
-            import json
-            print(json.dumps({"stopped_reason": result.stopped_reason, "state": result.state, "run_id": result.run_id, "verification_ok": result.verification_ok, "succeeded": result.succeeded, "audit_complete": result.audit_complete}, ensure_ascii=False))
+        if machine_json:
+            print(jsonlib.dumps({"type": "result", "stopped_reason": result.stopped_reason, "state": result.state, "run_id": result.run_id, "verification_ok": result.verification_ok, "succeeded": result.succeeded, "audit_complete": result.audit_complete}, ensure_ascii=False, allow_nan=False))
         if not result.audit_complete:
             print("[final] session audit incomplete", file=sys.stderr)
         return 0 if result.succeeded and result.verification_ok is not False and result.audit_complete else 1

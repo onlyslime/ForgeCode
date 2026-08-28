@@ -15,6 +15,8 @@ import os
 from pathlib import Path
 import re
 import threading
+import time
+from contextlib import contextmanager
 from typing import Any, Iterable, Iterator
 import uuid
 
@@ -28,6 +30,10 @@ MAX_SESSION_EVENTS = 20_000
 
 class SessionFormatError(ValueError):
     """A session line cannot be trusted as an event envelope."""
+
+
+def _reject_nonfinite_json(value: str) -> None:
+    raise ValueError(f"non-finite JSON value is not allowed: {value}")
 
 
 @dataclass(frozen=True)
@@ -173,13 +179,13 @@ class SessionStore:
             with self.path.open(encoding="utf-8") as stream:
                 for line in stream:
                     try:
-                        raw = json.loads(line)
+                        raw = json.loads(line, parse_constant=_reject_nonfinite_json)
                         sequence = raw.get("sequence", 0) if isinstance(raw, dict) else 0
                         if isinstance(raw, dict) and "sequence" not in raw:
                             legacy_count += 1
                         if isinstance(sequence, int) and not isinstance(sequence, bool):
                             highest = max(highest, sequence)
-                    except (json.JSONDecodeError, OSError):
+                    except (json.JSONDecodeError, ValueError, OSError):
                         continue
         except (OSError, UnicodeError):
             return 1
@@ -193,11 +199,11 @@ class SessionStore:
         try:
             with self.path.open(encoding="utf-8") as stream:
                 for line in stream:
-                    raw = json.loads(line)
+                    raw = json.loads(line, parse_constant=_reject_nonfinite_json)
                     value = raw.get("run_id") if isinstance(raw, dict) else None
                     if isinstance(value, str) and value:
                         return value
-        except (OSError, UnicodeError, json.JSONDecodeError):
+        except (OSError, UnicodeError, json.JSONDecodeError, ValueError):
             return None
         return None
 
@@ -211,7 +217,11 @@ class SessionStore:
             raise ValueError("event kind must be a non-empty string")
         if not isinstance(payload, dict):
             raise ValueError("event payload must be an object")
-        with self._lock:
+        with self._lock, self._interprocess_lock():
+            # Another process may have appended since this store was created;
+            # recalculate the sequence while holding the OS-level lock so two
+            # writers cannot emit duplicate sequence numbers.
+            self._next_sequence = max(self._next_sequence, self._discover_next_sequence())
             try:
                 assert_no_path_alias(self.path, message="session path is a symlink or junction alias")
             except WorkspaceViolation as exc:
@@ -247,6 +257,69 @@ class SessionStore:
                 os.fsync(stream.fileno())
             self._next_sequence += 1
             return event
+
+    @contextmanager
+    def _interprocess_lock(self):
+        """Serialize appenders across processes without third-party deps.
+
+        POSIX uses ``flock`` and Windows uses ``msvcrt.locking`` on a sibling
+        lock file.  The lock file is deliberately retained (and lives under
+        ignored runtime storage in normal operation) so a crash cannot create
+        a missing-file race; the OS releases the advisory lock automatically.
+        """
+        lock_path = Path(str(self.path) + ".lock")
+        try:
+            assert_no_path_alias(lock_path, message="session lock path is a symlink or junction alias")
+            lock_path.parent.mkdir(parents=True, exist_ok=True)
+            handle = lock_path.open("a+b")
+        except (OSError, WorkspaceViolation) as exc:
+            raise SessionFormatError(f"cannot open session lock: {type(exc).__name__}") from exc
+        acquired = False
+        try:
+            deadline = time.monotonic() + 10.0
+            if os.name == "nt":
+                import msvcrt
+
+                handle.seek(0, os.SEEK_END)
+                if handle.tell() == 0:
+                    handle.write(b"0")
+                    handle.flush()
+                while not acquired:
+                    try:
+                        handle.seek(0)
+                        msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+                        acquired = True
+                    except OSError:
+                        if time.monotonic() >= deadline:
+                            raise SessionFormatError("timed out waiting for session lock")
+                        time.sleep(0.01)
+            else:
+                import fcntl
+
+                while not acquired:
+                    try:
+                        fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                        acquired = True
+                    except OSError:
+                        if time.monotonic() >= deadline:
+                            raise SessionFormatError("timed out waiting for session lock")
+                        time.sleep(0.01)
+            yield
+        finally:
+            if acquired:
+                try:
+                    if os.name == "nt":
+                        import msvcrt
+
+                        handle.seek(0)
+                        msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+                    else:
+                        import fcntl
+
+                        fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+                except OSError:
+                    pass
+            handle.close()
 
     def _validate_append_target(self) -> None:
         """Refuse to append to a stream that cannot be safely continued.
@@ -342,7 +415,7 @@ class SessionStore:
                         raise SessionFormatError(f"line {line_number}: {issue.message}")
                     break
                 try:
-                    raw = json.loads(line)
+                    raw = json.loads(line, parse_constant=_reject_nonfinite_json)
                     if not isinstance(raw, dict):
                         raise SessionFormatError("event must be an object")
                     if "schema_version" not in raw:
@@ -350,7 +423,7 @@ class SessionStore:
                         # inspection can distinguish it from durable events.
                         raw = {**raw, "schema_version": 0}
                     event = SessionEvent(**raw)
-                    if not isinstance(event.kind, str) or not isinstance(event.payload, dict) or not isinstance(event.timestamp, str):
+                    if not isinstance(event.kind, str) or not event.kind.strip() or len(event.kind) > 128 or not isinstance(event.payload, dict) or not isinstance(event.timestamp, str):
                         raise SessionFormatError("event has invalid envelope types")
                     if len(event.timestamp) > 128:
                         raise SessionFormatError("event timestamp is too long")
@@ -453,7 +526,9 @@ class SessionStore:
         chunks: list[str] = []
         used = 0
         for event in self.read():
-            line = json.dumps(asdict(event), ensure_ascii=False, separators=(",", ":")) + "\n"
+            safe_event = asdict(event)
+            safe_event["payload"] = bounded(redact_value(safe_event.get("payload", {}), self.secrets))
+            line = json.dumps(safe_event, ensure_ascii=False, allow_nan=False, separators=(",", ":")) + "\n"
             if used + len(line) > limit:
                 break
             chunks.append(line)

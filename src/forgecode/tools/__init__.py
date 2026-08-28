@@ -4,6 +4,7 @@ from .patch import ApplyPatchTool, ChangeOperation, ChangePlan, ChangeResult, Pa
 from .summary import WorkspaceSummaryTool
 from .repository_map import RepositoryMapTool
 from .shell import AllowAllApproval, DenyAllApproval, InteractiveApproval, ShellTool
+from ..hooks import Hook, HookIssue, HookRegistry
 
 
 def build_default_registry(guard) -> ToolRegistry:
@@ -36,5 +37,8 @@ __all__ = [
     "ToolDefinition",
     "ToolRegistry",
     "ToolResult",
+    "Hook",
+    "HookIssue",
+    "HookRegistry",
     "build_default_registry",
 ]

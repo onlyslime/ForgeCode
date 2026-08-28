@@ -30,6 +30,7 @@ class InteractiveSession:
     undo: Callable[[list[str]], object] = lambda _args: {}
     rules: Callable[[], object] = lambda: {}
     files: Callable[[], object] = lambda: {}
+    skills: Callable[[list[str]], object] = lambda _args: {}
     quit: Callable[[], object] = lambda: {"stopped": True}
     output: Callable[[str], None] = print
     json_mode: bool = False
@@ -39,13 +40,13 @@ class InteractiveSession:
     _queue_chars: int = 0
     stopped: bool = False
 
-    COMMANDS = ("help", "status", "plan", "mode", "rules", "files", "review", "test", "compact", "undo", "quit")
+    COMMANDS = ("help", "status", "plan", "mode", "rules", "files", "skills", "skill", "review", "test", "compact", "undo", "quit")
 
     def header(self, *, run_id: str = "", mode: str = "plan", profile: str = "default", rules_count: int = 0, budget: int = 60_000) -> str:
         return f"ForgeCode session run={run_id or '<new>'} workspace=. mode={mode} profile={profile} rules={rules_count} budget={budget}"
 
     def help_text(self) -> str:
-        return "/help /status /plan [show|refresh] /mode plan|act /rules /files /review /test [command] /compact /undo [id|latest] /quit"
+        return "/help /status /plan [show|refresh] /mode plan|act /rules /files /skills [id] /review /test [command] /compact /undo [id|latest] /quit"
 
     def dispatch(self, line: str) -> object | None:
         line = line.rstrip("\r\n")
@@ -80,6 +81,9 @@ class InteractiveSession:
         if command == "files":
             if args: raise SlashCommandError("usage: /files")
             return self.files()
+        if command in {"skills", "skill"}:
+            if len(args) > 2 or (len(args) == 2 and args[1] != "--approve"): raise SlashCommandError("usage: /skills [id] [--approve]")
+            return self.skills(args)
         if command == "review":
             if args: raise SlashCommandError("usage: /review")
             return self.review()

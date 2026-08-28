@@ -1,6 +1,6 @@
 """Provider-neutral message and tool-calling contracts."""
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, asdict
 import math
 from typing import Any, Protocol, Sequence
 
@@ -115,3 +115,19 @@ class ProviderError(RuntimeError):
         self.retryable = retryable
         self.status_code = status_code
         self.attempt = attempt
+
+
+@dataclass(frozen=True)
+class ModelCapabilities:
+    """Provider-neutral declaration used by diagnostics and clients."""
+
+    tool_calling: bool = True
+    json_mode: bool = False
+    streaming: bool = False
+    max_input_chars: int = 400_000
+    max_output_chars: int = 200_000
+    supports_reasoning: bool = False
+    supports_temperature: bool = True
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)

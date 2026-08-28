@@ -31,9 +31,16 @@ Chat Completions 返回结构化 tool calls，ForgeCode 在用户指定工作区
 - **真实离线演示**：DemoProvider 在隔离工作区读取有 bug 的 calculator，先跑
   出失败测试，再走 patch 和审批，最后取得真实通过结果；不需要网络或 API key。
 
-当前版本：`v0.0.6`。
+当前版本：`v0.0.7`。
 
-### v0.0.6 工作流
+### v0.0.7 扩展能力
+
+- **Skills manifest**：`skills list|check|show|run` 发现显式 Markdown skill，严格校验 id、版本、输入 schema、权限、审批和配额；Markdown skill 默认只提供提示内容，不能自行获得写入、Shell、网络或密钥权限。
+- **增量上下文索引**：`context index|search|show|clear` 在 ignored 的 `.forgecode` 中维护本地 JSON 索引，按 digest 增量更新，搜索支持关键词、正则、符号、glob 和路径过滤；返回行号、bounded snippet、digest 和检索原因，文件变化或敏感内容会被排除。
+- **Provider diagnostics**：`provider health` 只读展示模型能力、streaming 和配置状态，不发起网络请求；运行时继续使用统一的 retry、SSE 校验、取消/超时和 session 审计路径。
+- **Lifecycle hooks**：工具和模型前后置事件可被受控 observer 记录；声明 `fail_closed` 的 hook 出错会阻止操作，默认 observer 不改变审批决定，递归调用会被拒绝。
+
+### v0.0.6 基础工作流
 
 - **作用域规则**：`rules show/check` 从根目录及目标目录链加载
   `AGENTS.md`，展示 source、scope、priority、digest、截断和冲突；规则只是
@@ -67,6 +74,15 @@ prompt -> bounded context -> model response/tool calls -> local tools
 `https://api.openai.com/v1`), and `FORGECODE_MODEL` from the environment. The
 offline `DemoProvider` follows the same `AgentLoop` and `ToolRegistry` path.
 
+The v0.0.7 release adds a strict Markdown skill manifest and a local
+incremental context index. `skills list|check|show|run` and
+`context index|search|show|clear` are read-only, bounded, JSON-capable
+interfaces; index snippets are digest-checked before use. `provider health`
+reports capabilities without a network request, while lifecycle hooks provide
+auditable before/after tool and model observations with optional fail-closed
+behavior. These additions do not grant extensions implicit shell, write,
+network or secret access.
+
 ## Quick start
 
 Requires Python 3.11+ and [uv](https://docs.astral.sh/uv/).
@@ -77,6 +93,10 @@ uv run forgecode doctor
 uv run forgecode tools
 uv run forgecode rules show
 uv run forgecode config validate
+uv run forgecode provider health
+uv run forgecode skills list
+uv run forgecode context index
+uv run forgecode context search "AgentLoop"
 uv run pytest
 ```
 
@@ -125,8 +145,10 @@ $lines | uv run forgecode --workspace $demo chat --demo --auto-approve
 
 Useful read-only commands include `plan`, `rules show|check`, `config
 show|validate`, `session show|export|inspect|compact|fork`, `status`, `diff`,
-and `transaction`. Machine-readable commands use `--json`; interactive JSON
-mode emits one JSON object per line. Exit codes are 0 success, 1 execution or
+and `review`/`transaction`. `review` joins the latest ledger with session
+plan, references, verification checks and audit metrics. Machine-readable
+commands use `--json` or `--jsonl`; interactive JSON mode emits one JSON object
+per line. Exit codes are 0 success, 1 execution or
 audit failure, 2 invalid input/unavailable resource, 3 recovery/hash/config
 conflict, and 130 cancellation.
 

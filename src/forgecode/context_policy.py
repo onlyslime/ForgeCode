@@ -26,7 +26,10 @@ _PRIVATE_PARTS = {
     "cache",
 }
 _PRIVATE_NAMES = {"credentials.json", "id_rsa", "id_ed25519", "authorized_keys"}
-_PRIVATE_SUFFIXES = (".pem", ".key", ".secret", ".p12", ".pfx", ".crt", ".cer")
+_PRIVATE_SUFFIXES = (
+    ".pem", ".key", ".secret", ".p12", ".pfx", ".crt", ".cer",
+    ".log", ".jsonl", ".bak", ".backup", ".orig", ".swp", ".tmp",
+)
 
 
 def is_sensitive_context_path(relative: str) -> bool:
@@ -88,4 +91,33 @@ def is_ignored_context_path(guard: WorkspaceGuard, path: Path) -> bool:
     return ignored
 
 
-__all__ = ["is_ignored_context_path", "is_sensitive_context_path"]
+def may_contain_negated_context_path(guard: WorkspaceGuard, path: Path) -> bool:
+    """Return whether an ignored directory has a later ``!`` exception.
+
+    Directory pruning must not hide an explicitly re-included descendant.  We
+    keep this check deliberately conservative: built-in sensitive directories
+    remain un traversed, while ordinary ignored directories are visited only
+    when a negated pattern could match something below them.  Files are still
+    evaluated by :func:`is_ignored_context_path` before indexing.
+    """
+    try:
+        relative = guard.relative(path).replace("\\", "/").strip("/")
+        if is_sensitive_context_path(relative):
+            return False
+        lines = (guard.root / ".gitignore").read_text(encoding="utf-8").splitlines()
+    except (OSError, UnicodeError, ValueError):
+        return False
+    prefix = relative + "/" if relative else ""
+    for line in lines:
+        stripped = line.strip()
+        if not stripped.startswith("!"):
+            continue
+        pattern = stripped[1:].replace("\\", "/").strip("/")
+        if not pattern:
+            continue
+        if pattern.startswith(prefix) or fnmatch.fnmatchcase(prefix + "candidate", pattern) or fnmatch.fnmatchcase(relative, pattern):
+            return True
+    return False
+
+
+__all__ = ["is_ignored_context_path", "is_sensitive_context_path", "may_contain_negated_context_path"]

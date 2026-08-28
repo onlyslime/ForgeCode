@@ -9,6 +9,8 @@ scenario both use the production loop, tools, approvals and verification.
 uv sync
 uv run forgecode doctor
 uv run forgecode tools
+uv run forgecode provider health
+uv run forgecode skills list
 $demo = Join-Path ([System.IO.Path]::GetTempPath()) ('forgecode-demo-' + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $demo | Out-Null
 uv run forgecode --workspace $demo run --demo --auto-approve
@@ -17,6 +19,19 @@ uv run forgecode --workspace $demo status
 uv run forgecode --workspace $demo diff
 uv run forgecode --workspace $demo transaction
 ```
+
+For the v0.0.7 context path, build and query the ignored incremental index:
+
+```powershell
+uv run forgecode --workspace $demo context index --json
+uv run forgecode --workspace $demo context search "calculator" --json
+uv run forgecode --workspace $demo context show --json
+```
+
+If the workspace contains an explicitly declared `skills/*.md`,
+`skills check|show|run` validates and previews it. Markdown skills only add
+bounded prompt text; executable or side-effecting entries require an approved
+executor and never bypass Plan/Act or WorkspaceGuard.
 
 ## What to point out
 

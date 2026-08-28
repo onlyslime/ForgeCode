@@ -103,7 +103,7 @@ class AgentLoop:
             self._record("approval", {"tool": tool_name, "arguments": safe_arguments, "approved": approved})
             self._approvals.append({"tool": tool_name, "approved": approved})
 
-        self.context = ToolContext(context.guard, context.approval, approval_observer=record_approval, mode=context.mode, secrets=context.secrets, deadline_monotonic=time.monotonic() + self.config.total_timeout_seconds, cancellation_requested=context.cancellation_requested, transaction_store=context.transaction_store, run_id=context.run_id or (session.run_id if session else ""), plan_id=context.plan_id, plan_item_id=context.plan_item_id, pre_side_effect_check=context.pre_side_effect_check, rules_fingerprint=context.rules_fingerprint, plan_fingerprint=context.plan_fingerprint, config_fingerprint=context.config_fingerprint)
+        self.context = ToolContext(context.guard, context.approval, approval_observer=record_approval, mode=context.mode, secrets=context.secrets, deadline_monotonic=time.monotonic() + self.config.total_timeout_seconds, cancellation_requested=context.cancellation_requested, transaction_store=context.transaction_store, run_id=context.run_id or (session.run_id if session else ""), plan_id=context.plan_id, plan_item_id=context.plan_item_id, pre_side_effect_check=context.pre_side_effect_check, rules_fingerprint=context.rules_fingerprint, plan_fingerprint=context.plan_fingerprint, config_fingerprint=context.config_fingerprint, hooks=context.hooks)
 
     def _record(self, kind: str, payload: dict[str, Any]) -> None:
         safe_payload = self._sanitize_session_payload(payload)
@@ -269,10 +269,18 @@ class AgentLoop:
             self._record("model_request", {"step": step, "message_count": len(request_messages), "context_chars": sum(len(message.content) for message in request_messages), "tool_count": len(self.registry.schemas(self.context.mode))})
             provider_started = time.monotonic()
             try:
+                if self.context.hooks is not None:
+                    hook_issues = self.context.hooks.emit("before_model", {"step": step, "message_count": len(request_messages), "tool_count": len(self.registry.schemas(self.context.mode))})
+                    if any(issue.blocked for issue in hook_issues):
+                        raise ProviderError("model request blocked by lifecycle hook", category="hook_blocked")
                 remaining = self.context.remaining_seconds(self.config.provider_timeout_seconds)
                 if remaining <= 0:
                     raise ProviderError("run deadline exceeded before provider request", category="deadline_exceeded")
                 response = await asyncio.wait_for(self.provider.complete(request_messages, self.registry.schemas(self.context.mode)), timeout=remaining)
+                if self.context.hooks is not None:
+                    hook_issues = self.context.hooks.emit("after_model", {"step": step, "finish_reason": getattr(response, "finish_reason", None), "tool_calls": len(getattr(getattr(response, "message", None), "tool_calls", ()))})
+                    if any(issue.blocked for issue in hook_issues):
+                        raise ProviderError("model response blocked by lifecycle hook", category="hook_blocked")
                 for retry in getattr(self.provider, "retry_events", ()):
                     self._record("provider_retry", retry)
             except (KeyboardInterrupt, asyncio.CancelledError):
@@ -497,14 +505,17 @@ class AgentLoop:
                 self._checkpoint(reason=f"tool:{call.name}")
                 messages.append(Message(role="tool", content=self._tool_message_content(tool_result), tool_call_id=call.id))
                 conflict_error = tool_result.metadata.get("error") if isinstance(tool_result.metadata, dict) else None
-                if conflict_error in {"stale_context", "context_revalidation_failed", "concurrency_conflict", "transaction_prepare_failed", "transaction_commit_failed"}:
+                if conflict_error in {"stale_context", "context_revalidation_failed", "concurrency_conflict", "transaction_prepare_failed", "transaction_commit_failed", "hook_failed_after_effect"}:
                     if not self.lifecycle.terminal:
                         try:
                             self._transition(RunState.RECOVERY_REQUIRED, reason=str(conflict_error))
                         except LifecycleError:
                             self.lifecycle.state = RunState.RECOVERY_REQUIRED
                     self._record("recovery_conflict", {"step": step, "id": call.id, "tool": call.name, "error": conflict_error, "reason": tool_result.output[:1_000]})
-                    result = LoopResult(tuple(messages), "recovery_conflict", tool_result.output[:2_000], verification_ok, self.context.mode.value, explored=tuple(explored), state=self.lifecycle.state.value, run_id=self.run_id, audit_complete=self.audit_complete, verifications=tuple(self._verification_results))
+                    conflict_message = tool_result.output[:1_800]
+                    if conflict_error and conflict_error not in conflict_message:
+                        conflict_message = f"{conflict_message} [{conflict_error}]"
+                    result = LoopResult(tuple(messages), "recovery_conflict", conflict_message[:2_000], verification_ok, self.context.mode.value, explored=tuple(explored), state=self.lifecycle.state.value, run_id=self.run_id, audit_complete=self.audit_complete, verifications=tuple(self._verification_results))
                     self._record("final", {"stopped_reason": result.stopped_reason, "error": result.error, "state": result.state})
                     return result
                 if side_effecting and self.lifecycle.state is RunState.ACTING:

@@ -47,6 +47,7 @@ class ToolContext:
     rules_fingerprint: str = ""
     plan_fingerprint: str = ""
     config_fingerprint: str = ""
+    hooks: Any | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "mode", AgentMode(self.mode))
@@ -163,6 +164,12 @@ class ToolRegistry:
             )
         if not isinstance(arguments, dict):
             return ToolResult(False, "tool arguments must be an object", {"error": "invalid_arguments"})
+        before_hook_issues = ()
+        if context.hooks is not None:
+            before_hook_issues = context.hooks.emit("before_tool", {"tool": name, "arguments": arguments, "mode": context.mode.value})
+            blocked = [issue for issue in before_hook_issues if issue.blocked]
+            if blocked:
+                return ToolResult(False, f"{name} blocked by lifecycle hook", {"error": "hook_blocked", "hook_issues": [issue.to_dict() for issue in before_hook_issues]})
         try:
             result = tool.execute(arguments, context)
             if not isinstance(result, ToolResult):
@@ -172,8 +179,26 @@ class ToolRegistry:
             safe_output = redact_text(result.output, context.secrets)
             safe_metadata = redact_value(result.metadata, context.secrets)
             if len(safe_output) <= self.max_output_chars:
-                return ToolResult(result.ok, safe_output, safe_metadata)
-            metadata = {**safe_metadata, "truncated": True, "original_output_chars": len(safe_output)}
-            return ToolResult(result.ok, safe_output[: self.max_output_chars] + "\n[tool output truncated]", metadata)
+                final = ToolResult(result.ok, safe_output, safe_metadata)
+            else:
+                metadata = {**safe_metadata, "truncated": True, "original_output_chars": len(safe_output)}
+                final = ToolResult(result.ok, safe_output[: self.max_output_chars] + "\n[tool output truncated]", metadata)
+            if context.hooks is not None:
+                after_hook_issues = context.hooks.emit("after_tool", {"tool": name, "ok": final.ok, "output": final.output[:4_000], "metadata": final.metadata})
+                if before_hook_issues or after_hook_issues:
+                    final = ToolResult(final.ok, final.output, {**final.metadata, "hook_issues": [issue.to_dict() for issue in (*before_hook_issues, *after_hook_issues)]})
+                blocked = [issue for issue in after_hook_issues if issue.blocked]
+                if blocked:
+                    # The operation has already returned (and may have
+                    # committed a transaction).  Do not claim that a
+                    # side-effect was prevented; retain the real result and
+                    # expose the fail-closed issue for the caller's audit.
+                    return ToolResult(final.ok, final.output, {**final.metadata, "error": "hook_failed_after_effect", "hook_issues": [issue.to_dict() for issue in after_hook_issues]})
+            return final
         except Exception as exc:  # tool errors become model context, never process crashes
-            return ToolResult(False, redact_text(f"{type(exc).__name__}: {exc}", context.secrets), {"error": type(exc).__name__})
+            final = ToolResult(False, redact_text(f"{type(exc).__name__}: {exc}", context.secrets), {"error": type(exc).__name__})
+            if context.hooks is not None:
+                after_hook_issues = context.hooks.emit("after_tool", {"tool": name, "ok": False, "error": type(exc).__name__})
+                if before_hook_issues or after_hook_issues:
+                    final = ToolResult(final.ok, final.output, {**final.metadata, "hook_issues": [issue.to_dict() for issue in (*before_hook_issues, *after_hook_issues)]})
+            return final
