@@ -11,9 +11,11 @@ import io
 import json
 import threading
 import uuid
+from pathlib import Path
 from typing import Any, Iterable
 
 from .application.commands import main
+from .security.trust import TrustStore, TrustError
 
 _SESSION_LOCK = threading.RLock()
 _RPC_SESSIONS: dict[str, dict[str, Any]] = {}
@@ -51,6 +53,11 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                 if not isinstance(params, dict) or len(params) > 16:
                     raise ValueError("params must be a bounded object")
                 argv_value = list(method_map[method])
+                if method.startswith("trust.") and params.get("workspace") is not None:
+                    workspace = params.get("workspace")
+                    if not isinstance(workspace, str) or len(workspace) > 1_000 or any(ch in workspace for ch in "\r\n"):
+                        raise ValueError("trust.workspace is invalid")
+                    argv_value = ["--workspace", workspace, *argv_value]
                 if method == "session.open":
                     workspace = params.get("workspace", ".")
                     mode = params.get("mode", "plan")
@@ -76,6 +83,14 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                         raise ValueError("session handle is unknown")
                     with _SESSION_LOCK:
                         info = _RPC_SESSIONS.get(handle, {})
+                        if info.get("mode") == "act":
+                            try:
+                                trusted = TrustStore(Path(info["workspace"])).status().get("trusted", False)
+                            except TrustError:
+                                trusted = False
+                            if not trusted:
+                                info["state"] = "trust_revoked"
+                                raise ValueError("workspace trust is not granted")
                         if method in {"session.pause", "session.resume", "session.cancel", "session.approval"} and info.get("state") in {"completed", "failed", "cancelled", "approval_denied"}:
                             raise ValueError("session is terminal and cannot be controlled")
                         if method == "session.cancel": info["state"] = "cancelled"
@@ -113,6 +128,12 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                         with _SESSION_LOCK:
                             info = _RPC_SESSIONS.get(handle)
                         if info is None: raise ValueError("session handle is unknown")
+                        if info.get("mode") == "act":
+                            try:
+                                trusted = TrustStore(Path(info["workspace"])).status().get("trusted", False)
+                            except TrustError:
+                                trusted = False
+                            if not trusted: raise ValueError("workspace trust is not granted")
                         global_args.extend(["--workspace", info["workspace"]])
                         argv_value.extend(["--mode", info["mode"], "--session", info["session_path"]])
                     for key, flag in (("workspace", "--workspace"), ("mode", "--mode"), ("session", "--session"), ("profile", "--profile")):

@@ -85,3 +85,13 @@ def test_rpc_idempotency_caches_multi_event_response(tmp_path):
     second = list(serve_lines([json.dumps(request)]))
     assert first == second
     assert json.loads(second[-1])["id"] == "doctor-replay"
+
+
+def test_rpc_act_handle_fails_closed_after_trust_revoke(tmp_path):
+    _call({"method": "trust.grant", "params": {"workspace": str(tmp_path)}})
+    opened = _call({"method": "session.open", "params": {"workspace": str(tmp_path), "mode": "act"}})
+    handle = opened["data"]["session"]
+    _call({"method": "trust.revoke", "params": {"workspace": str(tmp_path)}})
+    denied = _call({"method": "session.status", "params": {"session": handle}})
+    assert denied["ok"] is False
+    assert "trust" in denied["error"]["message"]
