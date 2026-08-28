@@ -42,6 +42,12 @@ def test_rpc_session_open_validates_bounds():
     assert "plan or act" in payload["error"]["message"]
 
 
+def test_rpc_session_open_canonicalizes_workspace(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    payload = _call({"method": "session.open", "params": {"workspace": "."}})
+    assert payload["data"]["workspace"] == str(tmp_path.resolve())
+
+
 def test_rpc_session_run_requires_handle():
     payload = _call({"method": "session.run", "params": {"prompt": "hello"}})
     assert payload["ok"] is False

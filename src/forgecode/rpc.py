@@ -145,6 +145,9 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                     mode = params.get("mode", "plan")
                     if not isinstance(workspace, str) or len(workspace) > 1_000 or any(ch in workspace for ch in "\r\n"):
                         raise ValueError("session.open.workspace is invalid")
+                    workspace = str(Path(workspace).expanduser().resolve())
+                    if not Path(workspace).is_dir():
+                        raise ValueError("session.open.workspace must be an existing directory")
                     if mode not in {"plan", "act"}:
                         raise ValueError("session.open.mode must be plan or act")
                     requested_handle = params.get("session")
