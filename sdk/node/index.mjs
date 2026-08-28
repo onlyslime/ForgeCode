@@ -35,3 +35,5 @@ export const trust = (action = "status", options = {}) => invoke(["trust", actio
 export const login = (options = {}) => invoke(["login"], options);
 export const method = (name, options = {}) => invoke([], { ...options, method: name });
 export const run = (prompt, options = {}) => method("run", { ...options, params: { ...(options.params ?? {}), prompt } });
+export const sessionInspect = (session, options = {}) => method("session.inspect", { ...options, params: { ...(options.params ?? {}), session } });
+export const sessionTree = (options = {}) => method("session.tree", options);

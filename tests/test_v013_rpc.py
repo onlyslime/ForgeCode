@@ -51,3 +51,8 @@ def test_rpc_run_method_requires_bounded_prompt(tmp_path):
     assert any(item.get("kind") == "result" for item in results)
     bad = json.loads(next(serve_lines([json.dumps({"method": "run", "params": {"prompt": ""}})])))
     assert bad["error"]["code"] == "invalid_request"
+
+
+def test_rpc_session_method_validates_parameters(tmp_path):
+    bad = json.loads(next(serve_lines([json.dumps({"method": "session.inspect", "params": {}})])))
+    assert bad["error"]["code"] == "invalid_request"

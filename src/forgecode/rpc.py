@@ -28,7 +28,7 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
             if method is not None:
                 if not isinstance(method, str) or len(method) > 128 or any(ch.isspace() for ch in method):
                     raise ValueError("method must be bounded non-whitespace text")
-                method_map = {"trust.status": ["trust", "status"], "trust.grant": ["trust", "grant"], "trust.revoke": ["trust", "revoke"], "provider.list": ["provider", "list"], "provider.health": ["provider", "health"], "config.show": ["config", "show"], "doctor": ["doctor"], "login": ["login"], "run": ["run"]}
+                method_map = {"trust.status": ["trust", "status"], "trust.grant": ["trust", "grant"], "trust.revoke": ["trust", "revoke"], "provider.list": ["provider", "list"], "provider.health": ["provider", "health"], "config.show": ["config", "show"], "doctor": ["doctor"], "login": ["login"], "run": ["run"], "session.inspect": ["session", "inspect"], "session.tree": ["session", "tree"], "session.export": ["session", "export"]}
                 if method not in method_map:
                     raise ValueError("unsupported RPC method")
                 if argv_value:
@@ -54,6 +54,15 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                     if params.get("require_trust") is True: argv_value.append("--require-trust")
                     if params.get("demo") is True: argv_value.append("--demo")
                     argv_value = global_args + argv_value
+                elif method.startswith("session."):
+                    session_id = params.get("session") or params.get("session_id")
+                    if method == "session.tree":
+                        limit = params.get("limit", 50)
+                        if isinstance(limit, bool) or not isinstance(limit, int): raise ValueError("session.tree limit must be an integer")
+                        argv_value.extend(["--limit", str(max(1, min(200, limit)))])
+                    else:
+                        if not isinstance(session_id, str) or not session_id.strip() or len(session_id) > 512: raise ValueError("session parameter is required and bounded")
+                        argv_value.append(session_id)
                 argv_value.append("--jsonl")
             if not isinstance(argv_value, list):
                 raise ValueError("argv must be an array")
