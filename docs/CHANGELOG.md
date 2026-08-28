@@ -32,6 +32,8 @@ slice.
   callers must resume or cancel first.
 - Made control/close operations on orphaned `recovery_required` handles fail
   closed until an explicit recovery run reclaims them.
+- Exposed validated model profile discovery through the `config.profiles` RPC
+  method and Node `configProfiles` helper.
 - Verification: full regression `444 passed, 8 skipped, 2 warnings`, RPC
   lifecycle suite, compile, and CLI/doctor checks.
 

@@ -93,6 +93,9 @@ Provider health is offline by default. `provider health --probe` is an explicit
 opt-in reachability check, bounded to a short HEAD request and never including
 credential values; offline policy or missing configuration prevents the
 request and returns a structured reason.
+The `config.profiles` RPC method exposes the same validated profile/model
+discovery as the CLI `config profiles` command, allowing SDK clients to select
+an explicit profile on their next run without reading local config files.
 
 The Node client raises `ForgeCodeError` for timeout, output-limit, empty
 response, process spawn failures, invalid JSON (including malformed stream lines), and `ok=false` envelopes. `invoke` accepts bounded
