@@ -214,6 +214,18 @@ class ProviderError(RuntimeError):
         # as completed or replay its side effects automatically.
         self.unresolved = bool(unresolved)
 
+    def to_dict(self) -> dict[str, Any]:
+        """Return bounded diagnostic fields safe for envelopes and telemetry."""
+        return {
+            "category": self.category,
+            "retryable": self.retryable,
+            "status_code": self.status_code,
+            "attempt": self.attempt,
+            "request_id": self.request_id,
+            "unresolved": self.unresolved,
+            "message": str(self)[:500],
+        }
+
 
 @dataclass(frozen=True)
 class ModelCapabilities:
