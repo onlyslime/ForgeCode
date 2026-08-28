@@ -26,6 +26,8 @@ last 100 sequenced control events, and `session.cancel`, `session.pause`, and
 `session.resume` append one monotonic sequence event. `session.close` revokes
 the handle. `session.run` requires a live handle and inherits its workspace and
 mode; unknown or malformed handles fail closed with `invalid_request`.
+Close also removes the persisted recovery record, so a closed handle cannot be
+reopened after daemon restart.
 `session.approval` accepts only a boolean decision and records either a running
 or approval-denied state, allowing clients to complete an explicit approval
 handshake without bypassing CLI policy.
