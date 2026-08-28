@@ -32,6 +32,9 @@ reopened after daemon restart.
 `session.approval` accepts only a boolean decision and records either a running
 or approval-denied state, allowing clients to complete an explicit approval
 handshake without bypassing CLI policy.
+`session.close` rejects active running handles; clients must cancel or await
+completion before revocation so an in-flight worker cannot lose its recovery
+metadata.
 `session.events` accepts bounded `after` and `limit` cursors and returns
 `next_sequence`, so a disconnected client can resume event consumption without
 replaying already acknowledged records. Responses also include

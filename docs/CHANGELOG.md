@@ -23,6 +23,7 @@ slice.
 - Hardened embedded shutdown with terminate/kill fallbacks and bounded waits.
 - Serialized RPC session runs and made cancelled/failed/denied handles terminal
   with explicit recovery semantics.
+- Prevented closing active RPC handles before cancellation or completion.
 - Canonicalized persisted RPC workspaces and bounded request identifiers.
 - Normalized Node/Python SDK limits and process/JSON error contracts.
 - Verification: targeted RPC/embed/provider/telemetry gate (43 passed), Node
