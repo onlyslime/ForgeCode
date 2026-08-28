@@ -64,6 +64,15 @@ def session_result(session: str, *, workspace: str | None = None, request_id: st
     return list(stream([request], raise_for_status=raise_for_status, max_response_bytes=max_response_bytes))
 
 
+def session_wait(session: str, *, timeout: float = 30.0, request_id: str | int | None = None, raise_for_status: bool = False) -> list[dict[str, Any]]:
+    if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or timeout < 0 or timeout > 60:
+        raise ValueError("timeout must be between 0 and 60 seconds")
+    params = {"session": session, "timeout": timeout}
+    request = {"method": "session.wait", "params": params}
+    if request_id is not None: request["id"] = request_id
+    return list(stream([request], raise_for_status=raise_for_status))
+
+
 def stream(requests: Iterable[dict[str, Any]], *, raise_for_status: bool = False, max_items: int = 1024, max_response_bytes: int = 2_000_000) -> Iterable[dict[str, Any]]:
     """Process JSON-compatible RPC requests in order."""
     if isinstance(max_items, bool) or max_items < 1 or max_items > 100_000:
@@ -98,7 +107,7 @@ def stream(requests: Iterable[dict[str, Any]], *, raise_for_status: bool = False
         yield envelope
 
 
-__all__ = ["ForgeCodeError", "invoke", "session_result", "stream"]
+__all__ = ["ForgeCodeError", "invoke", "session_result", "session_wait", "stream"]
 
 
 class EmbeddedSession:

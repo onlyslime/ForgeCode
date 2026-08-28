@@ -32,6 +32,8 @@ slice.
   retrieval contract.
 - Exported the Python result helper through the package-level
   `session_result_embedded` API for discoverable embedding use.
+- Added bounded `session.wait` RPC plus Node/Python helpers to await background
+  runs without polling.
 - Isolated RPC pause/resume now attempt OS-level suspension signals where
   supported and record the applied control mechanism in session events.
 - Prevented closing paused RPC handles while their worker may still be alive;

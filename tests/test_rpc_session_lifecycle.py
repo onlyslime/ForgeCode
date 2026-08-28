@@ -174,6 +174,8 @@ def test_rpc_background_run_persists_structured_result(tmp_path, monkeypatch):
     assert result["data"]["result"][0]["data"]["answer"] == 42
     recovered = _call({"method": "session.open", "params": {"workspace": str(tmp_path), "session": handle}})
     assert recovered["data"]["recovered"] is True
+    waited = _call({"method": "session.wait", "params": {"session": handle, "timeout": 0}})
+    assert waited["data"]["timed_out"] is False
 
 
 def test_rpc_isolated_background_run_can_be_terminated(tmp_path):

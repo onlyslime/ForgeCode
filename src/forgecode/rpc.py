@@ -256,7 +256,7 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
             if method is not None:
                 if not isinstance(method, str) or len(method) > 128 or any(ch.isspace() for ch in method):
                     raise ValueError("method must be bounded non-whitespace text")
-                method_map = {"trust.status": ["trust", "status"], "trust.grant": ["trust", "grant"], "trust.revoke": ["trust", "revoke"], "provider.list": ["provider", "list"], "provider.health": ["provider", "health"], "config.show": ["config", "show"], "config.profiles": ["config", "profiles"], "doctor": ["doctor"], "login": ["login"], "run": ["run"], "session.open": ["session", "open"], "session.run": ["run"], "session.events": ["session", "events"], "session.cancel": ["session", "cancel"], "session.pause": ["session", "pause"], "session.resume": ["session", "resume"], "session.approval": ["session", "approval"], "session.close": ["session", "close"], "session.status": ["session", "status"], "session.result": ["session", "result"], "session.inspect": ["session", "inspect"], "session.tree": ["session", "tree"], "session.export": ["session", "export"]}
+                method_map = {"trust.status": ["trust", "status"], "trust.grant": ["trust", "grant"], "trust.revoke": ["trust", "revoke"], "provider.list": ["provider", "list"], "provider.health": ["provider", "health"], "config.show": ["config", "show"], "config.profiles": ["config", "profiles"], "doctor": ["doctor"], "login": ["login"], "run": ["run"], "session.open": ["session", "open"], "session.run": ["run"], "session.events": ["session", "events"], "session.cancel": ["session", "cancel"], "session.pause": ["session", "pause"], "session.resume": ["session", "resume"], "session.approval": ["session", "approval"], "session.close": ["session", "close"], "session.status": ["session", "status"], "session.result": ["session", "result"], "session.wait": ["session", "wait"], "session.inspect": ["session", "inspect"], "session.tree": ["session", "tree"], "session.export": ["session", "export"]}
                 if method not in method_map:
                     raise ValueError("unsupported RPC method")
                 if argv_value:
@@ -331,7 +331,7 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                                 oldest = next(iter(_RPC_REPLAYS)); _RPC_REPLAYS.pop(oldest, None); _RPC_FINGERPRINTS.pop(oldest, None)
                     yield encoded
                     continue
-                if method in {"session.close", "session.status", "session.result", "session.events", "session.cancel", "session.pause", "session.resume", "session.approval"}:
+                if method in {"session.close", "session.status", "session.result", "session.wait", "session.events", "session.cancel", "session.pause", "session.resume", "session.approval"}:
                     handle = params.get("session") or params.get("session_id")
                     with _SESSION_LOCK: _prune_sessions()
                     if handle not in _RPC_SESSIONS:
@@ -414,6 +414,18 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                     if info.get("result") is not None:
                         data["result"] = info["result"]
                     if method == "session.result":
+                        data["result"] = info.get("result")
+                    if method == "session.wait":
+                        timeout = params.get("timeout", 30.0)
+                        if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or timeout < 0 or timeout > 60:
+                            raise ValueError("session.wait.timeout must be between 0 and 60 seconds")
+                        deadline = time.monotonic() + float(timeout)
+                        while info.get("state") in {"running", "paused"} and time.monotonic() < deadline:
+                            _SESSION_LOCK.release()
+                            time.sleep(0.01)
+                            _SESSION_LOCK.acquire()
+                            info = _RPC_SESSIONS.get(handle, info)
+                        data["timed_out"] = info.get("state") in {"running", "paused"}
                         data["result"] = info.get("result")
                     if method == "session.events":
                         after = params.get("after", 0)

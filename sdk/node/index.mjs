@@ -113,6 +113,7 @@ export const sessionTree = (options = {}) => method("session.tree", options);
 export const sessionOpen = (options = {}) => method("session.open", options);
 export const sessionStatus = (session, options = {}) => method("session.status", { ...options, params: { ...(options.params ?? {}), session } });
 export const sessionResult = (session, options = {}) => method("session.result", { ...options, params: { ...(options.params ?? {}), session } });
+export const sessionWait = (session, options = {}) => method("session.wait", { ...options, params: { ...(options.params ?? {}), session, ...(options.timeout === undefined ? {} : { timeout: options.timeout }) } });
 export const sessionEvents = (session, options = {}) => method("session.events", { ...options, params: { ...(options.params ?? {}), session, ...(options.after === undefined ? {} : { after: options.after }), ...(options.limit === undefined ? {} : { limit: options.limit }) } });
 export const sessionRun = (session, prompt, options = {}) => method("session.run", { ...options, params: { ...(options.params ?? {}), session, prompt } });
 export const sessionControl = (session, action, options = {}) => method(`session.${action}`, { ...options, params: { ...(options.params ?? {}), session } });

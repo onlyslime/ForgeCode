@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from forgecode.embed import ForgeCodeError, invoke, session_result, stream
+from forgecode.embed import ForgeCodeError, invoke, session_result, session_wait, stream
 import forgecode
 
 
@@ -69,3 +69,5 @@ def test_embed_session_result_validates_handle():
     with pytest.raises(ValueError):
         session_result("x\ny")
     assert forgecode.session_result_embedded is session_result
+    with pytest.raises(ValueError):
+        session_wait("x", timeout=61)
