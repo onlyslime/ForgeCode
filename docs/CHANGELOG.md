@@ -12,6 +12,8 @@ slice.
 - Verification: Node SDK contract and RPC session tests.
 - Corrected Node `sessionTree()` direct workspace/limit options to map into
   RPC parameters; this compatibility fix remains grouped under v0.0.33.
+- Aligned direct workspace options across Node session open/status/result/wait,
+  events, control, inspect, and run helpers; grouped under v0.0.33.
 
 ## v0.0.32 — 2026-08-29
 

@@ -114,7 +114,7 @@ export const login = ({ profile, provider, apiKeyEnv, ...options } = {}) => invo
 });
 export const method = (name, options = {}) => invoke([], { ...options, method: name });
 export const run = (prompt, options = {}) => method("run", { ...options, params: { ...(options.params ?? {}), prompt } });
-export const sessionInspect = (session, options = {}) => method("session.inspect", { ...options, params: { ...(options.params ?? {}), session } });
+export const sessionInspect = (session, { workspace, ...options } = {}) => method("session.inspect", { ...options, params: { ...(options.params ?? {}), session, ...(workspace === undefined ? {} : { workspace }) } });
 export const sessionTree = ({ workspace, limit, ...options } = {}) => method("session.tree", {
   ...options,
   params: {
@@ -132,13 +132,21 @@ export const sessionList = ({ workspace, state, limit, ...options } = {}) => met
     ...(limit === undefined ? {} : { limit }),
   },
 });
-export const sessionOpen = (options = {}) => method("session.open", options);
-export const sessionStatus = (session, options = {}) => method("session.status", { ...options, params: { ...(options.params ?? {}), session } });
-export const sessionResult = (session, options = {}) => method("session.result", { ...options, params: { ...(options.params ?? {}), session } });
-export const sessionWait = (session, options = {}) => method("session.wait", { ...options, params: { ...(options.params ?? {}), session, ...(options.timeout === undefined ? {} : { timeout: options.timeout }) } });
-export const sessionEvents = (session, options = {}) => method("session.events", { ...options, params: { ...(options.params ?? {}), session, ...(options.after === undefined ? {} : { after: options.after }), ...(options.limit === undefined ? {} : { limit: options.limit }) } });
-export const sessionRun = (session, prompt, options = {}) => method("session.run", { ...options, params: { ...(options.params ?? {}), session, prompt } });
-export const sessionControl = (session, action, options = {}) => method(`session.${action}`, { ...options, params: { ...(options.params ?? {}), session } });
+export const sessionOpen = ({ workspace, mode, session, ...options } = {}) => method("session.open", {
+  ...options,
+  params: {
+    ...(options.params ?? {}),
+    ...(workspace === undefined ? {} : { workspace }),
+    ...(mode === undefined ? {} : { mode }),
+    ...(session === undefined ? {} : { session }),
+  },
+});
+export const sessionStatus = (session, { workspace, ...options } = {}) => method("session.status", { ...options, params: { ...(options.params ?? {}), session, ...(workspace === undefined ? {} : { workspace }) } });
+export const sessionResult = (session, { workspace, ...options } = {}) => method("session.result", { ...options, params: { ...(options.params ?? {}), session, ...(workspace === undefined ? {} : { workspace }) } });
+export const sessionWait = (session, { workspace, timeout, ...options } = {}) => method("session.wait", { ...options, params: { ...(options.params ?? {}), session, ...(workspace === undefined ? {} : { workspace }), ...(timeout === undefined ? {} : { timeout }) } });
+export const sessionEvents = (session, { workspace, after, limit, ...options } = {}) => method("session.events", { ...options, params: { ...(options.params ?? {}), session, ...(workspace === undefined ? {} : { workspace }), ...(after === undefined ? {} : { after }), ...(limit === undefined ? {} : { limit }) } });
+export const sessionRun = (session, prompt, { workspace, ...options } = {}) => method("session.run", { ...options, params: { ...(options.params ?? {}), session, prompt, ...(workspace === undefined ? {} : { workspace }) } });
+export const sessionControl = (session, action, { workspace, ...options } = {}) => method(`session.${action}`, { ...options, params: { ...(options.params ?? {}), session, ...(workspace === undefined ? {} : { workspace }) } });
 export const sessionClose = (session, options = {}) => sessionControl(session, "close", options);
 export const sessionApproval = (session, approved, options = {}) => method("session.approval", { ...options, params: { ...(options.params ?? {}), session, approved } });
 export const configProfiles = (options = {}) => method("config.profiles", options);

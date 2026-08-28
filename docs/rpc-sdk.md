@@ -58,6 +58,9 @@ tail, available as a diagnostic-only `stderr` property.
 Spawn failures are emitted as typed `process_error` events to listeners rather
 than becoming uncaught child-process errors in the host application.
 
+Node session helpers accept workspace directly in their options (for example
+`sessionOpen({ workspace, mode })`, `sessionTree({ workspace, limit })`, and
+`sessionList({ workspace, limit, state })`) and map it into RPC parameters.
 The Node SDK exposes `sessionList({ workspace, limit, state })`, backed by the
 `session.list` method. State filters are bounded to the known lifecycle states
 and workspace paths are canonicalized before discovery; limits are 1–200.
