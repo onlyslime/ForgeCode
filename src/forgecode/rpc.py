@@ -43,7 +43,12 @@ def _persist_session(handle: str, info: dict[str, Any]) -> None:
     with tmp.open("w", encoding="utf-8") as stream:
         stream.write(encoded)
         stream.flush()
-        os.fsync(stream.fileno())
+        try:
+            os.fsync(stream.fileno())
+        except OSError:
+            # Some Windows/network filesystems do not expose file fsync;
+            # flush plus atomic replace still preserves a complete record.
+            pass
     tmp.replace(path)
     try:
         directory_fd = os.open(str(path.parent), os.O_RDONLY)

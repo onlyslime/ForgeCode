@@ -55,6 +55,13 @@ def test_rpc_session_open_canonicalizes_workspace(tmp_path, monkeypatch):
     assert payload["data"]["workspace"] == str(tmp_path.resolve())
 
 
+def test_rpc_session_persistence_tolerates_unsupported_fsync(tmp_path, monkeypatch):
+    import forgecode.rpc as rpc
+    monkeypatch.setattr(rpc.os, "fsync", lambda _fd: (_ for _ in ()).throw(OSError("unsupported")))
+    payload = _call({"method": "session.open", "params": {"workspace": str(tmp_path)}})
+    assert payload["ok"] is True
+
+
 def test_rpc_session_run_requires_handle():
     payload = _call({"method": "session.run", "params": {"prompt": "hello"}})
     assert payload["ok"] is False
