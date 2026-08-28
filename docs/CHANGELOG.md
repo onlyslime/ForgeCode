@@ -47,6 +47,7 @@ slice.
 - Added telemetry export `returned_count` and `truncated` metadata for bounded
   audit exports.
 - Applied argv bounds consistently to Node streaming invocation.
+- Rejected non-standard NaN/Infinity values in Python embedding stream JSON.
 - Normalized writes to exited embedded workers as typed `process_error` failures.
 - Added profile/provider credential selectors to the Node login helper.
 - Normalized Node child-process spawn failures to typed `process_error` errors.
