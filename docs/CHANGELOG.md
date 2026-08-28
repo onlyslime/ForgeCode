@@ -30,6 +30,8 @@ slice.
 - Bounded JSONL RPC request lines to 1 MiB before parsing.
 - Documented the bounded request-line contract and `request_too_large` error.
 - Verified cancellation markers survive persisted RPC handle recovery.
+- Closed embedded worker pipe handles during shutdown to avoid Windows resource
+  warnings after forced termination.
 - Canonicalized persisted RPC workspaces and bounded request identifiers.
 - Normalized Node/Python SDK limits and process/JSON error contracts.
 - Verification: targeted RPC/embed/provider/telemetry/cancellation gate (74 passed), Node
