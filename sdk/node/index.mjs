@@ -74,7 +74,15 @@ export function invokeStream(argv = [], options = {}) {
 }
 
 export const trust = (action = "status", options = {}) => invoke(["trust", action], options);
-export const login = (options = {}) => invoke(["login"], options);
+export const login = ({ profile, provider, apiKeyEnv, ...options } = {}) => invoke([], {
+  ...options,
+  method: "login",
+  params: {
+    ...(profile === undefined ? {} : { profile }),
+    ...(provider === undefined ? {} : { provider }),
+    ...(apiKeyEnv === undefined ? {} : { api_key_env: apiKeyEnv }),
+  },
+});
 export const method = (name, options = {}) => invoke([], { ...options, method: name });
 export const run = (prompt, options = {}) => method("run", { ...options, params: { ...(options.params ?? {}), prompt } });
 export const sessionInspect = (session, options = {}) => method("session.inspect", { ...options, params: { ...(options.params ?? {}), session } });

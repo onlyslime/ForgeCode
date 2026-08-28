@@ -56,6 +56,8 @@ The Node client raises `ForgeCodeError` for timeout, output-limit, empty
 response, invalid JSON (including malformed stream lines), and `ok=false` envelopes. `invoke` accepts bounded
 `timeoutMs` and `maxOutputBytes`; `invokeStream` supports the same method/params
 RPC transport for programmatic callers.
+The Node `login({ profile, provider, apiKeyEnv })` helper forwards the same
+bounded selectors as the CLI and RPC login methods.
 
 Python embedding mirrors this contract with `forgecode.embed.ForgeCodeError`.
 `invoke(..., raise_for_status=True)` and `stream(..., raise_for_status=True)`
