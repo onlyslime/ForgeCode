@@ -123,10 +123,25 @@ export function interactive(workspace, { mode = "plan", executable = "forgecode"
   const child = spawn(executable, ["--workspace", workspace, "chat", "--mode", mode, "--jsonl"], { stdio: ["pipe", "pipe", "pipe"] });
   let buffer = ""; const events = []; const listeners = new Set();
   child.stdout.on("data", (chunk) => { buffer += chunk; const lines = buffer.split(/\r?\n/); buffer = lines.pop(); for (const line of lines) if (line.trim()) { const event = JSON.parse(line); events.push(event); if (events.length > maxEvents) events.splice(0, events.length - maxEvents); for (const listener of listeners) listener(event); } });
+  let closed = false;
   return {
     process: child,
-    send(text) { if (typeof text !== "string" || !text.trim() || text.length > 8000) throw new Error("message must be non-empty and bounded"); child.stdin.write(text.replace(/[\r\n]/g, " ") + "\n"); },
-    cancel() { this.send("/cancel"); }, pause() { this.send("/pause"); }, resume() { this.send("/resume"); }, close() { this.send("/quit"); },
+    send(text) { if (closed) throw new ForgeCodeError("interactive process is closed", { code: "process_error" }); if (typeof text !== "string" || !text.trim() || text.length > 8000) throw new Error("message must be non-empty and bounded"); try { child.stdin.write(text.replace(/[\r\n]/g, " ") + "\n"); } catch (error) { throw new ForgeCodeError(error.message || "interactive process is unavailable", { code: "process_error" }); } },
+    cancel() { this.send("/cancel"); }, pause() { this.send("/pause"); }, resume() { this.send("/resume"); }, close() { if (!closed) { try { child.stdin.write("/quit\n"); } catch {} closed = true; } },
     on(listener) { listeners.add(listener); return () => listeners.delete(listener); }, events,
+    async closeAndWait(timeoutMs = 3000) {
+      boundedNumber(timeoutMs, "timeoutMs");
+      if (closed) return child.exitCode;
+      closed = true;
+      try { child.stdin.write("/quit\n"); } catch {}
+      if (child.exitCode === null) {
+        await new Promise((resolve) => {
+          const timer = setTimeout(resolve, timeoutMs);
+          child.once("close", () => { clearTimeout(timer); resolve(); });
+        });
+      }
+      if (child.exitCode === null) child.kill();
+      return child.exitCode;
+    },
   };
 }

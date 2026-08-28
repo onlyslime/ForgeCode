@@ -9,6 +9,11 @@ assert.throws(() => invoke([], { method: "doctor", params: { value: "x".repeat(1
 assert.throws(() => invokeStream([], { maxItems: 0 }), TypeError);
 assert.throws(() => invokeStream([], { maxStderrBytes: 0 }), TypeError);
 assert.throws(() => interactive(".", { maxEvents: 0 }), TypeError);
+{
+  const session = interactive(".", { executable: process.execPath });
+  session.close();
+  assert.throws(() => session.send("hello"), (error) => error.code === "process_error");
+}
 assert.throws(() => invokeStream(["x".repeat(1001)]), TypeError);
 try {
   await invoke([], { executable: process.execPath, method: "bad method", timeoutMs: 1000 });

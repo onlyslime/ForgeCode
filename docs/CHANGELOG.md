@@ -24,6 +24,8 @@ slice.
   embedding backpressure explicit and reject unsafe queue sizes.
 - Bounded Node SDK stderr diagnostics and interactive event retention with
   explicit `maxStderrBytes`/`maxEvents` limits.
+- Added typed closed-session writes and bounded `interactive.closeAndWait()`
+  cleanup with terminate fallback.
 - Verification: full regression `444 passed, 8 skipped, 2 warnings`, RPC
   lifecycle suite, compile, and CLI/doctor checks.
 

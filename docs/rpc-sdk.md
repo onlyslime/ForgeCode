@@ -31,6 +31,9 @@ the persisted session/RPC cursors for durable recovery.
 The Node `invokeStream` helper similarly caps diagnostic stderr via
 `maxStderrBytes` (256 KiB by default), and `interactive` retains only a
 bounded `maxEvents` window (2,048 by default).
+Node interactive sessions reject writes after `close()` with typed
+`process_error`; `closeAndWait(timeoutMs)` provides a bounded graceful quit
+with process termination fallback for hosts that need deterministic cleanup.
 
 ## Session lifecycle
 
