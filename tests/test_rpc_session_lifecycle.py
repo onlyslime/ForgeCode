@@ -163,6 +163,8 @@ def test_rpc_background_run_persists_structured_result(tmp_path, monkeypatch):
             break
         time.sleep(0.01)
     assert status["data"]["result"][0]["data"]["answer"] == 42
+    result = _call({"method": "session.result", "params": {"session": handle}})
+    assert result["data"]["result"][0]["data"]["answer"] == 42
     recovered = _call({"method": "session.open", "params": {"workspace": str(tmp_path), "session": handle}})
     assert recovered["data"]["recovered"] is True
 

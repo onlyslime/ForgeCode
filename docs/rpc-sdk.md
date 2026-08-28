@@ -72,6 +72,8 @@ If child-process creation fails, the handle is finalized as `failed` with a
 Completed background runs retain a bounded list of structured CLI envelopes in
 `session.status` and in recovered `session.open` responses; oversized output
 is represented by a redacted truncation marker.
+`session.result` is the equivalent read-only RPC for clients that only need
+the retained result payload and terminal metadata.
 `session.close` rejects active running handles; clients must cancel or await
 completion before revocation so an in-flight worker cannot lose its recovery
 metadata.
