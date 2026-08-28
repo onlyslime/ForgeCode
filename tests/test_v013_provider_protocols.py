@@ -63,5 +63,5 @@ def test_stream_interruption_has_stable_error_category():
     with pytest.raises(ProviderError) as caught:
         asyncio.run(provider.complete([Message("user", "hi")], []))
     assert caught.value.category == "stream_error"
-    assert caught.value.retryable is False
+    assert caught.value.retryable is True
     assert provider.attempt_events[-1]["outcome"] == "error"
