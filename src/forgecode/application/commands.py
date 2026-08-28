@@ -368,6 +368,10 @@ def _parser() -> argparse.ArgumentParser:
     trust_parser.add_argument("action", choices=("status", "grant", "revoke"), nargs="?", default="status")
     trust_parser.add_argument("--json", action="store_true", default=argparse.SUPPRESS, dest="json")
     trust_parser.add_argument("--jsonl", action="store_true", default=argparse.SUPPRESS, dest="jsonl")
+    telemetry_parser = subparsers.add_parser("telemetry", help="inspect local telemetry policy and audit records")
+    telemetry_parser.add_argument("action", choices=("status", "export"), nargs="?", default="status")
+    telemetry_parser.add_argument("--json", action="store_true", default=argparse.SUPPRESS, dest="json")
+    telemetry_parser.add_argument("--jsonl", action="store_true", default=argparse.SUPPRESS, dest="jsonl")
     rpc_parser = subparsers.add_parser("rpc", help="serve JSONL requests on stdin")
     rpc_parser.add_argument("--json", action="store_true", default=argparse.SUPPRESS, dest="json")
     rpc_parser.add_argument("--jsonl", action="store_true", default=argparse.SUPPRESS, dest="jsonl")
@@ -752,6 +756,24 @@ def main(argv: list[str] | None = None) -> int:
         else:
             print(payload["message"])
             print(f"configured: {payload['configured']}")
+        return 0
+    if command == "telemetry":
+        machine_json = bool(getattr(args, "json", False) or getattr(args, "jsonl", False))
+        effective = settings.effective
+        mode = effective.telemetry if effective else "off"
+        path = workspace / ".forgecode" / "telemetry.jsonl"
+        if getattr(args, "action", "status") == "export":
+            try:
+                content = path.read_text(encoding="utf-8") if path.exists() else ""
+            except OSError as exc:
+                if machine_json: _emit_machine(_machine_error("telemetry export", "telemetry_error", str(exc), exit_code=2))
+                else: print(str(exc), file=sys.stderr)
+                return 2
+            payload = {"mode": mode, "offline": bool(effective.offline) if effective else False, "records": content.splitlines()[-1000:], "count": len(content.splitlines())}
+        else:
+            payload = {"mode": mode, "offline": bool(effective.offline) if effective else False, "local_path": ".forgecode/telemetry.jsonl", "exists": path.exists()}
+        if machine_json: _emit_machine(_machine_envelope("telemetry " + args.action, "telemetry", True, data=payload, exit_code=0))
+        else: print(jsonlib.dumps(payload, ensure_ascii=False) if args.action == "export" else f"telemetry={mode} offline={payload['offline']} local_exists={payload['exists']}")
         return 0
     if command == "rpc":
         from ..rpc import serve_lines
