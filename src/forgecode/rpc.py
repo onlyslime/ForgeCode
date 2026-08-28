@@ -265,15 +265,16 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                             state = info.get("state")
                             if state in {"approval_denied", "cancelled", "completed", "failed"}:
                                 raise ValueError(f"session is {state}; open a new session")
-                            if info.get("state") == "running":
+                            if state == "running":
                                 raise ValueError("session is busy; wait for the active run to finish")
-                            info["state"] = "running"
                         if info.get("mode") == "act":
                             try:
                                 trusted = TrustStore(Path(info["workspace"])).status().get("trusted", False)
                             except TrustError:
                                 trusted = False
                             if not trusted: raise ValueError("workspace trust is not granted")
+                        with _SESSION_LOCK:
+                            info["state"] = "running"
                         # A new explicit run clears a prior cancellation latch;
                         # the previous run remains recorded as cancelled.
                         with _SESSION_LOCK:

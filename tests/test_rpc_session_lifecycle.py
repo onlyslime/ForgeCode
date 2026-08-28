@@ -155,6 +155,15 @@ def test_rpc_act_handle_fails_closed_after_trust_revoke(tmp_path):
     assert "trust" in denied["error"]["message"]
 
 
+def test_rpc_untrusted_act_run_does_not_poison_handle_state(tmp_path):
+    opened = _call({"method": "session.open", "params": {"workspace": str(tmp_path), "mode": "act"}})
+    handle = opened["data"]["session"]
+    denied = _call({"method": "session.run", "params": {"session": handle, "prompt": "hello"}})
+    assert denied["ok"] is False
+    status = _call({"method": "session.status", "params": {"session": handle}})
+    assert status["data"]["state"] == "idle"
+
+
 def test_rpc_session_status_exposes_bounded_lifecycle_metadata(tmp_path):
     handle = _call({"method": "session.open", "params": {"workspace": str(tmp_path)}})["data"]["session"]
     status = _call({"method": "session.status", "params": {"session": handle}})
