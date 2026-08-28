@@ -12,6 +12,13 @@ def test_embed_raise_for_status_preserves_envelope(tmp_path):
     assert caught.value.envelope and caught.value.envelope["ok"] is False
 
 
+def test_embed_invoke_validates_response_limit():
+    with pytest.raises(ValueError):
+        invoke(["doctor"], max_response_bytes=0)
+    with pytest.raises(ValueError):
+        invoke(["doctor"], max_response_bytes=True)
+
+
 def test_embed_stream_strict_mode_raises_on_failed_rpc():
     with pytest.raises(ForgeCodeError):
         list(stream([{"method": "not-supported"}], raise_for_status=True))
