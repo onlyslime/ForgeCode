@@ -53,7 +53,7 @@ credential values; offline policy or missing configuration prevents the
 request and returns a structured reason.
 
 The Node client raises `ForgeCodeError` for timeout, output-limit, empty
-response, invalid JSON (including malformed stream lines), and `ok=false` envelopes. `invoke` accepts bounded
+response, process spawn failures, invalid JSON (including malformed stream lines), and `ok=false` envelopes. `invoke` accepts bounded
 `timeoutMs` and `maxOutputBytes`; `invokeStream` supports the same method/params
 RPC transport for programmatic callers.
 The Node `login({ profile, provider, apiKeyEnv })` helper forwards the same

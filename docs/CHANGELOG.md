@@ -22,6 +22,7 @@ slice.
 - Added trust revalidation at RunService side-effect boundaries during act runs.
 - Hardened embedded-session shutdown with bounded terminate/kill waits.
 - Added profile/provider credential selectors to the Node login helper.
+- Normalized Node child-process spawn failures to typed `process_error` errors.
 - Verification: version/import consistency and targeted telemetry checks.
 
 ## v0.0.26 — 2026-08-28
