@@ -179,6 +179,10 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                             with _SESSION_LOCK:
                                 _RPC_REPLAYS[request_id] = (encoded,)
                                 _RPC_FINGERPRINTS[request_id] = fingerprint
+                                while len(_RPC_REPLAYS) > 1024:
+                                    oldest = next(iter(_RPC_REPLAYS))
+                                    _RPC_REPLAYS.pop(oldest, None)
+                                    _RPC_FINGERPRINTS.pop(oldest, None)
                         yield encoded
                         continue
                     handle = uuid.uuid4().hex

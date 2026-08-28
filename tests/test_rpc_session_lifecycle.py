@@ -245,6 +245,16 @@ def test_rpc_recovery_open_is_idempotent_by_request_id(tmp_path):
     assert first == second
 
 
+def test_rpc_recovery_replay_cache_remains_bounded(tmp_path):
+    handle = _call({"method": "session.open", "params": {"workspace": str(tmp_path)}})["data"]["session"]
+    from forgecode import rpc
+    rpc._RPC_SESSIONS.pop(handle, None)
+    for index in range(1030):
+        request = {"id": f"recover-{index}", "method": "session.open", "params": {"workspace": str(tmp_path), "session": handle}}
+        list(serve_lines([json.dumps(request)]))
+    assert len(rpc._RPC_REPLAYS) <= 1024
+
+
 def test_rpc_recovery_restores_event_cursor(tmp_path):
     handle = _call({"method": "session.open", "params": {"workspace": str(tmp_path)}})["data"]["session"]
     _call({"method": "session.pause", "params": {"session": handle}})
