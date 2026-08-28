@@ -155,7 +155,7 @@ def _session_record_path(info: dict[str, Any], handle: str) -> Path:
 def _persist_session(handle: str, info: dict[str, Any]) -> None:
     path = _session_record_path(info, handle)
     path.parent.mkdir(parents=True, exist_ok=True)
-    payload = {key: info.get(key) for key in ("workspace", "mode", "session_path", "state", "sequence", "created_at", "cancel_requested", "result")}
+    payload = {key: info.get(key) for key in ("workspace", "mode", "session_path", "state", "sequence", "created_at", "cancel_requested", "result", "execution")}
     payload["events"] = list(info.get("events", []))[-_MAX_SESSION_EVENTS:]
     tmp = path.with_suffix(".tmp")
     encoded = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
@@ -408,7 +408,9 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                             _RPC_SESSIONS.pop(handle, None)
                         elif method in {"session.cancel", "session.pause", "session.resume", "session.approval"}:
                             _persist_session(handle, info)
-                    data = {"session": handle, "closed": method == "session.close", "state": info.get("state"), "sequence": info.get("sequence", 0), "workspace": info.get("workspace"), "mode": info.get("mode"), "cancel_requested": bool(info.get("cancel_requested", False))}
+                    worker = info.get("process") or info.get("worker")
+                    worker_alive = bool(worker is not None and (worker.poll() is None if hasattr(worker, "poll") else worker.is_alive()))
+                    data = {"session": handle, "closed": method == "session.close", "state": info.get("state"), "sequence": info.get("sequence", 0), "workspace": info.get("workspace"), "mode": info.get("mode"), "cancel_requested": bool(info.get("cancel_requested", False)), "worker_alive": worker_alive, "execution": info.get("execution")}
                     if info.get("result") is not None:
                         data["result"] = info["result"]
                     if method == "session.result":
@@ -527,6 +529,7 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                     target = _isolated_session_run if isolate else _background_session_run
                     worker = threading.Thread(target=target, args=(handle, argv), name=f"forgecode-rpc-{handle[:8]}", daemon=True)
                     info["worker"] = worker
+                    info["execution"] = "process" if isolate else "thread"
                     worker.start()
                     _persist_session(handle, info)
                 payload = {"schema_version": 1, "kind": "session", "ok": True, "command": method, "data": {"session": handle, "state": "running", "accepted": True, "background": True}, "exit_code": 0}

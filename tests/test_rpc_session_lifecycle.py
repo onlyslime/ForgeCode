@@ -154,6 +154,7 @@ def test_rpc_background_run_allows_control_while_worker_is_active(tmp_path, monk
             break
         time.sleep(0.02)
     assert status["data"]["state"] == "cancelled"
+    assert status["data"]["worker_alive"] is False
 
 
 def test_rpc_background_run_persists_structured_result(tmp_path, monkeypatch):
