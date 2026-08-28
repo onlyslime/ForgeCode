@@ -154,8 +154,12 @@ class EmbeddedSession:
 
     def send(self, text: str) -> None:
         if not isinstance(text, str) or not text.strip() or len(text) > 8_000: raise ValueError("message must be non-empty and bounded")
-        if self.process.stdin is None: raise RuntimeError("session stdin is closed")
-        self.process.stdin.write(text.replace("\r", " ").replace("\n", " ") + "\n"); self.process.stdin.flush()
+        if self.process.stdin is None: raise ForgeCodeError("session stdin is closed", code="process_error")
+        try:
+            self.process.stdin.write(text.replace("\r", " ").replace("\n", " ") + "\n")
+            self.process.stdin.flush()
+        except (OSError, ValueError) as exc:
+            raise ForgeCodeError(str(exc)[:500] or "session process is unavailable", code="process_error") from exc
 
     def cancel(self) -> None: self.send("/cancel")
     def pause(self) -> None: self.send("/pause")

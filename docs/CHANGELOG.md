@@ -42,6 +42,7 @@ slice.
   aligning client-side validation with the RPC protocol.
 - Included persisted state, sequence, and cancellation metadata in recovered
   `session.open` responses.
+- Normalized writes to exited embedded workers as typed `process_error` failures.
 - Added profile/provider credential selectors to the Node login helper.
 - Normalized Node child-process spawn failures to typed `process_error` errors.
 - Verification: version/import consistency and targeted telemetry checks.

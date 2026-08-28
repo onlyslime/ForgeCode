@@ -48,3 +48,18 @@ def test_embedded_act_reconnect_requires_current_trust(tmp_path):
             assert exc.code == "trust_required"
     finally:
         session.close()
+
+
+def test_embedded_send_after_process_exit_is_typed(tmp_path):
+    session = EmbeddedSession(str(tmp_path))
+    try:
+        session.process.terminate()
+        session.process.wait(timeout=3)
+        try:
+            session.send("hello")
+        except ForgeCodeError as exc:
+            assert exc.code == "process_error"
+        else:
+            raise AssertionError("expected process_error")
+    finally:
+        session.close()

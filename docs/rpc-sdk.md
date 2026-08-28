@@ -81,6 +81,8 @@ workspace/mode binding, and emits `process_reconnected`. It never loops or
 silently retries side effects. Act-mode reconnect also revalidates persisted
 workspace trust and raises `ForgeCodeError(code="trust_required")` when trust
 has been revoked.
+Writes to a closed embedded worker raise `ForgeCodeError(code="process_error")`
+instead of leaking platform-specific pipe exceptions.
 Closing an embedded session uses bounded graceful shutdown, then terminate and
 kill fallbacks with waits, so callers do not retain an uncollected child process.
 
