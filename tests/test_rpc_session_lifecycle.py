@@ -109,6 +109,35 @@ def test_rpc_session_run_updates_handle_state(tmp_path):
     assert status["data"]["state"] in {"completed", "failed", "cancelled"}
 
 
+def test_rpc_background_run_allows_control_while_worker_is_active(tmp_path, monkeypatch):
+    import threading
+    import time
+    from forgecode import rpc
+
+    started = threading.Event()
+    release = threading.Event()
+    def slow_main(_argv):
+        started.set()
+        release.wait(2)
+        return 0
+
+    monkeypatch.setattr(rpc, "main", slow_main)
+    handle = _call({"method": "session.open", "params": {"workspace": str(tmp_path)}})["data"]["session"]
+    accepted = _call({"method": "session.run", "params": {"session": handle, "prompt": "hello", "background": True}})
+    assert accepted["data"]["accepted"] is True
+    assert started.wait(1)
+    cancelled = _call({"method": "session.cancel", "params": {"session": handle}})
+    assert cancelled["data"]["cancel_requested"] is True
+    release.set()
+    deadline = time.time() + 2
+    while time.time() < deadline:
+        status = _call({"method": "session.status", "params": {"session": handle}})
+        if status["data"]["state"] == "cancelled":
+            break
+        time.sleep(0.02)
+    assert status["data"]["state"] == "cancelled"
+
+
 def test_rpc_session_run_rejects_denied_approval(tmp_path):
     handle = _call({"method": "session.open", "params": {"workspace": str(tmp_path)}})["data"]["session"]
     _call({"method": "session.approval", "params": {"session": handle, "approved": False}})

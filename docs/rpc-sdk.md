@@ -34,6 +34,10 @@ reopened after daemon restart.
 `session.approval` accepts only a boolean decision and records either a running
 or approval-denied state, allowing clients to complete an explicit approval
 handshake without bypassing CLI policy.
+Clients may pass `background: true` to `session.run` to receive an immediate
+`accepted` envelope while the shared handle remains `running`; status/events
+then expose the terminal `run_finished` event and controls can be sent during
+execution. The default synchronous response remains unchanged.
 `session.close` rejects active running handles; clients must cancel or await
 completion before revocation so an in-flight worker cannot lose its recovery
 metadata.

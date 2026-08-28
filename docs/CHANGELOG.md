@@ -5,6 +5,15 @@ and metadata-only commits remain under the current version and are not listed as
 new releases. Verification notes identify the evidence used for each feature
 slice.
 
+## v0.0.28 — 2026-08-29
+
+- Added opt-in background RPC session runs. `session.run` with
+  `background: true` returns an immediate accepted envelope while the shared
+  handle executes on a daemon worker; status/events expose terminal
+  completion and concurrent controls can cancel or pause the run.
+- Synchronous `session.run` behavior remains backward compatible.
+- Verification: RPC lifecycle suite, compile, and CLI version checks.
+
 ## v0.0.27 — 2026-08-28
 
 - Synchronized release metadata after the v0.0.26 telemetry retention work.

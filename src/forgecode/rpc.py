@@ -29,6 +29,46 @@ _MAX_SESSION_EVENTS = 512
 _MAX_REQUEST_LINE_BYTES = 1_048_576
 
 
+def _background_session_run(handle: str, argv: list[str]) -> None:
+    """Run a session request outside the JSONL reader.
+
+    Keeping the worker detached from ``serve_lines`` lets a client send a
+    control request (cancel/pause/resume/status/events) while the model run is
+    still active.  The existing synchronous response contract remains
+    unchanged when ``background`` is not requested.
+    """
+    captured = io.StringIO()
+    code = 1
+    error_code: str | None = None
+    try:
+        with contextlib.redirect_stdout(captured):
+            code = main(argv)
+    except Exception as exc:  # pragma: no cover - injected by callers
+        error_code = type(exc).__name__
+    with _SESSION_LOCK:
+        info = _RPC_SESSIONS.get(handle)
+        if info is None:
+            return
+        if info.get("cancel_requested"):
+            state = "cancelled"
+        elif error_code is not None:
+            state = "failed"
+        else:
+            state = "completed" if code == 0 else ("cancelled" if code == 130 else "failed")
+        info["state"] = state
+        info["sequence"] = int(info.get("sequence", 0)) + 1
+        event: dict[str, Any] = {"sequence": info["sequence"], "type": "run_finished", "state": state, "exit_code": code}
+        if error_code is not None:
+            event["error_code"] = "worker_error"
+        info.setdefault("events", []).append(event)
+        if len(info["events"]) > _MAX_SESSION_EVENTS:
+            del info["events"][:-_MAX_SESSION_EVENTS]
+        try:
+            _persist_session(handle, info)
+        except OSError:
+            pass
+
+
 def _session_record_path(info: dict[str, Any], handle: str) -> Path:
     return Path(info["workspace"]) / ".forgecode" / "rpc-sessions" / f"{handle}.json"
 
@@ -311,6 +351,9 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                     if params.get("auto_approve") is True: argv_value.append("--auto-approve")
                     if params.get("require_trust") is True: argv_value.append("--require-trust")
                     if params.get("demo") is True: argv_value.append("--demo")
+                    background = params.get("background", False)
+                    if not isinstance(background, bool):
+                        raise ValueError("run.background must be boolean")
                     argv_value = global_args + argv_value
                 elif method == "login":
                     provider = params.get("provider")
@@ -341,6 +384,24 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
             if not isinstance(argv_value, list):
                 raise ValueError("argv must be an array")
             argv = [str(item) for item in argv_value]
+            if method in {"run", "session.run"} and handle and background:
+                with _SESSION_LOCK:
+                    info = _RPC_SESSIONS.get(handle)
+                    if info is None or info.get("state") != "running":
+                        raise ValueError("session is not running")
+                    worker = threading.Thread(target=_background_session_run, args=(handle, argv), name=f"forgecode-rpc-{handle[:8]}", daemon=True)
+                    info["worker"] = worker
+                    worker.start()
+                    _persist_session(handle, info)
+                payload = {"schema_version": 1, "kind": "session", "ok": True, "command": method, "data": {"session": handle, "state": "running", "accepted": True, "background": True}, "exit_code": 0}
+                if request_id is not None: payload["id"] = request_id
+                encoded = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+                if request_id is not None:
+                    with _SESSION_LOCK:
+                        _RPC_REPLAYS[request_id] = (encoded,)
+                        _RPC_FINGERPRINTS[request_id] = fingerprint
+                yield encoded
+                continue
             captured = io.StringIO()
             with contextlib.redirect_stdout(captured):
                 code = main(argv)
