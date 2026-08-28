@@ -25,7 +25,7 @@ export function invoke(argv = [], { cwd, executable = "forgecode", method, param
     child.stdin.end();
     child.stdout.on("data", (chunk) => { out += chunk; if (Buffer.byteLength(out) > maxOutputBytes && !settled) { child.kill(); settled = true; clearTimeout(timer); reject(new ForgeCodeError("response exceeds output limit", { code: "output_limit" })); } });
     child.stderr.on("data", (chunk) => { err += chunk; });
-    child.on("error", (error) => { if (!settled) { settled = true; clearTimeout(timer); reject(error); } });
+    child.on("error", (error) => { if (!settled) { settled = true; clearTimeout(timer); reject(new ForgeCodeError(error.message || "process failed", { code: "process_error" })); } });
     child.on("close", (code) => {
       if (settled) return;
       settled = true; clearTimeout(timer);
@@ -66,7 +66,7 @@ export function invokeStream(argv = [], options = {}) {
       }
     });
     child.stderr.on("data", (chunk) => { err += chunk; });
-    child.on("error", (error) => { if (!settled) { settled = true; clearTimeout(timer); reject(error); } });
+    child.on("error", (error) => { if (!settled) { settled = true; clearTimeout(timer); reject(new ForgeCodeError(error.message || "process failed", { code: "process_error" })); } });
     child.on("close", (code) => {
       if (settled) return; settled = true; clearTimeout(timer);
       if (buffer.trim()) {

@@ -12,6 +12,14 @@ try {
 }
 
 try {
+  await invoke([], { executable: "forgecode-command-that-does-not-exist", timeoutMs: 1000 });
+  assert.fail("expected process failure");
+} catch (error) {
+  assert.ok(error instanceof ForgeCodeError);
+  assert.equal(error.code, "process_error");
+}
+
+try {
   await invokeStream([], { executable: process.execPath, method: "bad method", maxItems: 1, timeoutMs: 1000 });
 } catch (error) {
   assert.ok(error instanceof ForgeCodeError || error.code);
