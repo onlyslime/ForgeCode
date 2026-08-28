@@ -33,3 +33,9 @@ def test_rpc_session_open_validates_bounds():
     payload = _call({"method": "session.open", "params": {"mode": "unsafe"}})
     assert payload["ok"] is False
     assert "plan or act" in payload["error"]["message"]
+
+
+def test_rpc_session_run_requires_handle():
+    payload = _call({"method": "session.run", "params": {"prompt": "hello"}})
+    assert payload["ok"] is False
+    assert "requires session handle" in payload["error"]["message"]

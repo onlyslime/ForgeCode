@@ -33,7 +33,7 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
             if method is not None:
                 if not isinstance(method, str) or len(method) > 128 or any(ch.isspace() for ch in method):
                     raise ValueError("method must be bounded non-whitespace text")
-                method_map = {"trust.status": ["trust", "status"], "trust.grant": ["trust", "grant"], "trust.revoke": ["trust", "revoke"], "provider.list": ["provider", "list"], "provider.health": ["provider", "health"], "config.show": ["config", "show"], "doctor": ["doctor"], "login": ["login"], "run": ["run"], "session.open": ["session", "open"], "session.close": ["session", "close"], "session.status": ["session", "status"], "session.inspect": ["session", "inspect"], "session.tree": ["session", "tree"], "session.export": ["session", "export"]}
+                method_map = {"trust.status": ["trust", "status"], "trust.grant": ["trust", "grant"], "trust.revoke": ["trust", "revoke"], "provider.list": ["provider", "list"], "provider.health": ["provider", "health"], "config.show": ["config", "show"], "doctor": ["doctor"], "login": ["login"], "run": ["run"], "session.open": ["session", "open"], "session.run": ["run"], "session.close": ["session", "close"], "session.status": ["session", "status"], "session.inspect": ["session", "inspect"], "session.tree": ["session", "tree"], "session.export": ["session", "export"]}
                 if method not in method_map:
                     raise ValueError("unsupported RPC method")
                 if argv_value:
@@ -68,13 +68,15 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                     if request_id is not None: payload["id"] = request_id
                     yield json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
                     continue
-                if method == "run":
+                if method in {"run", "session.run"}:
                     prompt = params.get("prompt", "")
                     if not isinstance(prompt, str) or not prompt.strip() or len(prompt) > 8_000:
                         raise ValueError("run.prompt must be non-empty and bounded")
                     global_args = []
                     argv_value.append(prompt)
-                    handle = params.get("session")
+                    handle = params.get("session") or params.get("session_id")
+                    if method == "session.run" and not handle:
+                        raise ValueError("session.run requires session handle")
                     if handle:
                         with _SESSION_LOCK:
                             info = _RPC_SESSIONS.get(handle)
