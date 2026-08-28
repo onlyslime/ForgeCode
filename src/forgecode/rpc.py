@@ -41,6 +41,14 @@ def _persist_session(handle: str, info: dict[str, Any]) -> None:
     tmp.replace(path)
 
 
+def _remove_session_record(handle: str, info: dict[str, Any]) -> None:
+    try:
+        _session_record_path(info, handle).unlink(missing_ok=True)
+    except OSError:
+        # A failed revocation must remain visible to the caller; do not hide it.
+        raise ValueError("could not revoke persisted session handle")
+
+
 def _load_session(handle: str, workspace_hint: str | None = None) -> dict[str, Any] | None:
     if not isinstance(handle, str) or len(handle) != 32 or any(ch not in "0123456789abcdef" for ch in handle):
         return None
@@ -192,7 +200,9 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                             info.setdefault("events", []).append({"sequence": info["sequence"], "type": method.rsplit(".", 1)[-1], "state": info.get("state")})
                             if len(info["events"]) > _MAX_SESSION_EVENTS:
                                 del info["events"][:-_MAX_SESSION_EVENTS]
-                        if method == "session.close": _RPC_SESSIONS.pop(handle, None)
+                        if method == "session.close":
+                            _remove_session_record(handle, info)
+                            _RPC_SESSIONS.pop(handle, None)
                         elif method in {"session.cancel", "session.pause", "session.resume", "session.approval"}:
                             _persist_session(handle, info)
                     data = {"session": handle, "closed": method == "session.close", "state": info.get("state"), "sequence": info.get("sequence", 0), "workspace": info.get("workspace"), "mode": info.get("mode")}

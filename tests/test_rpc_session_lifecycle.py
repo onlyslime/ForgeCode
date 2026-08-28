@@ -150,3 +150,12 @@ def test_rpc_act_recovery_rejects_revoked_workspace(tmp_path):
     recovered = _call({"method": "session.open", "params": {"workspace": str(tmp_path), "session": handle}})
     assert recovered["ok"] is False
     assert recovered["error"]["code"] == "trust_revoked"
+
+
+def test_rpc_session_close_removes_recovery_record(tmp_path):
+    opened = _call({"method": "session.open", "params": {"workspace": str(tmp_path)}})
+    handle = opened["data"]["session"]
+    _call({"method": "session.close", "params": {"session": handle}})
+    reopened = _call({"method": "session.open", "params": {"workspace": str(tmp_path), "session": handle}})
+    assert reopened["ok"] is False
+    assert "not recoverable" in reopened["error"]["message"]
