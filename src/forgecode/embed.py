@@ -11,6 +11,7 @@ from typing import Any, Iterable
 from pathlib import Path
 
 from .rpc import serve_lines
+from .security.trust import TrustStore, TrustError
 
 
 class ForgeCodeError(RuntimeError):
@@ -90,6 +91,12 @@ class EmbeddedSession:
         """Restart a dead worker once, preserving workspace and mode binding."""
         if self.is_alive:
             return False
+        if self._mode == "act":
+            try:
+                if not TrustStore(Path(self._workspace)).status().get("trusted", False):
+                    raise ForgeCodeError("workspace trust is not granted", code="trust_required")
+            except TrustError as exc:
+                raise ForgeCodeError(str(exc), code="trust_required") from exc
         environment = dict(self._environment)
         source_root = str(Path(__file__).resolve().parents[1])
         environment["PYTHONPATH"] = source_root + os.pathsep + environment.get("PYTHONPATH", "")

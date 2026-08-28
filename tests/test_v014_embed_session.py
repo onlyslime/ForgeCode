@@ -1,6 +1,7 @@
 import time
 
-from forgecode.embed import EmbeddedSession
+from forgecode.embed import EmbeddedSession, ForgeCodeError
+from forgecode.security.trust import TrustStore
 
 
 def test_embedded_session_controls_production_chat(tmp_path):
@@ -29,5 +30,21 @@ def test_embedded_session_reconnects_dead_worker(tmp_path):
         assert session.reconnect() is True
         event = session.poll(2)
         assert event and event.get("kind") == "process_reconnected"
+    finally:
+        session.close()
+
+
+def test_embedded_act_reconnect_requires_current_trust(tmp_path):
+    TrustStore(tmp_path).grant()
+    session = EmbeddedSession(str(tmp_path), mode="act")
+    try:
+        session.process.terminate()
+        session.process.wait(timeout=3)
+        TrustStore(tmp_path).revoke()
+        try:
+            session.reconnect()
+            raise AssertionError("expected trust failure")
+        except ForgeCodeError as exc:
+            assert exc.code == "trust_required"
     finally:
         session.close()

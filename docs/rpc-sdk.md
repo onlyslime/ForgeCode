@@ -3,7 +3,8 @@
 ForgeCode exposes a bounded JSONL protocol (`schema_version: 1`) shared by the
 CLI, Python `forgecode.embed` helpers and the Node SDK. Every request may carry
 an application `id`; replaying an id returns the original response without
-reapplying a control operation. Replay memory is bounded to 1024 ids. Session
+reapplying a control operation. Replay memory is bounded to 1024 ids. String
+ids are non-empty, newline-safe, and limited to 256 characters. Session
 handles are bounded to 256 active handles with an eight-hour TTL; expired
 handles fail closed instead of accumulating in a long-lived daemon.
 Handle metadata is persisted under the workspace's ignored
@@ -65,7 +66,9 @@ reported as `ForgeCodeError(code="invalid_json")`, matching the Node SDK.
 `EmbeddedSession.reconnect()` is an explicit bounded recovery operation: it
 only starts a replacement worker after the prior process exits, preserves the
 workspace/mode binding, and emits `process_reconnected`. It never loops or
-silently retries side effects.
+silently retries side effects. Act-mode reconnect also revalidates persisted
+workspace trust and raises `ForgeCodeError(code="trust_required")` when trust
+has been revoked.
 
 ## Safety and compatibility
 
