@@ -32,7 +32,7 @@ slice.
 - Verified cancellation markers survive persisted RPC handle recovery.
 - Canonicalized persisted RPC workspaces and bounded request identifiers.
 - Normalized Node/Python SDK limits and process/JSON error contracts.
-- Verification: targeted RPC/embed/provider/telemetry gate (58 passed, 1 skipped), Node
+- Verification: targeted RPC/embed/provider/telemetry/cancellation gate (74 passed), Node
   smoke, Python compile, doctor JSONL, and diff checks.
 - Additional hardening: bounded SDK argv/params and request ids, typed process
   and JSON errors, RPC busy/terminal/approval taxonomy, cancellation recovery,
