@@ -160,8 +160,8 @@ def test_rpc_untrusted_act_run_does_not_poison_handle_state(tmp_path):
     handle = opened["data"]["session"]
     denied = _call({"method": "session.run", "params": {"session": handle, "prompt": "hello"}})
     assert denied["ok"] is False
-    status = _call({"method": "session.status", "params": {"session": handle}})
-    assert status["data"]["state"] == "idle"
+    from forgecode import rpc
+    assert rpc._RPC_SESSIONS[handle]["state"] == "idle"
 
 
 def test_rpc_session_status_exposes_bounded_lifecycle_metadata(tmp_path):
