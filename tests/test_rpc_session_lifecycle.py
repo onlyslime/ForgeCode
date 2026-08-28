@@ -292,6 +292,18 @@ def test_rpc_act_cancel_remains_available_after_trust_revoke(tmp_path):
     assert cancelled["data"]["cancel_requested"] is True
 
 
+def test_rpc_act_result_remains_readable_after_trust_revoke(tmp_path):
+    _call({"method": "trust.grant", "params": {"workspace": str(tmp_path)}})
+    handle = _call({"method": "session.open", "params": {"workspace": str(tmp_path), "mode": "act"}})["data"]["session"]
+    from forgecode import rpc
+    rpc._RPC_SESSIONS[handle]["result"] = [{"ok": True, "data": {"audit": "safe"}}]
+    rpc._RPC_SESSIONS[handle]["state"] = "completed"
+    _call({"method": "trust.revoke", "params": {"workspace": str(tmp_path)}})
+    result = _call({"method": "session.result", "params": {"session": handle}})
+    assert result["ok"] is True
+    assert result["data"]["result"][0]["data"]["audit"] == "safe"
+
+
 def test_rpc_untrusted_act_run_does_not_poison_handle_state(tmp_path):
     opened = _call({"method": "session.open", "params": {"workspace": str(tmp_path), "mode": "act"}})
     handle = opened["data"]["session"]

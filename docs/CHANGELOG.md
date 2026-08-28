@@ -40,6 +40,8 @@ slice.
   workers can always be stopped while new execution remains denied.
 - Enforced existing-directory validation for diagnostic RPC workspace
   parameters before invoking downstream CLI code.
+- Kept read-only Act `session.result` retrieval available after trust
+  revocation for post-incident audit evidence.
 - Spool-isolated RPC stdout to bounded temporary storage, preventing large
   provider/tool output from exhausting daemon memory.
 - Finalized isolated RPC handles on child-process startup failure with a

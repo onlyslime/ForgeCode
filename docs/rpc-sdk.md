@@ -23,6 +23,8 @@ Control and close requests against a `recovery_required` handle fail with
 After Act trust is revoked, cancellation remains permitted so clients can
 terminate an active worker; new execution and other lifecycle controls remain
 fail-closed with `trust_revoked`.
+The read-only `session.result` method remains available after revocation so
+operators can inspect the bounded audit outcome.
 The persisted record includes only the bounded recent event window and its
 sequence, allowing cursor-based event recovery after daemon restart.
 Each handle retains only the most recent 512 control/run events. Clients must
