@@ -37,3 +37,15 @@ export const method = (name, options = {}) => invoke([], { ...options, method: n
 export const run = (prompt, options = {}) => method("run", { ...options, params: { ...(options.params ?? {}), prompt } });
 export const sessionInspect = (session, options = {}) => method("session.inspect", { ...options, params: { ...(options.params ?? {}), session } });
 export const sessionTree = (options = {}) => method("session.tree", options);
+
+export function interactive(workspace, { mode = "plan", executable = "forgecode" } = {}) {
+  const child = spawn(executable, ["--workspace", workspace, "chat", "--mode", mode, "--jsonl"], { stdio: ["pipe", "pipe", "pipe"] });
+  let buffer = ""; const events = []; const listeners = new Set();
+  child.stdout.on("data", (chunk) => { buffer += chunk; const lines = buffer.split(/\r?\n/); buffer = lines.pop(); for (const line of lines) if (line.trim()) { const event = JSON.parse(line); events.push(event); for (const listener of listeners) listener(event); } });
+  return {
+    process: child,
+    send(text) { if (typeof text !== "string" || !text.trim() || text.length > 8000) throw new Error("message must be non-empty and bounded"); child.stdin.write(text.replace(/[\r\n]/g, " ") + "\n"); },
+    cancel() { this.send("/cancel"); }, pause() { this.send("/pause"); }, resume() { this.send("/resume"); }, close() { this.send("/quit"); },
+    on(listener) { listeners.add(listener); return () => listeners.delete(listener); }, events,
+  };
+}
