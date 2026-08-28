@@ -29,6 +29,21 @@ Every commit and release tag uses `vA.B.C`.
 - Commit subjects use `vA.B.C: short description`; tags use the exact version.
 - Before committing, run relevant tests and inspect `git status` for secrets and unintended files.
 
+### Version history maintenance
+
+- Maintain the tracked Markdown changelog at `docs/CHANGELOG.md`. Every
+  versioned feature release must add a dated entry describing user-visible
+  behavior, compatibility notes, and verification evidence; reconstruct older
+  entries from the existing roadmap/acceptance files and git history when
+  needed.
+- Do not increment `C` for every small edit. A version change requires a
+  substantive user-visible feature, protocol, security, persistence, or CLI
+  capability. Documentation-only edits, tests, refactors, metadata syncs, and
+  isolated bug fixes should be grouped under the current version and must not
+  trigger a new release version.
+- Keep the changelog and the version files synchronized whenever a substantive
+  release is made; do not create duplicate entries for intermediate commits.
+
 The current version is `v0.0.8`; the next ordinary commit is `v0.0.9` unless the user explicitly requests an A or B update.
 
 ## Documentation boundaries
