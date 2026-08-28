@@ -40,6 +40,7 @@ def test_rpc_request_line_is_bounded():
     response = json.loads(next(iter(serve_lines(["{" + "x" * 1_048_576]))))
     assert response["ok"] is False
     assert "request_too_large" in response["error"]["message"]
+    assert response["error"]["code"] == "request_too_large"
 
 
 def test_rpc_session_open_validates_bounds():

@@ -364,7 +364,9 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
             yield from responses
         except Exception as exc:
             message = str(exc)[:2000]
-            if "workspace trust" in message:
+            if "request_too_large" in message:
+                code = "request_too_large"
+            elif "workspace trust" in message:
                 code = "trust_revoked"
             elif "busy" in message:
                 code = "session_busy"
