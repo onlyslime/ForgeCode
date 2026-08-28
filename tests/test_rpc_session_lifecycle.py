@@ -150,7 +150,7 @@ def test_rpc_background_run_allows_control_while_worker_is_active(tmp_path, monk
     deadline = time.time() + 2
     while time.time() < deadline:
         status = _call({"method": "session.status", "params": {"session": handle}})
-        if status["data"]["state"] == "cancelled":
+        if status["data"]["state"] == "cancelled" and not status["data"]["worker_alive"]:
             break
         time.sleep(0.02)
     assert status["data"]["state"] == "cancelled"
