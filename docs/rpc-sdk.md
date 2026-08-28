@@ -5,6 +5,8 @@ CLI, Python `forgecode.embed` helpers and the Node SDK. Every request may carry
 an application `id`; replaying an id returns the original response without
 reapplying a control operation. Replay memory is bounded to 1024 ids. String
 ids are non-empty, newline-safe, and limited to 256 characters. Session
+JSONL request lines are capped at 1 MiB; oversized input returns
+`request_too_large` before parsing.
 handles are bounded to 256 active handles with an eight-hour TTL; expired
 handles fail closed instead of accumulating in a long-lived daemon.
 Handle metadata is persisted under the workspace's ignored
