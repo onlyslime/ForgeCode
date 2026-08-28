@@ -41,6 +41,9 @@ bounded `maxEvents` window (2,048 by default).
 Node interactive sessions reject writes after `close()` with typed
 `process_error`; `closeAndWait(timeoutMs)` provides a bounded graceful quit
 with process termination fallback for hosts that need deterministic cleanup.
+Malformed JSON emitted by an interactive worker is converted into a bounded
+`process_error` event and the worker is terminated, rather than escaping into
+the embedding application's event loop.
 
 ## Session lifecycle
 

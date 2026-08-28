@@ -26,6 +26,8 @@ slice.
   explicit `maxStderrBytes`/`maxEvents` limits.
 - Added typed closed-session writes and bounded `interactive.closeAndWait()`
   cleanup with terminate fallback.
+- Converted malformed Node interactive JSON into typed `process_error` events
+  with worker termination instead of uncaught host exceptions.
 - Isolated RPC pause/resume now attempt OS-level suspension signals where
   supported and record the applied control mechanism in session events.
 - Prevented closing paused RPC handles while their worker may still be alive;

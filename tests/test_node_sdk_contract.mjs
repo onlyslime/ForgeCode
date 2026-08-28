@@ -14,6 +14,14 @@ assert.throws(() => interactive(".", { maxEvents: 0 }), TypeError);
   session.close();
   assert.throws(() => session.send("hello"), (error) => error.code === "process_error");
 }
+{
+  const session = interactive(".", { executable: process.execPath });
+  let seen = null;
+  session.on((event) => { seen = event; });
+  session.process.stdout.emit("data", "not-json\n");
+  assert.equal(seen?.code, "invalid_json");
+  session.close();
+}
 assert.throws(() => invokeStream(["x".repeat(1001)]), TypeError);
 try {
   await invoke([], { executable: process.execPath, method: "bad method", timeoutMs: 1000 });
