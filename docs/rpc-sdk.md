@@ -33,6 +33,11 @@ response, invalid JSON, and `ok=false` envelopes. `invoke` accepts bounded
 `timeoutMs` and `maxOutputBytes`; `invokeStream` supports the same method/params
 RPC transport for programmatic callers.
 
+Python embedding mirrors this contract with `forgecode.embed.ForgeCodeError`.
+`invoke(..., raise_for_status=True)` and `stream(..., raise_for_status=True)`
+raise typed failures while preserving the original envelope; responses are
+bounded by `max_response_bytes`.
+
 ## Safety and compatibility
 
 Prompts, paths, provider names and environment-variable names are bounded and
