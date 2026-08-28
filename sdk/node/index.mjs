@@ -37,6 +37,12 @@ export const method = (name, options = {}) => invoke([], { ...options, method: n
 export const run = (prompt, options = {}) => method("run", { ...options, params: { ...(options.params ?? {}), prompt } });
 export const sessionInspect = (session, options = {}) => method("session.inspect", { ...options, params: { ...(options.params ?? {}), session } });
 export const sessionTree = (options = {}) => method("session.tree", options);
+export const sessionOpen = (options = {}) => method("session.open", options);
+export const sessionStatus = (session, options = {}) => method("session.status", { ...options, params: { ...(options.params ?? {}), session } });
+export const sessionEvents = (session, options = {}) => method("session.events", { ...options, params: { ...(options.params ?? {}), session } });
+export const sessionRun = (session, prompt, options = {}) => method("session.run", { ...options, params: { ...(options.params ?? {}), session, prompt } });
+export const sessionControl = (session, action, options = {}) => method(`session.${action}`, { ...options, params: { ...(options.params ?? {}), session } });
+export const sessionClose = (session, options = {}) => sessionControl(session, "close", options);
 
 export function interactive(workspace, { mode = "plan", executable = "forgecode" } = {}) {
   const child = spawn(executable, ["--workspace", workspace, "chat", "--mode", mode, "--jsonl"], { stdio: ["pipe", "pipe", "pipe"] });
