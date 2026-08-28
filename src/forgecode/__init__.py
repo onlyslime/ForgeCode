@@ -17,10 +17,10 @@ from .review import (
     run_security_checks,
 )
 from .evaluation import TrajectoryScore, evaluate_events, evaluate_session
-from .embed import invoke as invoke_embedded, stream as stream_embedded
+from .embed import invoke as invoke_embedded, session_result as session_result_embedded, stream as stream_embedded
 
 __all__ = [
-    "__version__", "DiffHunk", "ReviewArtifactError", "ReviewBuilder", "invoke_embedded", "stream_embedded",
+    "__version__", "DiffHunk", "ReviewArtifactError", "ReviewBuilder", "invoke_embedded", "session_result_embedded", "stream_embedded",
     "ReviewError", "ReviewFinding", "ReviewReport", "SecurityCheckResult",
     "export_review", "import_review", "run_security_checks", "TrajectoryScore", "evaluate_events", "evaluate_session",
 ]

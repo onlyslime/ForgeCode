@@ -38,6 +38,8 @@ the persisted session/RPC cursors for durable recovery.
 The Python `session_result()` helper mirrors Node `sessionResult()`, validating
 the handle/workspace and returning the same `session.result` envelope with the
 existing typed error and response-size limits.
+It is also exported as `forgecode.session_result_embedded` for callers that
+use the package-level embedding API.
 The Node `invokeStream` helper similarly caps diagnostic stderr via
 `maxStderrBytes` (256 KiB by default), and `interactive` retains only a
 bounded `maxEvents` window (2,048 by default).

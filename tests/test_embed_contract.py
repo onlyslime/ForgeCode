@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 
 from forgecode.embed import ForgeCodeError, invoke, session_result, stream
+import forgecode
 
 
 def test_embed_raise_for_status_preserves_envelope(tmp_path):
@@ -67,3 +68,4 @@ def test_embed_session_result_validates_handle():
         session_result("")
     with pytest.raises(ValueError):
         session_result("x\ny")
+    assert forgecode.session_result_embedded is session_result
