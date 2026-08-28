@@ -5,6 +5,12 @@ and metadata-only commits remain under the current version and are not listed as
 new releases. Verification notes identify the evidence used for each feature
 slice.
 
+## v0.0.33 — 2026-08-29
+
+- Fixed Node `sessionList()` to map workspace, lifecycle state, and limit into
+  RPC parameters instead of silently treating them as process options.
+- Verification: Node SDK contract and RPC session tests.
+
 ## v0.0.32 — 2026-08-29
 
 - Bound RPC `session.tree` discovery to its explicitly supplied canonical

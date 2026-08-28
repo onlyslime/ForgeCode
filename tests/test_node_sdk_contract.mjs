@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
-import { ForgeCodeError, invoke, invokeStream, interactive } from "../sdk/node/index.mjs";
+import { ForgeCodeError, invoke, invokeStream, interactive, sessionList } from "../sdk/node/index.mjs";
 
 assert.equal(typeof ForgeCodeError, "function");
+assert.equal(typeof sessionList, "function");
 assert.throws(() => invoke([], { timeoutMs: NaN }), TypeError);
 assert.throws(() => invoke(["x".repeat(1001)]), TypeError);
 assert.throws(() => invoke([], { signal: {} }), TypeError);
