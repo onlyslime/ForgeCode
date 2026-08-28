@@ -88,6 +88,8 @@ def test_rpc_idempotency_caches_multi_event_response(tmp_path):
     second = list(serve_lines([json.dumps(request)]))
     assert first == second
     assert json.loads(second[-1])["id"] == "doctor-replay"
+    conflict = list(serve_lines([json.dumps({"id": "doctor-replay", "method": "provider.list", "params": {}})]))
+    assert json.loads(conflict[-1])["error"]["message"].startswith("request id was already used")
 
 
 def test_rpc_act_handle_fails_closed_after_trust_revoke(tmp_path):

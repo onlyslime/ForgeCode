@@ -21,6 +21,7 @@ from .security.trust import TrustStore, TrustError
 _SESSION_LOCK = threading.RLock()
 _RPC_SESSIONS: dict[str, dict[str, Any]] = {}
 _RPC_REPLAYS: dict[str | int, tuple[str, ...]] = {}
+_RPC_FINGERPRINTS: dict[str | int, str] = {}
 _SESSION_TTL_SECONDS = 8 * 60 * 60
 _MAX_RPC_SESSIONS = 256
 
@@ -44,8 +45,12 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
             if request_id is not None and (not isinstance(request_id, (str, int)) or isinstance(request_id, bool)):
                 raise ValueError("request id must be a string or integer")
             if request_id is not None:
+                fingerprint = json.dumps(request, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
                 with _SESSION_LOCK:
                     replay = _RPC_REPLAYS.get(request_id)
+                    previous_fingerprint = _RPC_FINGERPRINTS.get(request_id)
+                if previous_fingerprint is not None and previous_fingerprint != fingerprint:
+                    raise ValueError("request id was already used for a different request")
                 if replay is not None:
                     yield from replay
                     continue
@@ -87,6 +92,7 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                     if request_id is not None:
                         with _SESSION_LOCK:
                             _RPC_REPLAYS[request_id] = (encoded,)
+                            _RPC_FINGERPRINTS[request_id] = fingerprint
                             while len(_RPC_REPLAYS) > 1024: _RPC_REPLAYS.pop(next(iter(_RPC_REPLAYS)))
                     yield encoded
                     continue
@@ -135,6 +141,7 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                     if request_id is not None:
                         with _SESSION_LOCK:
                             _RPC_REPLAYS[request_id] = (encoded,)
+                            _RPC_FINGERPRINTS[request_id] = fingerprint
                             while len(_RPC_REPLAYS) > 1024: _RPC_REPLAYS.pop(next(iter(_RPC_REPLAYS)))
                     yield encoded
                     continue
@@ -211,6 +218,7 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                 if request_id is not None:
                     with _SESSION_LOCK:
                         _RPC_REPLAYS[request_id] = (encoded,)
+                        _RPC_FINGERPRINTS[request_id] = fingerprint
                         while len(_RPC_REPLAYS) > 1024: _RPC_REPLAYS.pop(next(iter(_RPC_REPLAYS)))
                 yield encoded
                 continue
@@ -225,12 +233,16 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
             if request_id is not None:
                 with _SESSION_LOCK:
                     _RPC_REPLAYS[request_id] = tuple(responses)
+                    _RPC_FINGERPRINTS[request_id] = fingerprint
                     while len(_RPC_REPLAYS) > 1024: _RPC_REPLAYS.pop(next(iter(_RPC_REPLAYS)))
             yield from responses
         except Exception as exc:
             message = str(exc)[:2000]
             code = "trust_revoked" if "workspace trust" in message else "invalid_request"
-            yield json.dumps({"schema_version": 1, "kind": "error", "ok": False, "command": "rpc", "error": {"code": code, "message": message}, "exit_code": 2}, ensure_ascii=False)
+            payload = {"schema_version": 1, "kind": "error", "ok": False, "command": "rpc", "error": {"code": code, "message": message}, "exit_code": 2}
+            if request_id is not None: payload["id"] = request_id
+            if method is not None: payload["method"] = method
+            yield json.dumps(payload, ensure_ascii=False)
 
 
 __all__ = ["serve_lines"]
