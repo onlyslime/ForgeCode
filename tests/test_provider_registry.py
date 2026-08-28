@@ -46,6 +46,15 @@ def test_rpc_login_forwards_bounded_provider_params(tmp_path: Path):
     assert payload["method"] == "login"
 
 
+def test_rpc_login_forwards_profile_selector(tmp_path: Path):
+    records = list(serve_lines([json.dumps({"id": "login-profile", "method": "login", "params": {"profile": "local"}, "argv": []})]))
+    payload = json.loads(records[-1])
+    assert payload["id"] == "login-profile"
+    # The profile is validated by the CLI; an absent profile yields a stable
+    # structured error rather than being silently ignored.
+    assert payload["error"]["code"] == "config_invalid"
+
+
 def test_login_profile_reports_selected_credential_reference(tmp_path: Path, capsys):
     (tmp_path / ".forgecode").mkdir()
     (tmp_path / ".forgecode" / "config.toml").write_text(
