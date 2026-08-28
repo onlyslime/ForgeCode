@@ -40,7 +40,7 @@ slice.
   workers can always be stopped while new execution remains denied.
 - Spool-isolated RPC stdout to bounded temporary storage, preventing large
   provider/tool output from exhausting daemon memory.
-- Verification: full regression `444 passed, 8 skipped, 2 warnings`, RPC
+- Verification: full regression `449 passed, 8 skipped, 2 warnings`, RPC
   lifecycle suite, compile, and CLI/doctor checks.
 
 ## v0.0.27 — 2026-08-28
