@@ -28,7 +28,7 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
             if method is not None:
                 if not isinstance(method, str) or len(method) > 128 or any(ch.isspace() for ch in method):
                     raise ValueError("method must be bounded non-whitespace text")
-                method_map = {"trust.status": ["trust", "status"], "trust.grant": ["trust", "grant"], "trust.revoke": ["trust", "revoke"], "provider.list": ["provider", "list"], "provider.health": ["provider", "health"], "login": ["login"]}
+                method_map = {"trust.status": ["trust", "status"], "trust.grant": ["trust", "grant"], "trust.revoke": ["trust", "revoke"], "provider.list": ["provider", "list"], "provider.health": ["provider", "health"], "config.show": ["config", "show"], "doctor": ["doctor"], "login": ["login"]}
                 if method not in method_map:
                     raise ValueError("unsupported RPC method")
                 if argv_value:

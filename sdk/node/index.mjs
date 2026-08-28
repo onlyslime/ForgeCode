@@ -33,3 +33,4 @@ export function invokeStream(argv = [], options = {}) {
 
 export const trust = (action = "status", options = {}) => invoke(["trust", action], options);
 export const login = (options = {}) => invoke(["login"], options);
+export const method = (name, options = {}) => invoke([], { ...options, method: name });

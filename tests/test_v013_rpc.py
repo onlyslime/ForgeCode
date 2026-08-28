@@ -34,3 +34,11 @@ def test_rpc_method_dispatch_and_rejection(tmp_path):
     assert result["data"]["providers"]
     bad = json.loads(next(serve_lines([json.dumps({"method": "unknown"})])))
     assert bad["error"]["code"] == "invalid_request"
+
+
+def test_rpc_config_and_doctor_methods(tmp_path):
+    for name in ("config.show", "doctor"):
+        payload = json.loads(next(serve_lines([json.dumps({"id": name, "method": name})])))
+        assert payload["id"] == name
+        assert payload["method"] == name
+        assert payload["ok"] is True
