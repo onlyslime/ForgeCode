@@ -138,6 +138,23 @@ def test_rpc_background_run_allows_control_while_worker_is_active(tmp_path, monk
     assert status["data"]["state"] == "cancelled"
 
 
+def test_rpc_background_run_persists_structured_result(tmp_path, monkeypatch):
+    from forgecode import rpc
+    monkeypatch.setattr(rpc, "main", lambda _argv: print(json.dumps({"ok": True, "data": {"answer": 42}})) or 0)
+    handle = _call({"method": "session.open", "params": {"workspace": str(tmp_path)}})["data"]["session"]
+    accepted = _call({"method": "session.run", "params": {"session": handle, "prompt": "hello", "background": True}})
+    assert accepted["data"]["accepted"] is True
+    import time
+    for _ in range(50):
+        status = _call({"method": "session.status", "params": {"session": handle}})
+        if status["data"]["state"] == "completed":
+            break
+        time.sleep(0.01)
+    assert status["data"]["result"][0]["data"]["answer"] == 42
+    recovered = _call({"method": "session.open", "params": {"workspace": str(tmp_path), "session": handle}})
+    assert recovered["data"]["recovered"] is True
+
+
 def test_rpc_session_run_rejects_denied_approval(tmp_path):
     handle = _call({"method": "session.open", "params": {"workspace": str(tmp_path)}})["data"]["session"]
     _call({"method": "session.approval", "params": {"session": handle, "approved": False}})

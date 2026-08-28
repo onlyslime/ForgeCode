@@ -28,6 +28,7 @@ _SESSION_TTL_SECONDS = 8 * 60 * 60
 _MAX_RPC_SESSIONS = 256
 _MAX_SESSION_EVENTS = 512
 _MAX_REQUEST_LINE_BYTES = 1_048_576
+_MAX_SESSION_RESULT_BYTES = 262_144
 
 
 def _background_session_run(handle: str, argv: list[str]) -> None:
@@ -65,6 +66,18 @@ def _background_session_run(handle: str, argv: list[str]) -> None:
         event: dict[str, Any] = {"sequence": info["sequence"], "type": "run_finished", "state": state, "exit_code": code}
         if error_code is not None:
             event["error_code"] = "worker_error"
+        results: list[Any] = []
+        for raw in captured.getvalue().splitlines():
+            if not raw.strip():
+                continue
+            try:
+                value = json.loads(raw)
+            except (TypeError, ValueError):
+                continue
+            if isinstance(value, dict):
+                results.append(value)
+        encoded_result = json.dumps(results[-16:], ensure_ascii=False, separators=(",", ":"))
+        info["result"] = json.loads(encoded_result[:_MAX_SESSION_RESULT_BYTES]) if len(encoded_result.encode("utf-8")) <= _MAX_SESSION_RESULT_BYTES else {"truncated": True, "count": len(results)}
         info.setdefault("events", []).append(event)
         if len(info["events"]) > _MAX_SESSION_EVENTS:
             del info["events"][:-_MAX_SESSION_EVENTS]
@@ -82,7 +95,7 @@ def _session_record_path(info: dict[str, Any], handle: str) -> Path:
 def _persist_session(handle: str, info: dict[str, Any]) -> None:
     path = _session_record_path(info, handle)
     path.parent.mkdir(parents=True, exist_ok=True)
-    payload = {key: info.get(key) for key in ("workspace", "mode", "session_path", "state", "sequence", "created_at", "cancel_requested")}
+    payload = {key: info.get(key) for key in ("workspace", "mode", "session_path", "state", "sequence", "created_at", "cancel_requested", "result")}
     payload["events"] = list(info.get("events", []))[-_MAX_SESSION_EVENTS:]
     tmp = path.with_suffix(".tmp")
     encoded = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
@@ -132,7 +145,7 @@ def _load_session(handle: str, workspace_hint: str | None = None) -> dict[str, A
             # A daemon restart cannot retain an in-process worker. Never
             # claim that a recovered running handle is still executing.
             state = "recovery_required" if persisted_state == "running" else persisted_state
-            info = {"workspace": str(workspace), "mode": raw["mode"], "session_path": raw["session_path"], "state": state, "sequence": int(raw.get("sequence", 0)), "events": events[-_MAX_SESSION_EVENTS:], "created_monotonic": time.monotonic(), "created_at": raw.get("created_at"), "cancel_requested": bool(raw.get("cancel_requested", False))}
+            info = {"workspace": str(workspace), "mode": raw["mode"], "session_path": raw["session_path"], "state": state, "sequence": int(raw.get("sequence", 0)), "events": events[-_MAX_SESSION_EVENTS:], "created_monotonic": time.monotonic(), "created_at": raw.get("created_at"), "cancel_requested": bool(raw.get("cancel_requested", False)), "result": raw.get("result")}
             if info["mode"] not in {"plan", "act"}: continue
             created_at = info.get("created_at")
             if isinstance(created_at, (int, float)) and time.time() - float(created_at) > _SESSION_TTL_SECONDS:
@@ -294,6 +307,8 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                         elif method in {"session.cancel", "session.pause", "session.resume", "session.approval"}:
                             _persist_session(handle, info)
                     data = {"session": handle, "closed": method == "session.close", "state": info.get("state"), "sequence": info.get("sequence", 0), "workspace": info.get("workspace"), "mode": info.get("mode"), "cancel_requested": bool(info.get("cancel_requested", False))}
+                    if info.get("result") is not None:
+                        data["result"] = info["result"]
                     if method == "session.events":
                         after = params.get("after", 0)
                         limit = params.get("limit", 100)

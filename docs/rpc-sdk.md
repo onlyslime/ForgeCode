@@ -41,6 +41,9 @@ Clients may pass `background: true` to `session.run` to receive an immediate
 `accepted` envelope while the shared handle remains `running`; status/events
 then expose the terminal `run_finished` event and controls can be sent during
 execution. The default synchronous response remains unchanged.
+Completed background runs retain a bounded list of structured CLI envelopes in
+`session.status` and in recovered `session.open` responses; oversized output
+is represented by a redacted truncation marker.
 `session.close` rejects active running handles; clients must cancel or await
 completion before revocation so an in-flight worker cannot lose its recovery
 metadata.
