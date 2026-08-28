@@ -24,6 +24,11 @@ Each handle retains only the most recent 512 control/run events. Clients must
 use `next_sequence` and treat cursors older than the retained window as a
 resynchronization point.
 
+Python `EmbeddedSession` bounds its in-memory event queue (`max_events`,
+default 1,024; maximum 100,000). This prevents a slow consumer from causing
+unbounded client-side memory growth; callers should poll regularly and use
+the persisted session/RPC cursors for durable recovery.
+
 ## Session lifecycle
 
 `session.open` creates an in-memory handle bound to a validated workspace and

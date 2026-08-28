@@ -20,6 +20,8 @@ slice.
   non-cooperative provider process without changing synchronous runs.
 - Unified RunService AgentLoop lifecycle callbacks with the privacy-filtered
   telemetry recorder for auditable provider/tool/session families.
+- Added a bounded `EmbeddedSession` event queue (`max_events`) to make Python
+  embedding backpressure explicit and reject unsafe queue sizes.
 - Verification: full regression `444 passed, 8 skipped, 2 warnings`, RPC
   lifecycle suite, compile, and CLI/doctor checks.
 

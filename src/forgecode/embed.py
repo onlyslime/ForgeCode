@@ -89,16 +89,18 @@ __all__ = ["ForgeCodeError", "invoke", "stream"]
 
 class EmbeddedSession:
     """Programmatic interactive session backed by the production CLI worker."""
-    def __init__(self, workspace: str, *, mode: str = "plan", executable: str = "forgecode"):
+    def __init__(self, workspace: str, *, mode: str = "plan", executable: str = "forgecode", max_events: int = 1024):
         if mode not in {"plan", "act"}:
             raise ValueError("mode must be plan or act")
+        if isinstance(max_events, bool) or not isinstance(max_events, int) or max_events < 1 or max_events > 100_000:
+            raise ValueError("max_events must be between 1 and 100000")
         command = [sys.executable, "-u", "-m", "forgecode"] if executable == "forgecode" else [executable]
-        self._workspace, self._mode, self._command, self._environment = workspace, mode, command, dict(os.environ)
+        self._workspace, self._mode, self._command, self._environment, self._max_events = workspace, mode, command, dict(os.environ), max_events
         environment = dict(os.environ)
         source_root = str(Path(__file__).resolve().parents[1])
         environment["PYTHONPATH"] = source_root + os.pathsep + environment.get("PYTHONPATH", "")
         self.process = subprocess.Popen([*command, "--workspace", workspace, "chat", "--mode", mode, "--jsonl"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8", bufsize=1, env=environment)
-        self._events: Queue[dict[str, Any]] = Queue()
+        self._events: Queue[dict[str, Any]] = Queue(maxsize=max_events)
         self._stderr: Queue[str] = Queue(maxsize=128)
         self._stderr_text = ""
         self._reader = threading.Thread(target=self._read, daemon=True)
@@ -120,7 +122,7 @@ class EmbeddedSession:
         source_root = str(Path(__file__).resolve().parents[1])
         environment["PYTHONPATH"] = source_root + os.pathsep + environment.get("PYTHONPATH", "")
         self.process = subprocess.Popen([*self._command, "--workspace", self._workspace, "chat", "--mode", self._mode, "--jsonl"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8", bufsize=1, env=environment)
-        self._events = Queue()
+        self._events = Queue(maxsize=self._max_events)
         self._stderr_text = ""
         self._reader = threading.Thread(target=self._read, daemon=True)
         self._err_reader = threading.Thread(target=self._read_stderr, daemon=True)

@@ -63,3 +63,13 @@ def test_embedded_send_after_process_exit_is_typed(tmp_path):
             raise AssertionError("expected process_error")
     finally:
         session.close()
+
+
+def test_embedded_session_bounds_event_queue(tmp_path):
+    for value in (0, 100_001):
+        try:
+            EmbeddedSession(str(tmp_path), max_events=value)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("expected max_events validation")
