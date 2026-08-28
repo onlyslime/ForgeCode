@@ -840,7 +840,7 @@ def main(argv: list[str] | None = None) -> int:
         machine_json = bool(getattr(args, "json", False) or getattr(args, "jsonl", False))
         command_name = f"provider {action}"
         if action == "list":
-            rows = [{"name": name, "streaming": name == "openai-compatible", "local": name == "ollama", "credential": "optional" if name == "ollama" else "environment"} for name in ("openai-compatible", "anthropic", "google", "ollama")]
+            rows = [{"name": name, "streaming": True, "local": name == "ollama", "credential": "optional" if name == "ollama" else "environment"} for name in ("openai-compatible", "anthropic", "google", "ollama")]
             if machine_json:
                 _emit_machine(_machine_envelope(command_name, "provider_list", True, data={"providers": rows}, exit_code=0))
             else:
