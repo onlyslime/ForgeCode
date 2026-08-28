@@ -16,6 +16,8 @@ mode; unknown or malformed handles fail closed with `invalid_request`.
 `session.approval` accepts only a boolean decision and records either a running
 or approval-denied state, allowing clients to complete an explicit approval
 handshake without bypassing CLI policy.
+Terminal states are monotonic: a completed, failed, cancelled, or denied
+session rejects later pause/resume/cancel/approval requests.
 
 The handle registry is deliberately bounded by request validation and does not
 create a second execution loop. Production execution remains owned by the
