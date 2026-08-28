@@ -63,7 +63,7 @@ def stream(requests: Iterable[dict[str, Any]], *, raise_for_status: bool = False
             if not isinstance(item, dict):
                 raise ValueError("stream requests must be objects")
             try:
-                encoded = json.dumps(item, ensure_ascii=False)
+                encoded = json.dumps(item, ensure_ascii=False, allow_nan=False)
             except (TypeError, ValueError) as exc:
                 raise ValueError("stream request must be JSON-serializable") from exc
             if len(encoded.encode("utf-8")) > 1_000_000:
