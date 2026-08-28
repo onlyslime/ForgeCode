@@ -359,6 +359,15 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
         except Exception as exc:
             message = str(exc)[:2000]
             code = "trust_revoked" if "workspace trust" in message else "invalid_request"
+            if method in {"run", "session.run"} and handle:
+                with _SESSION_LOCK:
+                    info = _RPC_SESSIONS.get(handle)
+                    if info is not None and info.get("state") == "running":
+                        info["state"] = "failed"
+                        info["sequence"] = int(info.get("sequence", 0)) + 1
+                        info.setdefault("events", []).append({"sequence": info["sequence"], "type": "run_failed", "state": "failed", "error_code": code})
+                        try: _persist_session(handle, info)
+                        except OSError: pass
             payload = {"schema_version": 1, "kind": "error", "ok": False, "command": "rpc", "error": {"code": code, "message": message}, "exit_code": 2}
             if request_id is not None: payload["id"] = request_id
             if method is not None: payload["method"] = method

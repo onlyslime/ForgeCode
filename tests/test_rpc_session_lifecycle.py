@@ -120,6 +120,20 @@ def test_rpc_session_run_rejects_cancelled_handle(tmp_path):
     assert "cancelled" in result["error"]["message"]
 
 
+def test_rpc_failed_run_releases_busy_state(tmp_path):
+    handle = _call({"method": "session.open", "params": {"workspace": str(tmp_path)}})["data"]["session"]
+    from forgecode import rpc
+    original = rpc.main
+    rpc.main = lambda _argv: (_ for _ in ()).throw(RuntimeError("boom"))
+    try:
+        failed = _call({"method": "session.run", "params": {"session": handle, "prompt": "hello", "demo": True}})
+    finally:
+        rpc.main = original
+    assert failed["ok"] is False
+    status = _call({"method": "session.status", "params": {"session": handle}})
+    assert status["data"]["state"] == "failed"
+
+
 def test_rpc_idempotency_caches_multi_event_response(tmp_path):
     request = {"id": "doctor-replay", "method": "doctor", "params": {}}
     first = list(serve_lines([json.dumps(request)]))
