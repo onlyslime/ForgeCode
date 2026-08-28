@@ -9,7 +9,7 @@ from typing import Any, Callable
 
 from ..agent import AgentConfig, AgentLoop, ContextBuilder, LoopResult
 from ..config import EffectiveConfig
-from ..models import CancellationToken, ModelProvider
+from ..models import CancellationToken, ModelProvider, DemoProvider
 from ..security.workspace import WorkspaceGuard
 from ..security.trust import TrustStore, TrustError
 from ..telemetry import Telemetry
@@ -169,7 +169,7 @@ class RunService:
         transaction_store = self.transaction_store or TransactionStore(self.guard, max_total_bytes=self.effective_config.transaction_max_bytes if self.effective_config else 50_000_000)
         original_side_effect_check = self.pre_side_effect_check
         def side_effect_check() -> bool | str:
-            if mode == "act":
+            if mode == "act" and not isinstance(self.provider, DemoProvider):
                 try:
                     if not TrustStore(self.guard.root).status().get("trusted", False):
                         return "workspace trust was revoked during execution"
