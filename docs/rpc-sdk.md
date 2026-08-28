@@ -95,6 +95,7 @@ the retained result payload and terminal metadata.
 `session.wait` provides a bounded wait (0–60 seconds) for background runs and
 returns `timed_out`, state, sequence, and the same retained result payload.
 Node `sessionWait()` and Python `session_wait()` expose this contract directly.
+The Python helper is also available as `forgecode.session_wait_embedded`.
 `session.close` rejects active running handles; clients must cancel or await
 completion before revocation so an in-flight worker cannot lose its recovery
 metadata.

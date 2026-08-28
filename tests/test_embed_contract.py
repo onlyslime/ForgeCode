@@ -69,5 +69,6 @@ def test_embed_session_result_validates_handle():
     with pytest.raises(ValueError):
         session_result("x\ny")
     assert forgecode.session_result_embedded is session_result
+    assert forgecode.session_wait_embedded is session_wait
     with pytest.raises(ValueError):
         session_wait("x", timeout=61)
