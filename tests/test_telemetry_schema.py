@@ -19,3 +19,11 @@ def test_telemetry_offline_never_creates_records(tmp_path):
     telemetry = Telemetry(tmp_path, mode="local", offline=True)
     assert telemetry.record("event", value=1) is False
     assert not (tmp_path / ".forgecode" / "telemetry.jsonl").exists()
+
+
+def test_telemetry_event_names_are_safe_tokens(tmp_path):
+    telemetry = Telemetry(tmp_path, mode="local")
+    telemetry.record("prompt: do not log /workspace/secret.txt", value=True)
+    record = json.loads((tmp_path / ".forgecode" / "telemetry.jsonl").read_text(encoding="utf-8"))
+    assert record["event"] == "prompt_do_not_log_workspace_secret.txt"
+    assert ":" not in record["event"] and "/" not in record["event"]

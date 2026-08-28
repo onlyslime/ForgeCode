@@ -7,6 +7,7 @@ JSONL audit file for diagnostics.
 from __future__ import annotations
 
 import json
+import re
 import time
 from pathlib import Path
 from typing import Any
@@ -29,7 +30,8 @@ class Telemetry:
     def record(self, event: str, **metadata: Any) -> bool:
         if self.mode != "local":
             return False
-        safe = {"schema_version": self.SCHEMA_VERSION, "event": str(event)[:128], "timestamp": int(time.time())}
+        event_text = re.sub(r"[^A-Za-z0-9_.-]+", "_", str(event))[:128] or "event"
+        safe = {"schema_version": self.SCHEMA_VERSION, "event": event_text, "timestamp": int(time.time())}
         dropped = 0
         for key, value in metadata.items():
             key_text = str(key)[:64]
