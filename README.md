@@ -38,6 +38,7 @@ Chat Completions 返回结构化 tool calls，ForgeCode 在用户指定工作区
 
 - `trust status|grant|revoke` 建立可撤销的工作区信任记录；`login` 仅引用环境变量凭据。
 - `rpc` 接受 JSONL 请求并复用 CLI envelope；Node 客户端位于 `sdk/node/index.mjs`。
+- RPC/SDK 生命周期与隐私边界见 [`docs/rpc-sdk.md`](docs/rpc-sdk.md) 和 [`docs/privacy.md`](docs/privacy.md)。
 - 配置支持 `offline` 与 `telemetry = off|local|on`；offline 强制禁止外发，local 仅写入本地审计 JSONL。
 - 交互输入中的 Escape 控制字节会立即请求取消，并复用既有 cancel/pause 边界。
 
