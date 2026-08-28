@@ -124,11 +124,12 @@ export const configProfiles = (options = {}) => method("config.profiles", option
 export function interactive(workspace, { mode = "plan", executable = "forgecode", maxEvents = 2048 } = {}) {
   if (!Number.isInteger(maxEvents) || maxEvents < 1 || maxEvents > 100_000) throw new TypeError("maxEvents must be an integer between 1 and 100000");
   const child = spawn(executable, ["--workspace", workspace, "chat", "--mode", mode, "--jsonl"], { stdio: ["pipe", "pipe", "pipe"] });
-  let buffer = ""; const events = []; const listeners = new Set();
+  let buffer = ""; let stderr = ""; const events = []; const listeners = new Set();
   child.stdout.on("data", (chunk) => { buffer += chunk; const lines = buffer.split(/\r?\n/); buffer = lines.pop(); for (const line of lines) if (line.trim()) { try { const event = JSON.parse(line); events.push(event); if (events.length > maxEvents) events.splice(0, events.length - maxEvents); for (const listener of listeners) listener(event); } catch (error) { const event = { kind: "process_error", code: "invalid_json", message: error.message || "invalid JSON event" }; events.push(event); if (events.length > maxEvents) events.splice(0, events.length - maxEvents); for (const listener of listeners) listener(event); child.kill(); return; } } });
+  child.stderr.on("data", (chunk) => { stderr += chunk.toString(); if (Buffer.byteLength(stderr, "utf8") > 256_000) stderr = stderr.slice(-128_000); });
   let closed = false;
   return {
-    process: child,
+    process: child, get stderr() { return stderr; },
     send(text) { if (closed) throw new ForgeCodeError("interactive process is closed", { code: "process_error" }); if (typeof text !== "string" || !text.trim() || text.length > 8000) throw new Error("message must be non-empty and bounded"); try { child.stdin.write(text.replace(/[\r\n]/g, " ") + "\n"); } catch (error) { throw new ForgeCodeError(error.message || "interactive process is unavailable", { code: "process_error" }); } },
     cancel() { this.send("/cancel"); }, pause() { this.send("/pause"); }, resume() { this.send("/resume"); }, close() { if (!closed) { try { child.stdin.write("/quit\n"); } catch {} closed = true; } },
     on(listener) { listeners.add(listener); return () => listeners.delete(listener); }, events,

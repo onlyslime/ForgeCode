@@ -53,6 +53,8 @@ with process termination fallback for hosts that need deterministic cleanup.
 Malformed JSON emitted by an interactive worker is converted into a bounded
 `process_error` event and the worker is terminated, rather than escaping into
 the embedding application's event loop.
+Interactive stderr is continuously drained and retained to a bounded 256 KiB
+tail, available as a diagnostic-only `stderr` property.
 
 ## Session lifecycle
 

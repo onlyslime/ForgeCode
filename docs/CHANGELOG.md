@@ -28,6 +28,8 @@ slice.
   cleanup with terminate fallback.
 - Converted malformed Node interactive JSON into typed `process_error` events
   with worker termination instead of uncaught host exceptions.
+- Added bounded stderr draining for Node interactive workers to prevent pipe
+  backpressure deadlocks; the retained diagnostic tail is exposed read-only.
 - Added Python `session_result()` convenience API to match the Node SDK result
   retrieval contract.
 - Exported the Python result helper through the package-level
