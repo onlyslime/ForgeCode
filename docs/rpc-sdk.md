@@ -6,6 +6,9 @@ an application `id`; replaying an id returns the original response without
 reapplying a control operation. Replay memory is bounded to 1024 ids. Session
 handles are bounded to 256 active handles with an eight-hour TTL; expired
 handles fail closed instead of accumulating in a long-lived daemon.
+Each handle retains only the most recent 512 control/run events. Clients must
+use `next_sequence` and treat cursors older than the retained window as a
+resynchronization point.
 
 ## Session lifecycle
 
