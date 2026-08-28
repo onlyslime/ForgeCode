@@ -14,7 +14,8 @@ slice.
 - Synchronous `session.run` behavior remains backward compatible.
 - Recovered orphaned running handles now report `recovery_required` and emit a
   restart event when explicitly reclaimed by a new run.
-- Verification: RPC lifecycle suite, compile, and CLI version checks.
+- Verification: full regression `442 passed, 8 skipped, 2 warnings`, RPC
+  lifecycle suite, compile, and CLI/doctor checks.
 
 ## v0.0.27 — 2026-08-28
 
