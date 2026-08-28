@@ -31,7 +31,7 @@ Chat Completions 返回结构化 tool calls，ForgeCode 在用户指定工作区
 - **真实离线演示**：DemoProvider 在隔离工作区读取有 bug 的 calculator，先跑
   出失败测试，再走 patch 和审批，最后取得真实通过结果；不需要网络或 API key。
 
-当前版本：`v0.0.33`（版本号与 `VERSION`、`pyproject.toml` 和
+当前版本：`v0.0.34`（版本号与 `VERSION`、`pyproject.toml` 和
 `src/forgecode/__init__.py` 保持同步）。
 
 ### v0.0.13 CLI harness
@@ -44,6 +44,8 @@ Chat Completions 返回结构化 tool calls，ForgeCode 在用户指定工作区
 - `sessions --state <state>`、RPC `session.list` 以及 Node/Python
   `sessionList`/`session_list` 提供有界、可脚本化的后台会话发现；workspace
   会先规范化并校验，避免跨工作区读取元数据。
+- `config policy`/`config.policy` 提供只读的逐工具权限解释，展示配置与运行时
+  收窄、Plan/Act、approval、trust 的生效原因。
 
 ### v0.0.9 扩展能力
 

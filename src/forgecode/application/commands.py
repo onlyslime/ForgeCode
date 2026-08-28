@@ -368,6 +368,13 @@ def _parser() -> argparse.ArgumentParser:
     config_profiles.add_argument("--show", dest="profile_name")
     config_profiles.add_argument("--json", action="store_true", default=argparse.SUPPRESS, dest="json")
     config_profiles.add_argument("--jsonl", action="store_true", default=argparse.SUPPRESS, dest="jsonl")
+    config_policy = config_sub.add_parser("policy", help="explain effective tool permissions without executing them")
+    config_policy.add_argument("--profile")
+    config_policy.add_argument("--tools", help="optional runtime allow-list to explain")
+    config_policy.add_argument("--exclude-tools", help="optional runtime deny-list to explain")
+    config_policy.add_argument("--no-tools", action="store_true")
+    config_policy.add_argument("--json", action="store_true", default=argparse.SUPPRESS, dest="json")
+    config_policy.add_argument("--jsonl", action="store_true", default=argparse.SUPPRESS, dest="jsonl")
     provider_parser = subparsers.add_parser("provider", help="inspect provider configuration without making a request")
     provider_parser.add_argument("--json", action="store_true", default=argparse.SUPPRESS, dest="json")
     provider_parser.add_argument("--jsonl", action="store_true", default=argparse.SUPPRESS, dest="jsonl")
@@ -616,7 +623,7 @@ def _raw_command_name(argv: list[str]) -> str:
     values (which may contain arbitrary prompt text).
     """
     commands = {"doctor", "tools", "skills", "skill", "rules", "config", "provider", "login", "trust", "rpc", "transaction", "rollback", "review", "chat", "start", "inspect", "map", "context", "test", "tests", "sessions", "diff", "status", "session", "plan", "run", "eval", "benchmark"}
-    actions = {"skills": {"list", "check", "show", "run"}, "skill": {"list", "check", "show", "run"}, "rules": {"show", "check", "explain"}, "config": {"show", "validate", "profiles"}, "provider": {"health", "list"}, "trust": {"status", "grant", "revoke"}, "context": {"show", "index", "search", "complete", "explain", "diagnostics", "clear"}, "test": {"list", "show", "run"}, "tests": {"list", "show", "run"}, "session": {"show", "export", "inspect", "compact", "fork", "tree", "clone", "import"}}
+    actions = {"skills": {"list", "check", "show", "run"}, "skill": {"list", "check", "show", "run"}, "rules": {"show", "check", "explain"}, "config": {"show", "validate", "profiles", "policy"}, "provider": {"health", "list"}, "trust": {"status", "grant", "revoke"}, "context": {"show", "index", "search", "complete", "explain", "diagnostics", "clear"}, "test": {"list", "show", "run"}, "tests": {"list", "show", "run"}, "session": {"show", "export", "inspect", "compact", "fork", "tree", "clone", "import"}}
     command = "doctor"
     command_index = -1
     options_with_values = {
@@ -862,7 +869,27 @@ def main(argv: list[str] | None = None) -> int:
         machine_json = bool(getattr(args, "json", False) or getattr(args, "jsonl", False))
         command_name = f"config {getattr(args, 'config_action', 'show')}"
         try:
-            if args.config_action == "profiles":
+            if args.config_action == "policy":
+                config = ConfigLoader(workspace).load(profile=getattr(args, "profile", None))
+                available = set(base_registry.names())
+                effective_policy = config.tool_policy
+                runtime_policy = parse_tool_policy_options(getattr(args, "tools", None), getattr(args, "exclude_tools", None), no_tools=bool(getattr(args, "no_tools", False)), available=tuple(sorted(available)))
+                rows = []
+                trusted = TrustStore(workspace).status().get("trusted", False)
+                for name in sorted(available):
+                    enabled = effective_policy.permits(name, available=available)
+                    reasons = []
+                    if name in effective_policy.deny: reasons.append("config_deny")
+                    elif effective_policy.allow and name not in effective_policy.allow: reasons.append("config_not_allowlisted")
+                    if runtime_policy is not None:
+                        enabled = enabled and runtime_policy.permits(name, available=available)
+                        if name in runtime_policy.deny: reasons.append("runtime_deny")
+                        elif runtime_policy.allow and name not in runtime_policy.allow: reasons.append("runtime_not_allowlisted")
+                    if config.default_mode == "plan" and name in {"write_file", "apply_patch", "run_command"}: reasons.append("plan_mode_read_only"); enabled = False
+                    if not trusted and config.default_mode == "act" and name in {"write_file", "apply_patch", "run_command"}: reasons.append("workspace_trust_required"); enabled = False
+                    rows.append({"tool": name, "enabled": enabled, "reasons": reasons or ["permitted_by_current_policy"], "approval": config.approval, "mode": config.default_mode, "trust": trusted})
+                payload = {"profile": config.profile, "provider": config.provider, "mode": config.default_mode, "approval": config.approval, "trust": trusted, "config_policy": {"allow": list(effective_policy.allow), "deny": list(effective_policy.deny)}, "runtime_policy": None if runtime_policy is None else {"allow": list(runtime_policy.allow), "deny": list(runtime_policy.deny)}, "tools": rows}
+            elif args.config_action == "profiles":
                 profiles = ConfigLoader(workspace).profiles()
                 selected = getattr(args, "profile_name", None)
                 if selected:
@@ -897,6 +924,10 @@ def main(argv: list[str] | None = None) -> int:
             if args.config_action == "profiles":
                 for item in payload["profiles"]:
                     print(f"{item['name']} provider={item['provider']} model={item['model'] or '<unset>'} streaming={item['streaming']} key={item['api_key_env']} configured={item['api_key_configured']}")
+            elif args.config_action == "policy":
+                print(f"policy profile={payload['profile']} mode={payload['mode']} approval={payload['approval']} trust={payload['trust']}")
+                for row in payload["tools"]:
+                    print(f"{row['tool']}: {'enabled' if row['enabled'] else 'disabled'} ({', '.join(row['reasons'])})")
             else:
                 print("configuration: valid")
                 for key, value in config.to_dict().items():

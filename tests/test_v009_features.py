@@ -79,6 +79,17 @@ def test_cli_eval_and_config_profiles_machine_contract(capsys, tmp_path: Path):
     assert main(["--workspace", str(tmp_path), "eval", "run", "--jsonl"]) == 1
 
 
+def test_config_policy_explains_trust_and_runtime_narrowing(capsys, tmp_path: Path):
+    assert main(["--workspace", str(tmp_path), "config", "policy", "--tools", "read_file", "--jsonl"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["ok"] is True
+    assert payload["data"]["trust"] is False
+    rows = {item["tool"]: item for item in payload["data"]["tools"]}
+    assert rows["read_file"]["enabled"] is True
+    assert rows["write_file"]["enabled"] is False
+    assert "runtime_not_allowlisted" in rows["write_file"]["reasons"]
+
+
 def test_session_tree_clone_and_import_are_non_replaying(capsys, tmp_path: Path):
     session_dir = tmp_path / ".forgecode" / "sessions"
     session_dir.mkdir(parents=True)

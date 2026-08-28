@@ -14,7 +14,7 @@ JSONL RPC、Node/Python SDK、session list/tree、profile 审计和 telemetry/of
 所有入口共享同一工具、审批、日志和安全边界；JSONL stdout 是稳定 envelope，
 进度与审批写 stderr。`sessions --state` 可筛选后台会话，workspace 参数会规范化校验。
 
-当前版本 v0.0.33。安全信任通过 `trust status|grant|revoke` 管理，凭据通过环境变量引用。
+当前版本 v0.0.34。安全信任通过 `trust status|grant|revoke` 管理，凭据通过环境变量引用。
 
 非目标：IDE、Web/桌面 UI、浏览器、远程 MCP、插件市场、worktree、并行子代理、
 云执行和操作系统级 sandbox；审批与风险分类是防线，但不替代 OS 隔离。

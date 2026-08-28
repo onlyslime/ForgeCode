@@ -259,7 +259,7 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
             if method is not None:
                 if not isinstance(method, str) or len(method) > 128 or any(ch.isspace() for ch in method):
                     raise ValueError("method must be bounded non-whitespace text")
-                method_map = {"trust.status": ["trust", "status"], "trust.grant": ["trust", "grant"], "trust.revoke": ["trust", "revoke"], "provider.list": ["provider", "list"], "provider.health": ["provider", "health"], "config.show": ["config", "show"], "config.profiles": ["config", "profiles"], "doctor": ["doctor"], "login": ["login"], "run": ["run"], "session.open": ["session", "open"], "session.run": ["run"], "session.list": ["sessions"], "session.events": ["session", "events"], "session.cancel": ["session", "cancel"], "session.pause": ["session", "pause"], "session.resume": ["session", "resume"], "session.approval": ["session", "approval"], "session.close": ["session", "close"], "session.status": ["session", "status"], "session.result": ["session", "result"], "session.wait": ["session", "wait"], "session.inspect": ["session", "inspect"], "session.tree": ["session", "tree"], "session.export": ["session", "export"]}
+                method_map = {"trust.status": ["trust", "status"], "trust.grant": ["trust", "grant"], "trust.revoke": ["trust", "revoke"], "provider.list": ["provider", "list"], "provider.health": ["provider", "health"], "config.show": ["config", "show"], "config.profiles": ["config", "profiles"], "config.policy": ["config", "policy"], "doctor": ["doctor"], "login": ["login"], "run": ["run"], "session.open": ["session", "open"], "session.run": ["run"], "session.list": ["sessions"], "session.events": ["session", "events"], "session.cancel": ["session", "cancel"], "session.pause": ["session", "pause"], "session.resume": ["session", "resume"], "session.approval": ["session", "approval"], "session.close": ["session", "close"], "session.status": ["session", "status"], "session.result": ["session", "result"], "session.wait": ["session", "wait"], "session.inspect": ["session", "inspect"], "session.tree": ["session", "tree"], "session.export": ["session", "export"]}
                 if method not in method_map:
                     raise ValueError("unsupported RPC method")
                 if argv_value:
@@ -274,13 +274,23 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                     if not isinstance(workspace, str) or len(workspace) > 1_000 or any(ch in workspace for ch in "\r\n"):
                         raise ValueError("trust.workspace is invalid")
                     argv_value = ["--workspace", workspace, *argv_value]
-                if method in {"config.show", "config.profiles", "provider.health", "provider.list", "doctor"} and params.get("workspace") is not None:
+                if method in {"config.show", "config.profiles", "config.policy", "provider.health", "provider.list", "doctor"} and params.get("workspace") is not None:
                     workspace = params.get("workspace")
                     if not isinstance(workspace, str) or len(workspace) > 1_000 or any(ch in workspace for ch in "\r\n"):
                         raise ValueError("workspace is invalid")
                     if not Path(workspace).expanduser().is_dir():
                         raise ValueError("workspace must be an existing directory")
                     argv_value = ["--workspace", workspace, *argv_value]
+                if method == "config.policy":
+                    for key, flag in (("profile", "--profile"), ("tools", "--tools"), ("exclude_tools", "--exclude-tools")):
+                        value = params.get(key)
+                        if value is not None:
+                            if not isinstance(value, str) or len(value) > 4_000 or any(ch in value for ch in "\r\n"):
+                                raise ValueError(f"config.policy.{key} is invalid")
+                            argv_value.extend([flag, value])
+                    if params.get("no_tools"):
+                        if not isinstance(params["no_tools"], bool): raise ValueError("config.policy.no_tools must be boolean")
+                        argv_value.append("--no-tools")
                 if method == "session.list":
                     workspace = params.get("workspace", ".")
                     if not isinstance(workspace, str) or len(workspace) > 1_000 or any(ch in workspace for ch in "\r\n"):

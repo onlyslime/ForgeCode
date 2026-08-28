@@ -150,6 +150,10 @@ export const sessionControl = (session, action, { workspace, ...options } = {}) 
 export const sessionClose = (session, options = {}) => sessionControl(session, "close", options);
 export const sessionApproval = (session, approved, options = {}) => method("session.approval", { ...options, params: { ...(options.params ?? {}), session, approved } });
 export const configProfiles = (options = {}) => method("config.profiles", options);
+export const configPolicy = ({ workspace, profile, tools, excludeTools, noTools, ...options } = {}) => method("config.policy", {
+  ...options,
+  params: { ...(options.params ?? {}), ...(workspace === undefined ? {} : { workspace }), ...(profile === undefined ? {} : { profile }), ...(tools === undefined ? {} : { tools }), ...(excludeTools === undefined ? {} : { exclude_tools: excludeTools }), ...(noTools === undefined ? {} : { no_tools: noTools }) },
+});
 
 export function interactive(workspace, { mode = "plan", executable = "forgecode", maxEvents = 2048 } = {}) {
   if (!Number.isInteger(maxEvents) || maxEvents < 1 || maxEvents > 100_000) throw new TypeError("maxEvents must be an integer between 1 and 100000");
