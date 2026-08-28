@@ -44,7 +44,10 @@ Every commit and release tag uses `vA.B.C`.
 - Keep the changelog and the version files synchronized whenever a substantive
   release is made; do not create duplicate entries for intermediate commits.
 
-The current version is `v0.0.8`; the next ordinary commit is `v0.0.9` unless the user explicitly requests an A or B update.
+The current version is `v0.0.27`; the next ordinary versioned release is
+`v0.0.28` unless the user explicitly requests an A or B update. Keep ordinary
+fixes and documentation commits on the current version; increment C only for
+substantive user-visible release content.
 
 ## Documentation boundaries
 
