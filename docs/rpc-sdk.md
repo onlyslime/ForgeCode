@@ -28,6 +28,11 @@ opt-in reachability check, bounded to a short HEAD request and never including
 credential values; offline policy or missing configuration prevents the
 request and returns a structured reason.
 
+The Node client raises `ForgeCodeError` for timeout, output-limit, empty
+response, invalid JSON, and `ok=false` envelopes. `invoke` accepts bounded
+`timeoutMs` and `maxOutputBytes`; `invokeStream` supports the same method/params
+RPC transport for programmatic callers.
+
 ## Safety and compatibility
 
 Prompts, paths, provider names and environment-variable names are bounded and
