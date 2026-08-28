@@ -13,21 +13,45 @@ from pathlib import Path
 from .rpc import serve_lines
 
 
-def invoke(argv: list[str], *, request_id: str | int | None = None) -> list[dict[str, Any]]:
+class ForgeCodeError(RuntimeError):
+    """Typed embedding error carrying the original machine envelope."""
+    def __init__(self, message: str, *, code: str = "request_failed", envelope: dict[str, Any] | None = None):
+        super().__init__(message)
+        self.code = code
+        self.envelope = envelope
+
+
+def invoke(argv: list[str], *, request_id: str | int | None = None, raise_for_status: bool = False, max_response_bytes: int = 2_000_000) -> list[dict[str, Any]]:
     """Execute one bounded CLI request and return every JSONL envelope."""
-    request: dict[str, Any] = {"argv": list(argv)}
+    request: dict[str, Any] = {"argv": [*argv, "--jsonl"] if "--jsonl" not in argv and "--json" not in argv else list(argv)}
     if request_id is not None:
         request["id"] = request_id
-    return [json.loads(line) for line in serve_lines([json.dumps(request)])]
+    lines = list(serve_lines([json.dumps(request)]))
+    if sum(len(line.encode("utf-8")) for line in lines) > max_response_bytes:
+        raise ForgeCodeError("response exceeds output limit", code="output_limit")
+    try:
+        envelopes = [json.loads(line) for line in lines]
+    except ValueError as exc:
+        raise ForgeCodeError("invalid JSON response", code="invalid_json") from exc
+    if raise_for_status:
+        for envelope in envelopes:
+            if isinstance(envelope, dict) and envelope.get("ok") is False:
+                error = envelope.get("error") if isinstance(envelope.get("error"), dict) else {}
+                raise ForgeCodeError(str(error.get("message", "request failed")), code=str(error.get("code", "request_failed")), envelope=envelope)
+    return envelopes
 
 
-def stream(requests: Iterable[dict[str, Any]]) -> Iterable[dict[str, Any]]:
+def stream(requests: Iterable[dict[str, Any]], *, raise_for_status: bool = False) -> Iterable[dict[str, Any]]:
     """Process JSON-compatible RPC requests in order."""
     for line in serve_lines(json.dumps(item, ensure_ascii=False) for item in requests):
-        yield json.loads(line)
+        envelope = json.loads(line)
+        if raise_for_status and isinstance(envelope, dict) and envelope.get("ok") is False:
+            error = envelope.get("error") if isinstance(envelope.get("error"), dict) else {}
+            raise ForgeCodeError(str(error.get("message", "request failed")), code=str(error.get("code", "request_failed")), envelope=envelope)
+        yield envelope
 
 
-__all__ = ["invoke", "stream"]
+__all__ = ["ForgeCodeError", "invoke", "stream"]
 
 
 class EmbeddedSession:
