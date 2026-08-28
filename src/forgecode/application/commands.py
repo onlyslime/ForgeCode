@@ -357,6 +357,7 @@ def _parser() -> argparse.ArgumentParser:
     provider_list.add_argument("--json", action="store_true", default=argparse.SUPPRESS, dest="json")
     provider_list.add_argument("--jsonl", action="store_true", default=argparse.SUPPRESS, dest="jsonl")
     provider_health = provider_sub.add_parser("health", help="show bounded provider capabilities and configuration")
+    provider_health.add_argument("--probe", action="store_true", help="opt in to a bounded provider network probe")
     provider_health.add_argument("--json", action="store_true", default=argparse.SUPPRESS, dest="json")
     provider_health.add_argument("--jsonl", action="store_true", default=argparse.SUPPRESS, dest="jsonl")
     login_parser = subparsers.add_parser("login", help="show secure environment-based credential setup")
@@ -899,6 +900,15 @@ def main(argv: list[str] | None = None) -> int:
             },
             "network_request": False,
         }
+        if getattr(args, "probe", False):
+            if effective and effective.offline:
+                payload["probe"] = {"requested": True, "performed": False, "reason": "offline policy blocks network"}
+            else:
+                # The health command remains side-effect free until a provider
+                # adapter exposes a bounded probe; report this explicitly.
+                payload["probe"] = {"requested": True, "performed": False, "reason": "provider probe adapter unavailable"}
+        else:
+            payload["probe"] = {"requested": False, "performed": False, "reason": "offline by default"}
         payload["credential"] = "required" if provider_requires_credential(payload["provider"]) else "optional"
         if machine_json:
             envelope = _machine_envelope(command_name, "provider_health", True, data=payload, exit_code=0, **_compat_aliases(payload))

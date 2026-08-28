@@ -30,6 +30,12 @@ def test_ollama_login_and_health_are_local_without_key(capsys, tmp_path: Path):
     assert main(["--workspace", str(tmp_path), "provider", "health", "--json"]) == 0
     health = json.loads(capsys.readouterr().out)
     assert health["data"]["configured"] is False  # no model selected
+    assert health["data"]["probe"]["reason"] == "offline by default"
+
+    assert main(["--workspace", str(tmp_path), "provider", "health", "--probe", "--json"]) == 0
+    probed = json.loads(capsys.readouterr().out)
+    assert probed["data"]["probe"]["requested"] is True
+    assert probed["data"]["probe"]["performed"] is False
 
 
 def test_rpc_login_forwards_bounded_provider_params(tmp_path: Path):
