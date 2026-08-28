@@ -17,6 +17,7 @@ slice.
 - Aligned Python embedding stream parsing with the typed `invalid_json` error
   contract.
 - Added telemetry event-family classification and unknown-event audit markers.
+- Serialized telemetry append/retention operations for concurrent workers.
 - Made act-mode embedded reconnect fail closed when workspace trust is revoked.
 - Added trust revalidation at RunService side-effect boundaries during act runs.
 - Verification: version/import consistency and targeted telemetry checks.

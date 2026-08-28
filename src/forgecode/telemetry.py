@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import re
+import threading
 import time
 from pathlib import Path
 from typing import Any
@@ -22,6 +23,7 @@ class Telemetry:
         "transaction": "transaction", "recovery": "recovery", "session": "session", "run": "session",
         "cli": "session", "profile": "provider",
     }
+    _WRITE_LOCK = threading.RLock()
     def __init__(self, workspace: Path, *, mode: str = "off", offline: bool = False):
         self.workspace = Path(workspace).resolve()
         self.mode = "off" if offline else mode
@@ -59,17 +61,19 @@ class Telemetry:
         path = self.workspace / ".forgecode" / "telemetry.jsonl"
         path.parent.mkdir(parents=True, exist_ok=True)
         record = json.dumps(safe, ensure_ascii=False, separators=(",", ":")) + "\n"
-        with path.open("a", encoding="utf-8") as stream:
-            stream.write(record)
-        # Bound retention without exposing or rewriting records in off mode.
-        try:
-            lines = path.read_text(encoding="utf-8").splitlines()
-            if len(lines) > self.MAX_RECORDS:
-                tmp = path.with_suffix(".trim.tmp")
-                tmp.write_text("\n".join(lines[-self.MAX_RECORDS:]) + "\n", encoding="utf-8")
-                tmp.replace(path)
-        except OSError:
-            pass
+        with self._WRITE_LOCK:
+            with path.open("a", encoding="utf-8") as stream:
+                stream.write(record)
+                stream.flush()
+            # Bound retention without exposing or rewriting records in off mode.
+            try:
+                lines = path.read_text(encoding="utf-8").splitlines()
+                if len(lines) > self.MAX_RECORDS:
+                    tmp = path.with_suffix(".trim.tmp")
+                    tmp.write_text("\n".join(lines[-self.MAX_RECORDS:]) + "\n", encoding="utf-8")
+                    tmp.replace(path)
+            except OSError:
+                pass
         return True
 
 

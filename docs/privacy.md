@@ -25,6 +25,8 @@ Telemetry records carry an `event_family` classification (`provider`, `tool`,
 `approval`, `transaction`, `recovery`, or `session`). Unknown event names are
 retained only as bounded metadata and include an `audit_warning` marker so
 privacy reviews can identify producers that have not been classified.
+Writes and retention trimming are serialized within the process so concurrent
+workers cannot interleave JSONL records or race an atomic trim.
 
 Session and checkpoint records are local execution evidence, not telemetry.
 They may contain bounded tool metadata needed for recovery, but use the shared

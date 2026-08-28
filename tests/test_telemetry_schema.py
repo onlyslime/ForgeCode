@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from concurrent.futures import ThreadPoolExecutor
 
 from forgecode.telemetry import Telemetry
 
@@ -37,3 +38,12 @@ def test_telemetry_classifies_event_families_and_flags_unknown(tmp_path):
     assert records[0]["event_family"] == "provider"
     assert records[1]["event_family"] == "unknown"
     assert records[1]["audit_warning"] == "unclassified_event"
+
+
+def test_telemetry_concurrent_writes_remain_valid_jsonl(tmp_path):
+    telemetry = Telemetry(tmp_path, mode="local")
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        list(pool.map(lambda i: telemetry.record("tool_finished", index=i), range(64)))
+    lines = (tmp_path / ".forgecode" / "telemetry.jsonl").read_text(encoding="utf-8").splitlines()
+    assert len(lines) == 64
+    assert all(json.loads(line)["event_family"] == "tool" for line in lines)
