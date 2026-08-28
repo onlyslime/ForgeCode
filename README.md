@@ -31,7 +31,7 @@ Chat Completions 返回结构化 tool calls，ForgeCode 在用户指定工作区
 - **真实离线演示**：DemoProvider 在隔离工作区读取有 bug 的 calculator，先跑
   出失败测试，再走 patch 和审批，最后取得真实通过结果；不需要网络或 API key。
 
-当前版本：`v0.0.15`（版本号与 `VERSION`、`pyproject.toml` 和
+当前版本：`v0.0.17`（版本号与 `VERSION`、`pyproject.toml` 和
 `src/forgecode/__init__.py` 保持同步）。
 
 ### v0.0.13 CLI harness

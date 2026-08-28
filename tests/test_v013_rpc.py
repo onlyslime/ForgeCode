@@ -25,3 +25,12 @@ def test_rpc_preserves_request_id_and_embedded_api(tmp_path):
     assert result["id"] == "req-7"
     embedded = invoke(["--workspace", str(tmp_path), "trust", "status", "--jsonl"], request_id=9)
     assert embedded[0]["id"] == 9
+
+
+def test_rpc_method_dispatch_and_rejection(tmp_path):
+    request = json.dumps({"id": "m1", "method": "provider.list"})
+    result = json.loads(next(serve_lines([request])))
+    assert result["method"] == "provider.list"
+    assert result["data"]["providers"]
+    bad = json.loads(next(serve_lines([json.dumps({"method": "unknown"})])))
+    assert bad["error"]["code"] == "invalid_request"

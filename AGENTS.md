@@ -99,5 +99,5 @@ small change into an unbounded repository-wide activity.
 
 ## Push policy
 
-- After a requested implementation is verified and the release commit is ready, commit the complete intended change set and push it to the configured upstream remote automatically. Use the required `vA.B.C: short description` subject and inspect `git status` before pushing.
+- After a coherent feature slice (not each individual edit) is implemented and verified, commit the complete intended change set and push it to the configured upstream remote automatically. Group related code, tests, docs, and version updates into one feature commit. Use the required `vA.B.C: short description` subject and inspect `git status` before pushing.
 - Future implementation updates in this repository are authorized to follow the same verified commit-and-push flow without asking again, unless the owner explicitly says to keep changes local.
