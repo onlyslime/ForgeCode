@@ -347,6 +347,11 @@ def _parser() -> argparse.ArgumentParser:
     rules_check.add_argument("--compatible", action="store_true")
     rules_check.add_argument("--json", action="store_true", default=argparse.SUPPRESS, dest="json")
     rules_check.add_argument("--jsonl", action="store_true", default=argparse.SUPPRESS, dest="jsonl")
+    rules_explain = rules_sub.add_parser("explain", help="explain rule precedence and effective sources")
+    rules_explain.add_argument("targets", nargs="*", help="files/directories to explain")
+    rules_explain.add_argument("--compatible", action="store_true")
+    rules_explain.add_argument("--json", action="store_true", default=argparse.SUPPRESS, dest="json")
+    rules_explain.add_argument("--jsonl", action="store_true", default=argparse.SUPPRESS, dest="jsonl")
     config_parser = subparsers.add_parser("config", help="inspect or validate typed effective configuration")
     config_parser.add_argument("--json", action="store_true", default=argparse.SUPPRESS, dest="json")
     config_parser.add_argument("--jsonl", action="store_true", default=argparse.SUPPRESS, dest="jsonl")
@@ -609,7 +614,7 @@ def _raw_command_name(argv: list[str]) -> str:
     values (which may contain arbitrary prompt text).
     """
     commands = {"doctor", "tools", "skills", "skill", "rules", "config", "provider", "login", "trust", "rpc", "transaction", "rollback", "review", "chat", "start", "inspect", "map", "context", "test", "tests", "sessions", "diff", "status", "session", "plan", "run", "eval", "benchmark"}
-    actions = {"skills": {"list", "check", "show", "run"}, "skill": {"list", "check", "show", "run"}, "rules": {"show", "check"}, "config": {"show", "validate", "profiles"}, "provider": {"health", "list"}, "trust": {"status", "grant", "revoke"}, "context": {"show", "index", "search", "complete", "explain", "diagnostics", "clear"}, "test": {"list", "show", "run"}, "tests": {"list", "show", "run"}, "session": {"show", "export", "inspect", "compact", "fork", "tree", "clone", "import"}}
+    actions = {"skills": {"list", "check", "show", "run"}, "skill": {"list", "check", "show", "run"}, "rules": {"show", "check", "explain"}, "config": {"show", "validate", "profiles"}, "provider": {"health", "list"}, "trust": {"status", "grant", "revoke"}, "context": {"show", "index", "search", "complete", "explain", "diagnostics", "clear"}, "test": {"list", "show", "run"}, "tests": {"list", "show", "run"}, "session": {"show", "export", "inspect", "compact", "fork", "tree", "clone", "import"}}
     command = "doctor"
     command_index = -1
     options_with_values = {
@@ -973,6 +978,9 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"rules failed: {_redact_display(str(exc))}", file=sys.stderr)
             return 2
         payload = rules.to_dict(include_text=bool(getattr(args, "include_text", False) and action == "show"))
+        if action == "explain":
+            payload["precedence"] = "higher priority values are deeper target scopes; source order is deterministic"
+            payload["effective_sources"] = [{"path": source.path, "scope": source.scope, "priority": source.priority, "kind": source.kind, "digest": source.digest} for source in rules.sources]
         if action == "check":
             payload["valid"] = not any(item.severity == "error" for item in rules.diagnostics)
         if machine_json:
@@ -3311,3 +3319,4 @@ def _prepare_demo_workspace(registry, guard: WorkspaceGuard, *, task: str = "cal
         result = registry.execute("write_file", {"path": name, "content": content}, context)
         if not result.ok:
             raise OSError(f"could not prepare demo fixture {name}: {result.output}")
+
