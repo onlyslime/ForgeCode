@@ -261,6 +261,12 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                         with _SESSION_LOCK:
                             info = _RPC_SESSIONS.get(handle)
                         if info is None: raise ValueError("session handle is unknown")
+                        with _SESSION_LOCK:
+                            if info.get("state") == "approval_denied":
+                                raise ValueError("session approval was denied; open a new session")
+                            if info.get("state") == "running":
+                                raise ValueError("session is busy; wait for the active run to finish")
+                            info["state"] = "running"
                         if info.get("state") == "approval_denied":
                             raise ValueError("session approval was denied; open a new session")
                         if info.get("mode") == "act":
@@ -273,8 +279,6 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                         # the previous run remains recorded as cancelled.
                         with _SESSION_LOCK:
                             info["cancel_requested"] = False
-                            if info.get("state") == "cancelled":
-                                info["state"] = "running"
                         global_args.extend(["--workspace", info["workspace"]])
                         argv_value.extend(["--mode", info["mode"], "--session", info["session_path"]])
                     for key, flag in (("workspace", "--workspace"), ("mode", "--mode"), ("session", "--session"), ("profile", "--profile")):
