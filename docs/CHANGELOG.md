@@ -20,6 +20,13 @@ slice.
 - Serialized telemetry append/retention operations for concurrent workers.
 - Made act-mode embedded reconnect fail closed when workspace trust is revoked.
 - Added trust revalidation at RunService side-effect boundaries during act runs.
+- Hardened embedded shutdown with terminate/kill fallbacks and bounded waits.
+- Serialized RPC session runs and made cancelled/failed/denied handles terminal
+  with explicit recovery semantics.
+- Canonicalized persisted RPC workspaces and bounded request identifiers.
+- Normalized Node/Python SDK limits and process/JSON error contracts.
+- Verification: targeted RPC/embed/provider/telemetry gate (43 passed), Node
+  smoke, Python compile, doctor JSONL, and diff checks.
 - Hardened embedded-session shutdown with bounded terminate/kill waits.
 - Added profile/provider credential selectors to the Node login helper.
 - Normalized Node child-process spawn failures to typed `process_error` errors.
