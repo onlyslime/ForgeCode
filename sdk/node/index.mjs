@@ -1,6 +1,11 @@
 /** Minimal Node SDK for ForgeCode's JSONL RPC/CLI envelope. */
 import { spawn } from "node:child_process";
 
+function boundedNumber(value, name, { min = 1, integer = false } = {}) {
+  if (typeof value !== "number" || !Number.isFinite(value) || value < min || (integer && !Number.isInteger(value))) throw new TypeError(`${name} must be a finite ${integer ? "integer" : "number"} >= ${min}`);
+  return value;
+}
+
 export class ForgeCodeError extends Error {
   constructor(message, { code = "sdk_error", envelope = null, exitCode = null } = {}) {
     super(message); this.name = "ForgeCodeError"; this.code = code; this.envelope = envelope; this.exitCode = exitCode;
@@ -8,6 +13,7 @@ export class ForgeCodeError extends Error {
 }
 
 export function invoke(argv = [], { cwd, executable = "forgecode", method, params = {}, id, timeoutMs = 30000, maxOutputBytes = 2_000_000 } = {}) {
+  boundedNumber(timeoutMs, "timeoutMs"); boundedNumber(maxOutputBytes, "maxOutputBytes", { integer: true });
   return new Promise((resolve, reject) => {
     const rpc = method !== undefined;
     const child = spawn(executable, rpc ? ["rpc"] : [...argv, "--jsonl"], { cwd, stdio: ["pipe", "pipe", "pipe"] });
@@ -35,6 +41,9 @@ export function invoke(argv = [], { cwd, executable = "forgecode", method, param
 }
 
 export function invokeStream(argv = [], options = {}) {
+    boundedNumber(options.timeoutMs ?? 30000, "timeoutMs");
+    boundedNumber(options.maxOutputBytes ?? 2_000_000, "maxOutputBytes", { integer: true });
+    boundedNumber(options.maxItems ?? 1024, "maxItems", { integer: true });
   return new Promise((resolve, reject) => {
     const rpc = options.method !== undefined;
     const child = spawn(options.executable ?? "forgecode", rpc ? ["rpc"] : [...argv, "--jsonl"], { cwd: options.cwd, stdio: ["pipe", "pipe", "pipe"] });
