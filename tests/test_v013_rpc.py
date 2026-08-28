@@ -45,7 +45,7 @@ def test_rpc_config_and_doctor_methods(tmp_path):
 
 
 def test_rpc_run_method_requires_bounded_prompt(tmp_path):
-    request = json.dumps({"id": "run-1", "method": "run", "params": {"workspace": str(tmp_path), "prompt": "inspect", "mode": "plan"}})
+    request = json.dumps({"id": "run-1", "method": "run", "params": {"workspace": str(tmp_path), "prompt": "inspect", "mode": "plan", "demo": True}})
     results = [json.loads(item) for item in serve_lines([request])]
     assert results and all(item.get("id") == "run-1" for item in results)
     assert any(item.get("kind") == "result" for item in results)

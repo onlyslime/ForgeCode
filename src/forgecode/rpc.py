@@ -42,15 +42,18 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                     prompt = params.get("prompt", "")
                     if not isinstance(prompt, str) or not prompt.strip() or len(prompt) > 8_000:
                         raise ValueError("run.prompt must be non-empty and bounded")
+                    global_args = []
                     argv_value.append(prompt)
                     for key, flag in (("workspace", "--workspace"), ("mode", "--mode"), ("session", "--session"), ("profile", "--profile")):
                         value = params.get(key)
                         if value is not None:
                             if not isinstance(value, str) or len(value) > 1_000 or any(ch in value for ch in "\r\n"):
                                 raise ValueError(f"run.{key} is invalid")
-                            argv_value.extend([flag, value])
+                            (global_args if key == "workspace" else argv_value).extend([flag, value])
                     if params.get("auto_approve") is True: argv_value.append("--auto-approve")
                     if params.get("require_trust") is True: argv_value.append("--require-trust")
+                    if params.get("demo") is True: argv_value.append("--demo")
+                    argv_value = global_args + argv_value
                 argv_value.append("--jsonl")
             if not isinstance(argv_value, list):
                 raise ValueError("argv must be an array")
