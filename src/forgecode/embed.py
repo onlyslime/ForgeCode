@@ -28,6 +28,10 @@ def invoke(argv: list[str], *, request_id: str | int | None = None, raise_for_st
         raise ValueError("max_response_bytes must be a positive integer")
     request: dict[str, Any] = {"argv": [*argv, "--jsonl"] if "--jsonl" not in argv and "--json" not in argv else list(argv)}
     if request_id is not None:
+        if isinstance(request_id, bool) or not isinstance(request_id, (str, int)):
+            raise ValueError("request_id must be a string or integer")
+        if isinstance(request_id, str) and (not request_id or len(request_id) > 256 or any(ch in request_id for ch in "\r\n")):
+            raise ValueError("request_id must be non-empty, bounded, and newline-safe")
         request["id"] = request_id
     lines = list(serve_lines([json.dumps(request)]))
     if sum(len(line.encode("utf-8")) for line in lines) > max_response_bytes:

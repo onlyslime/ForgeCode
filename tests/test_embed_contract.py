@@ -19,6 +19,15 @@ def test_embed_invoke_validates_response_limit():
         invoke(["doctor"], max_response_bytes=True)
 
 
+def test_embed_invoke_validates_request_id():
+    with pytest.raises(ValueError):
+        invoke(["doctor"], request_id="")
+    with pytest.raises(ValueError):
+        invoke(["doctor"], request_id="x" * 257)
+    with pytest.raises(ValueError):
+        invoke(["doctor"], request_id=True)
+
+
 def test_embed_stream_strict_mode_raises_on_failed_rpc():
     with pytest.raises(ForgeCodeError):
         list(stream([{"method": "not-supported"}], raise_for_status=True))
