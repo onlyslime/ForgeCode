@@ -40,6 +40,8 @@ slice.
   `session_wait_embedded` API for discoverable embedding use.
 - Aligned Python `session_wait()` workspace validation with the result helper
   for cross-workspace daemon clients.
+- Replaced session wait polling with condition notifications on state changes,
+  reducing idle wakeups without changing timeout behavior.
 - Isolated RPC pause/resume now attempt OS-level suspension signals where
   supported and record the applied control mechanism in session events.
 - Prevented closing paused RPC handles while their worker may still be alive;

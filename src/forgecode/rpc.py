@@ -24,6 +24,7 @@ from .application.commands import main
 from .security.trust import TrustStore, TrustError
 
 _SESSION_LOCK = threading.RLock()
+_SESSION_CONDITION = threading.Condition(_SESSION_LOCK)
 _WORKER_OUTPUT_LOCK = threading.Lock()
 _RPC_SESSIONS: dict[str, dict[str, Any]] = {}
 _RPC_REPLAYS: dict[str | int, tuple[str, ...]] = {}
@@ -89,6 +90,7 @@ def _finish_background_session(handle: str, code: int, output: str, error_code: 
         info.pop("process", None)
         try: _persist_session(handle, info)
         except OSError: pass
+        _SESSION_CONDITION.notify_all()
 
 
 def _background_session_run(handle: str, argv: list[str]) -> None:
@@ -146,6 +148,7 @@ def _background_session_run(handle: str, argv: list[str]) -> None:
         except OSError:
             pass
         info.pop("worker", None)
+        _SESSION_CONDITION.notify_all()
 
 
 def _session_record_path(info: dict[str, Any], handle: str) -> Path:
@@ -408,6 +411,7 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                             _RPC_SESSIONS.pop(handle, None)
                         elif method in {"session.cancel", "session.pause", "session.resume", "session.approval"}:
                             _persist_session(handle, info)
+                            _SESSION_CONDITION.notify_all()
                     worker = info.get("process") or info.get("worker")
                     worker_alive = bool(worker is not None and (worker.poll() is None if hasattr(worker, "poll") else worker.is_alive()))
                     data = {"session": handle, "closed": method == "session.close", "state": info.get("state"), "sequence": info.get("sequence", 0), "workspace": info.get("workspace"), "mode": info.get("mode"), "cancel_requested": bool(info.get("cancel_requested", False)), "worker_alive": worker_alive, "execution": info.get("execution")}
@@ -421,9 +425,7 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                             raise ValueError("session.wait.timeout must be between 0 and 60 seconds")
                         deadline = time.monotonic() + float(timeout)
                         while info.get("state") in {"running", "paused"} and time.monotonic() < deadline:
-                            _SESSION_LOCK.release()
-                            time.sleep(0.01)
-                            _SESSION_LOCK.acquire()
+                            _SESSION_CONDITION.wait(timeout=max(0.0, deadline - time.monotonic()))
                             info = _RPC_SESSIONS.get(handle, info)
                         data["timed_out"] = info.get("state") in {"running", "paused"}
                         data["result"] = info.get("result")
