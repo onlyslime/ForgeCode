@@ -201,9 +201,10 @@ def _error_message(payload: bytes, secret: str | None) -> str:
         if isinstance(parsed, dict):
             error_data = parsed.get("error")
             if isinstance(error_data, dict):
-                text = str(error_data.get("message") or error_data.get("type") or error_data)
+                candidate = error_data.get("message") or error_data.get("type")
+                text = str(candidate) if isinstance(candidate, (str, int, float, bool)) else "provider returned an error"
             elif error_data:
-                text = str(error_data)
+                text = str(error_data) if isinstance(error_data, (str, int, float, bool)) else "provider returned an error"
     except (json.JSONDecodeError, ValueError):
         pass
     return _redact(text, secret)

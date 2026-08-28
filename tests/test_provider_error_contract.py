@@ -1,4 +1,5 @@
 from forgecode.models import ProviderError
+from forgecode.models.openai_compatible import _error_message
 
 
 def test_provider_error_to_dict_is_bounded_and_structured():
@@ -9,3 +10,8 @@ def test_provider_error_to_dict_is_bounded_and_structured():
     assert payload["status_code"] == 503
     assert len(payload["message"]) == 500
     assert payload["unresolved"] is True
+def test_provider_error_message_does_not_stringify_sensitive_error_object():
+    payload = b'{"error":{"api_key":"secret-value","details":{"token":"hidden"}}}'
+    message = _error_message(payload, None)
+    assert "secret-value" not in message and "hidden" not in message
+    assert message == "provider returned an error"
