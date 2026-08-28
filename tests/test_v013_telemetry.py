@@ -23,3 +23,10 @@ def test_telemetry_cli_status_and_export(capsys, tmp_path):
     assert main(["--workspace", str(tmp_path), "telemetry", "export", "--jsonl"]) == 0
     export = json.loads(capsys.readouterr().out)
     assert export["data"]["records"] == []
+
+
+def test_local_telemetry_retention_is_bounded(tmp_path):
+    telemetry = Telemetry(tmp_path, mode="local")
+    telemetry.MAX_RECORDS = 2
+    for index in range(4): telemetry.record("event", index=index)
+    assert len((tmp_path / ".forgecode" / "telemetry.jsonl").read_text().splitlines()) == 2

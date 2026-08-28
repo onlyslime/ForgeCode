@@ -13,6 +13,7 @@ from typing import Any
 
 
 class Telemetry:
+    MAX_RECORDS = 5_000
     def __init__(self, workspace: Path, *, mode: str = "off", offline: bool = False):
         self.workspace = Path(workspace).resolve()
         self.mode = "off" if offline else mode
@@ -32,8 +33,18 @@ class Telemetry:
                 safe[str(key)[:64]] = value
         path = self.workspace / ".forgecode" / "telemetry.jsonl"
         path.parent.mkdir(parents=True, exist_ok=True)
+        record = json.dumps(safe, ensure_ascii=False, separators=(",", ":")) + "\n"
         with path.open("a", encoding="utf-8") as stream:
-            stream.write(json.dumps(safe, ensure_ascii=False, separators=(",", ":")) + "\n")
+            stream.write(record)
+        # Bound retention without exposing or rewriting records in off mode.
+        try:
+            lines = path.read_text(encoding="utf-8").splitlines()
+            if len(lines) > self.MAX_RECORDS:
+                tmp = path.with_suffix(".trim.tmp")
+                tmp.write_text("\n".join(lines[-self.MAX_RECORDS:]) + "\n", encoding="utf-8")
+                tmp.replace(path)
+        except OSError:
+            pass
         return True
 
 
