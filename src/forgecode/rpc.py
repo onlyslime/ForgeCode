@@ -107,6 +107,8 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
             request_id = request.get("id")
             if request_id is not None and (not isinstance(request_id, (str, int)) or isinstance(request_id, bool)):
                 raise ValueError("request id must be a string or integer")
+            if isinstance(request_id, str) and (not request_id or len(request_id) > 256 or any(ch in request_id for ch in "\r\n")):
+                raise ValueError("request id must be non-empty, bounded, and newline-safe")
             if request_id is not None:
                 fingerprint = json.dumps(request, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
                 with _SESSION_LOCK:

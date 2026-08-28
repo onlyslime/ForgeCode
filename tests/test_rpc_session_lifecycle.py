@@ -29,6 +29,13 @@ def test_rpc_session_open_status_close_lifecycle(tmp_path):
     assert missing["error"]["code"] == "invalid_request"
 
 
+def test_rpc_request_id_is_bounded_and_newline_safe():
+    oversized = {"id": "x" * 257, "argv": ["doctor"]}
+    response = json.loads(next(iter(serve_lines([json.dumps(oversized)]))))
+    assert response["ok"] is False
+    assert response["error"]["code"] == "invalid_request"
+
+
 def test_rpc_session_open_validates_bounds():
     payload = _call({"method": "session.open", "params": {"mode": "unsafe"}})
     assert payload["ok"] is False
