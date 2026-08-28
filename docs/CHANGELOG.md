@@ -5,6 +5,12 @@ and metadata-only commits remain under the current version and are not listed as
 new releases. Verification notes identify the evidence used for each feature
 slice.
 
+## v0.0.31 — 2026-08-29
+
+- Added Python `session_list_embedded()` helper, completing session discovery
+  parity across CLI, RPC, Node, and Python embedding APIs.
+- Verification: RPC/CLI contract tests and Python import/compile checks.
+
 ## v0.0.30 — 2026-08-29
 
 - Added `session.list` RPC and Node `sessionList` helper with bounded workspace,
