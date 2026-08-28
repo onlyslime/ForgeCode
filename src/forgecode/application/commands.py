@@ -3319,4 +3319,3 @@ def _prepare_demo_workspace(registry, guard: WorkspaceGuard, *, task: str = "cal
         result = registry.execute("write_file", {"path": name, "content": content}, context)
         if not result.ok:
             raise OSError(f"could not prepare demo fixture {name}: {result.output}")
-
