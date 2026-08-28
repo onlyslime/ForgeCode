@@ -110,6 +110,13 @@ def test_rpc_session_status_exposes_bounded_lifecycle_metadata(tmp_path):
     assert "created_monotonic" not in status["data"]
 
 
+def test_rpc_cancel_exposes_auditable_cancel_request(tmp_path):
+    handle = _call({"method": "session.open", "params": {"workspace": str(tmp_path)}})["data"]["session"]
+    cancelled = _call({"method": "session.cancel", "params": {"session": handle}})
+    assert cancelled["data"]["state"] == "cancelled"
+    assert cancelled["data"]["cancel_requested"] is True
+
+
 def test_rpc_session_event_history_is_bounded(tmp_path):
     handle = _call({"method": "session.open", "params": {"workspace": str(tmp_path)}})["data"]["session"]
     for _ in range(520):

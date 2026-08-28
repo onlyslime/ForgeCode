@@ -35,7 +35,7 @@ def _session_record_path(info: dict[str, Any], handle: str) -> Path:
 def _persist_session(handle: str, info: dict[str, Any]) -> None:
     path = _session_record_path(info, handle)
     path.parent.mkdir(parents=True, exist_ok=True)
-    payload = {key: info.get(key) for key in ("workspace", "mode", "session_path", "state", "sequence", "created_at")}
+    payload = {key: info.get(key) for key in ("workspace", "mode", "session_path", "state", "sequence", "created_at", "cancel_requested")}
     payload["events"] = list(info.get("events", []))[-_MAX_SESSION_EVENTS:]
     tmp = path.with_suffix(".tmp")
     encoded = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
@@ -76,7 +76,7 @@ def _load_session(handle: str, workspace_hint: str | None = None) -> dict[str, A
                 continue
             events = raw.get("events", [])
             if not isinstance(events, list): events = []
-            info = {"workspace": str(workspace), "mode": raw["mode"], "session_path": raw["session_path"], "state": raw.get("state", "idle"), "sequence": int(raw.get("sequence", 0)), "events": events[-_MAX_SESSION_EVENTS:], "created_monotonic": time.monotonic(), "created_at": raw.get("created_at")}
+            info = {"workspace": str(workspace), "mode": raw["mode"], "session_path": raw["session_path"], "state": raw.get("state", "idle"), "sequence": int(raw.get("sequence", 0)), "events": events[-_MAX_SESSION_EVENTS:], "created_monotonic": time.monotonic(), "created_at": raw.get("created_at"), "cancel_requested": bool(raw.get("cancel_requested", False))}
             if info["mode"] not in {"plan", "act"}: continue
             created_at = info.get("created_at")
             if isinstance(created_at, (int, float)) and time.time() - float(created_at) > _SESSION_TTL_SECONDS:
@@ -166,7 +166,7 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                     handle = uuid.uuid4().hex
                     with _SESSION_LOCK:
                         _prune_sessions()
-                        _RPC_SESSIONS[handle] = {"workspace": workspace, "mode": mode, "session_path": f".forgecode/sessions/{handle}.jsonl", "state": "idle", "sequence": 0, "events": [], "created_monotonic": time.monotonic(), "created_at": int(time.time())}
+                        _RPC_SESSIONS[handle] = {"workspace": workspace, "mode": mode, "session_path": f".forgecode/sessions/{handle}.jsonl", "state": "idle", "sequence": 0, "events": [], "created_monotonic": time.monotonic(), "created_at": int(time.time()), "cancel_requested": False}
                         _persist_session(handle, _RPC_SESSIONS[handle])
                     payload = {"schema_version": 1, "kind": "session", "ok": True, "command": "session.open", "data": {"session": handle, "workspace": workspace, "mode": mode}, "exit_code": 0}
                     if request_id is not None: payload["id"] = request_id
@@ -199,7 +199,9 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                                 raise ValueError("workspace trust is not granted")
                         if method in {"session.pause", "session.resume", "session.cancel", "session.approval"} and info.get("state") in {"completed", "failed", "cancelled", "approval_denied"}:
                             raise ValueError("session is terminal and cannot be controlled")
-                        if method == "session.cancel": info["state"] = "cancelled"
+                        if method == "session.cancel":
+                            info["state"] = "cancelled"
+                            info["cancel_requested"] = True
                         elif method == "session.pause": info["state"] = "paused"
                         elif method == "session.resume": info["state"] = "running"
                         elif method == "session.approval":
@@ -216,7 +218,7 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                             _RPC_SESSIONS.pop(handle, None)
                         elif method in {"session.cancel", "session.pause", "session.resume", "session.approval"}:
                             _persist_session(handle, info)
-                    data = {"session": handle, "closed": method == "session.close", "state": info.get("state"), "sequence": info.get("sequence", 0), "workspace": info.get("workspace"), "mode": info.get("mode")}
+                    data = {"session": handle, "closed": method == "session.close", "state": info.get("state"), "sequence": info.get("sequence", 0), "workspace": info.get("workspace"), "mode": info.get("mode"), "cancel_requested": bool(info.get("cancel_requested", False))}
                     if method == "session.events":
                         after = params.get("after", 0)
                         limit = params.get("limit", 100)
@@ -260,6 +262,12 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                             except TrustError:
                                 trusted = False
                             if not trusted: raise ValueError("workspace trust is not granted")
+                        # A new explicit run clears a prior cancellation latch;
+                        # the previous run remains recorded as cancelled.
+                        with _SESSION_LOCK:
+                            info["cancel_requested"] = False
+                            if info.get("state") == "cancelled":
+                                info["state"] = "running"
                         global_args.extend(["--workspace", info["workspace"]])
                         argv_value.extend(["--mode", info["mode"], "--session", info["session_path"]])
                     for key, flag in (("workspace", "--workspace"), ("mode", "--mode"), ("session", "--session"), ("profile", "--profile")):

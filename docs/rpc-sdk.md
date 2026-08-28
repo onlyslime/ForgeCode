@@ -39,6 +39,8 @@ predates the bounded retention window, so clients must treat the event history
 as incomplete and reacquire a status/review snapshot.
 Terminal states are monotonic: a completed, failed, cancelled, or denied
 session rejects later pause/resume/cancel/approval requests.
+Cancellation responses expose `cancel_requested` so clients can distinguish a
+recorded cancellation request from a worker completion event.
 
 The handle registry is deliberately bounded by request validation and does not
 create a second execution loop. Production execution remains owned by the

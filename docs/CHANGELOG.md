@@ -12,6 +12,7 @@ slice.
   provider, and model selection are consistent across CLI, RPC, and chat.
 - Added RPC event-cursor truncation metadata (`oldest_sequence` and
   `truncated`) for safe disconnect recovery.
+- Added an auditable `cancel_requested` marker to RPC session control state.
 - Verification: version/import consistency and targeted telemetry checks.
 
 ## v0.0.26 — 2026-08-28
