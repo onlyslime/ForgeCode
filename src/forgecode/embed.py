@@ -182,6 +182,12 @@ class EmbeddedSession:
                         self.process.kill()
                     finally:
                         self.process.wait(timeout=2)
+        for handle in (self.process.stdin, self.process.stdout, self.process.stderr):
+            if handle is not None:
+                try:
+                    handle.close()
+                except OSError:
+                    pass
 
 
 __all__.append("EmbeddedSession")
