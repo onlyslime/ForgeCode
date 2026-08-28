@@ -59,7 +59,8 @@ RPC transport for programmatic callers.
 Python embedding mirrors this contract with `forgecode.embed.ForgeCodeError`.
 `invoke(..., raise_for_status=True)` and `stream(..., raise_for_status=True)`
 raise typed failures while preserving the original envelope; responses are
-bounded by `max_response_bytes`.
+bounded by `max_response_bytes`. Malformed JSON received during `stream()` is
+reported as `ForgeCodeError(code="invalid_json")`, matching the Node SDK.
 
 `EmbeddedSession.reconnect()` is an explicit bounded recovery operation: it
 only starts a replacement worker after the prior process exits, preserves the

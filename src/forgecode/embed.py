@@ -54,7 +54,10 @@ def stream(requests: Iterable[dict[str, Any]], *, raise_for_status: bool = False
         total += len(line.encode("utf-8"))
         if count > max_items or total > max_response_bytes:
             raise ForgeCodeError("response exceeds output limit", code="output_limit")
-        envelope = json.loads(line)
+        try:
+            envelope = json.loads(line)
+        except (TypeError, ValueError) as exc:
+            raise ForgeCodeError("invalid JSON response", code="invalid_json") from exc
         if raise_for_status and isinstance(envelope, dict) and envelope.get("ok") is False:
             error = envelope.get("error") if isinstance(envelope.get("error"), dict) else {}
             raise ForgeCodeError(str(error.get("message", "request failed")), code=str(error.get("code", "request_failed")), envelope=envelope)

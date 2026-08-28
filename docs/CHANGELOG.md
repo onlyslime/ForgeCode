@@ -14,6 +14,8 @@ slice.
   `truncated`) for safe disconnect recovery.
 - Added an auditable `cancel_requested` marker to RPC session control state.
 - Hardened Node streaming JSON parsing to return typed `invalid_json` errors.
+- Aligned Python embedding stream parsing with the typed `invalid_json` error
+  contract.
 - Verification: version/import consistency and targeted telemetry checks.
 
 ## v0.0.26 — 2026-08-28

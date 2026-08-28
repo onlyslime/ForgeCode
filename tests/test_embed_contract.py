@@ -21,3 +21,10 @@ def test_embed_stream_bounds_response_items():
     with pytest.raises(ForgeCodeError) as caught:
         list(stream([{"method": "doctor"}, {"method": "doctor"}], max_items=1))
     assert caught.value.code == "output_limit"
+
+
+def test_embed_stream_invalid_json_uses_typed_error(monkeypatch):
+    monkeypatch.setattr("forgecode.embed.serve_lines", lambda _lines: iter(["{broken-json"]))
+    with pytest.raises(ForgeCodeError) as caught:
+        list(stream([{"method": "doctor"}]))
+    assert caught.value.code == "invalid_json"
