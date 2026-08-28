@@ -37,6 +37,7 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                     continue
             argv_value = request.get("argv", [])
             method = request.get("method")
+            handle = None
             if method is not None:
                 if not isinstance(method, str) or len(method) > 128 or any(ch.isspace() for ch in method):
                     raise ValueError("method must be bounded non-whitespace text")
@@ -59,7 +60,7 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                         raise ValueError("session.open.mode must be plan or act")
                     handle = uuid.uuid4().hex
                     with _SESSION_LOCK:
-                        _RPC_SESSIONS[handle] = {"workspace": workspace, "mode": mode, "state": "idle", "sequence": 0, "events": []}
+                        _RPC_SESSIONS[handle] = {"workspace": workspace, "mode": mode, "session_path": f".forgecode/sessions/{handle}.jsonl", "state": "idle", "sequence": 0, "events": []}
                     payload = {"schema_version": 1, "kind": "session", "ok": True, "command": "session.open", "data": {"session": handle, "workspace": workspace, "mode": mode}, "exit_code": 0}
                     if request_id is not None: payload["id"] = request_id
                     encoded = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
@@ -111,7 +112,7 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                             info = _RPC_SESSIONS.get(handle)
                         if info is None: raise ValueError("session handle is unknown")
                         global_args.extend(["--workspace", info["workspace"]])
-                        argv_value.extend(["--mode", info["mode"], "--session", handle])
+                        argv_value.extend(["--mode", info["mode"], "--session", info["session_path"]])
                     for key, flag in (("workspace", "--workspace"), ("mode", "--mode"), ("session", "--session"), ("profile", "--profile")):
                         value = params.get(key)
                         if value is not None:
@@ -149,6 +150,13 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
             captured = io.StringIO()
             with contextlib.redirect_stdout(captured):
                 code = main(argv)
+            if method in {"run", "session.run"} and handle:
+                with _SESSION_LOCK:
+                    info = _RPC_SESSIONS.get(handle)
+                    if info is not None:
+                        info["state"] = "completed" if code == 0 else ("cancelled" if code == 130 else "failed")
+                        info["sequence"] = int(info.get("sequence", 0)) + 1
+                        info.setdefault("events", []).append({"sequence": info["sequence"], "type": "run_finished", "state": info["state"], "exit_code": code})
             output = [item for item in captured.getvalue().splitlines() if item.strip()]
             if not output:
                 payload = {"schema_version": 1, "kind": "result", "ok": code == 0, "command": "rpc", "data": {}, "exit_code": code}

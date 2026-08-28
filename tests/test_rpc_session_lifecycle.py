@@ -7,8 +7,8 @@ from forgecode.rpc import serve_lines
 
 def _call(request: dict) -> dict:
     output = list(serve_lines([json.dumps(request)]))
-    assert len(output) == 1
-    return json.loads(output[0])
+    assert output
+    return json.loads(output[-1])
 
 
 def test_rpc_session_open_status_close_lifecycle(tmp_path):
@@ -68,3 +68,11 @@ def test_rpc_session_approval_requires_boolean_and_updates_state(tmp_path):
     assert denied["data"]["state"] == "approval_denied"
     invalid = _call({"method": "session.approval", "params": {"session": handle, "approved": "no"}})
     assert invalid["ok"] is False
+
+
+def test_rpc_session_run_updates_handle_state(tmp_path):
+    handle = _call({"method": "session.open", "params": {"workspace": str(tmp_path)}})["data"]["session"]
+    result = _call({"method": "session.run", "params": {"session": handle, "prompt": "hello", "demo": True}})
+    assert result["method"] == "session.run"
+    status = _call({"method": "session.status", "params": {"session": handle}})
+    assert status["data"]["state"] in {"completed", "failed", "cancelled"}
