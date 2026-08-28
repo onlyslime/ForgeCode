@@ -109,6 +109,8 @@ an explicit profile on their next run without reading local config files.
 Configuration, provider, and doctor RPC methods accept a bounded `workspace`
 parameter and echo its canonical path in the envelope, so profile discovery is
 independent of the daemon's current directory.
+The workspace must already exist; missing directories are rejected before the
+CLI is invoked.
 
 The Node client raises `ForgeCodeError` for timeout, output-limit, empty
 response, process spawn failures, invalid JSON (including malformed stream lines), and `ok=false` envelopes. `invoke` accepts bounded

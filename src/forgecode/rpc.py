@@ -274,6 +274,8 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                     workspace = params.get("workspace")
                     if not isinstance(workspace, str) or len(workspace) > 1_000 or any(ch in workspace for ch in "\r\n"):
                         raise ValueError("workspace is invalid")
+                    if not Path(workspace).expanduser().is_dir():
+                        raise ValueError("workspace must be an existing directory")
                     argv_value = ["--workspace", workspace, *argv_value]
                 if method == "session.open":
                     workspace = params.get("workspace", ".")

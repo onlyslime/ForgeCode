@@ -38,6 +38,8 @@ slice.
   with the selected workspace echoed for auditability.
 - Kept Act-session cancellation available after trust revocation so active
   workers can always be stopped while new execution remains denied.
+- Enforced existing-directory validation for diagnostic RPC workspace
+  parameters before invoking downstream CLI code.
 - Spool-isolated RPC stdout to bounded temporary storage, preventing large
   provider/tool output from exhausting daemon memory.
 - Finalized isolated RPC handles on child-process startup failure with a
