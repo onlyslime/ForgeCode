@@ -15,3 +15,9 @@ def test_embed_raise_for_status_preserves_envelope(tmp_path):
 def test_embed_stream_strict_mode_raises_on_failed_rpc():
     with pytest.raises(ForgeCodeError):
         list(stream([{"method": "not-supported"}], raise_for_status=True))
+
+
+def test_embed_stream_bounds_response_items():
+    with pytest.raises(ForgeCodeError) as caught:
+        list(stream([{"method": "doctor"}, {"method": "doctor"}], max_items=1))
+    assert caught.value.code == "output_limit"

@@ -41,9 +41,19 @@ def invoke(argv: list[str], *, request_id: str | int | None = None, raise_for_st
     return envelopes
 
 
-def stream(requests: Iterable[dict[str, Any]], *, raise_for_status: bool = False) -> Iterable[dict[str, Any]]:
+def stream(requests: Iterable[dict[str, Any]], *, raise_for_status: bool = False, max_items: int = 1024, max_response_bytes: int = 2_000_000) -> Iterable[dict[str, Any]]:
     """Process JSON-compatible RPC requests in order."""
+    if isinstance(max_items, bool) or max_items < 1 or max_items > 100_000:
+        raise ValueError("max_items must be between 1 and 100000")
+    if isinstance(max_response_bytes, bool) or max_response_bytes < 1:
+        raise ValueError("max_response_bytes must be positive")
+    total = 0
+    count = 0
     for line in serve_lines(json.dumps(item, ensure_ascii=False) for item in requests):
+        count += 1
+        total += len(line.encode("utf-8"))
+        if count > max_items or total > max_response_bytes:
+            raise ForgeCodeError("response exceeds output limit", code="output_limit")
         envelope = json.loads(line)
         if raise_for_status and isinstance(envelope, dict) and envelope.get("ok") is False:
             error = envelope.get("error") if isinstance(envelope.get("error"), dict) else {}
