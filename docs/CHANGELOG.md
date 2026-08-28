@@ -5,6 +5,12 @@ and metadata-only commits remain under the current version and are not listed as
 new releases. Verification notes identify the evidence used for each feature
 slice.
 
+## v0.0.29 — 2026-08-29
+
+- Added bounded `sessions --state` filtering for scriptable background-session
+  orchestration while preserving human and JSON/JSONL envelopes.
+- Verification: `tests/test_cli_machine_contract.py` (24 passed).
+
 ## v0.0.28 — 2026-08-29
 
 - Added opt-in background RPC session runs. `session.run` with

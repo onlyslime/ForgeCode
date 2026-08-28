@@ -87,6 +87,18 @@ def test_context_jsonl_contains_results_in_one_envelope(capsys, tmp_path: Path):
     assert records[0]["data"]["results"]
 
 
+def test_sessions_state_filter_is_bounded_and_machine_readable(capsys, tmp_path: Path):
+    from forgecode.storage.session import SessionStore
+
+    store = SessionStore(tmp_path / ".forgecode" / "sessions" / "done.jsonl", run_id="done")
+    store.append("run_finished", {"state": "completed"}, outcome="completed")
+    assert main(["--workspace", str(tmp_path), "sessions", "--state", "completed", "--jsonl"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["ok"] is True
+    assert payload["data"]["count"] == 1
+    assert payload["data"]["sessions"][0]["state"] == "completed"
+
+
 def test_machine_errors_use_error_object_and_keep_stdout_parseable(capsys, tmp_path: Path):
     assert main(["--workspace", str(tmp_path), "skills", "show", "missing", "--json"]) == 2
     output = capsys.readouterr()

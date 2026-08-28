@@ -505,6 +505,7 @@ def _parser() -> argparse.ArgumentParser:
     eval_parser.add_argument("--jsonl", action="store_true", default=argparse.SUPPRESS, dest="jsonl")
     sessions_parser = subparsers.add_parser("sessions", help="list bounded local session records")
     sessions_parser.add_argument("--limit", type=int, default=50)
+    sessions_parser.add_argument("--state", choices=["running", "paused", "completed", "failed", "cancelled", "recovery_required"], help="only show sessions whose latest durable state matches")
     sessions_parser.add_argument("--json", action="store_true", default=argparse.SUPPRESS, dest="json")
     sessions_parser.add_argument("--jsonl", action="store_true", default=argparse.SUPPRESS, dest="jsonl")
     diff_parser = subparsers.add_parser("diff", help="show the latest bounded agent change preview")
@@ -2471,14 +2472,19 @@ def main(argv: list[str] | None = None) -> int:
             else:
                 print("session directory is outside workspace", file=sys.stderr)
             return 2
-        entries = sorted((path for path in directory.glob("*.jsonl") if path.is_file()), key=lambda path: path.name, reverse=True)[: args.limit] if directory.is_dir() else []
+        entries = sorted((path for path in directory.glob("*.jsonl") if path.is_file()), key=lambda path: path.name, reverse=True) if directory.is_dir() else []
         rows = []
         for path in entries:
             store = SessionStore(path)
             result = store.read_with_issues()
             last = result.events[-1] if result.events else None
             state = _last_session_state(result.events)
-            rows.append({"id": path.stem, "path": guard.relative(path), "events": len(result.events), "issues": len(result.issues), "state": state or (last.payload.get("state") if last else None)})
+            effective_state = state or (last.payload.get("state") if last else None)
+            if getattr(args, "state", None) and effective_state != args.state:
+                continue
+            rows.append({"id": path.stem, "path": guard.relative(path), "events": len(result.events), "issues": len(result.issues), "state": effective_state})
+            if len(rows) >= args.limit:
+                break
         if getattr(args, "json", False) and not getattr(args, "jsonl", False):
             # Preserve the v0.0.7 top-level array for existing session-list
             # consumers.  ``sessions --jsonl`` exposes the bounded envelope.
