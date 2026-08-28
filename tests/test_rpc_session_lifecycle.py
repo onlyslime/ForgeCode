@@ -235,6 +235,16 @@ def test_rpc_session_handle_can_be_recovered_from_workspace_metadata(tmp_path):
     assert recovered["data"]["recovered"] is True
 
 
+def test_rpc_recovery_open_is_idempotent_by_request_id(tmp_path):
+    handle = _call({"method": "session.open", "params": {"workspace": str(tmp_path)}})["data"]["session"]
+    from forgecode import rpc
+    rpc._RPC_SESSIONS.pop(handle, None)
+    request = {"id": "recover-open", "method": "session.open", "params": {"workspace": str(tmp_path), "session": handle}}
+    first = list(serve_lines([json.dumps(request)]))
+    second = list(serve_lines([json.dumps(request)]))
+    assert first == second
+
+
 def test_rpc_recovery_restores_event_cursor(tmp_path):
     handle = _call({"method": "session.open", "params": {"workspace": str(tmp_path)}})["data"]["session"]
     _call({"method": "session.pause", "params": {"session": handle}})
