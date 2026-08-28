@@ -181,7 +181,16 @@ class RunService:
         token = cancellation_token or self.cancellation_token
         context = ToolContext(self.guard, self.approval, mode=mode, secrets=secrets, cancellation_token=token, transaction_store=transaction_store, run_id=self.session.run_id, plan_id=self.plan_id, plan_item_id=self.plan_item_id, rules_fingerprint=self.rules_fingerprint, plan_fingerprint=self.plan_fingerprint, config_fingerprint=self.config_fingerprint, pre_side_effect_check=side_effect_check, hooks=self.hooks)
         context_builder = ContextBuilder(max_chars=self.effective_config.context_budget_chars if self.effective_config else 60_000)
-        loop = AgentLoop(self.provider, self.registry, context, session=self.session, config=self.config, context_builder=context_builder, on_event=on_event, cancellation_token=token)
+        telemetry = Telemetry(self.guard.root, mode=self.effective_config.telemetry, offline=self.effective_config.offline) if self.effective_config else None
+        def observed_event(name: str, data: dict[str, Any]) -> None:
+            if telemetry is not None:
+                try:
+                    telemetry.record(str(name), **{key: value for key, value in data.items() if isinstance(value, (str, int, float, bool)) or value is None})
+                except (OSError, ValueError):
+                    pass
+            if on_event is not None:
+                on_event(name, data)
+        loop = AgentLoop(self.provider, self.registry, context, session=self.session, config=self.config, context_builder=context_builder, on_event=observed_event, cancellation_token=token)
         if self.interactive_controls:
             loop.enable_interactive_controls()
         with self._active_lock:

@@ -15,6 +15,10 @@ objects, and strings over 256 characters are dropped and counted. Event labels
 are reduced to `[A-Za-z0-9_.-]`. Retention is capped at 5,000 records and export
 returns at most 1,000 records with a SHA-256 integrity digest.
 
+RunService observes AgentLoop lifecycle callbacks at this boundary, so
+provider/model, tool, approval, recovery, and session events share the same
+field filtering and event-family classification before being written.
+
 Provider failures expose a bounded `ProviderError.to_dict()` diagnostic with
 category, retryability, HTTP status, attempt, request id, unresolved-worker
 flag, and a 500-character message cap; raw response bodies are not included.

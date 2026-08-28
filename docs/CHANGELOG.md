@@ -18,6 +18,8 @@ slice.
   survive session recovery.
 - Added opt-in isolated background workers so cancellation can terminate a
   non-cooperative provider process without changing synchronous runs.
+- Unified RunService AgentLoop lifecycle callbacks with the privacy-filtered
+  telemetry recorder for auditable provider/tool/session families.
 - Verification: full regression `444 passed, 8 skipped, 2 warnings`, RPC
   lifecycle suite, compile, and CLI/doctor checks.
 
