@@ -28,6 +28,12 @@ assert.throws(() => interactive(".", { maxEvents: 0 }), TypeError);
   assert.throws(() => session.send("hello"), (error) => error.code === "process_error");
 }
 {
+  const session = interactive(".", { executable: "forgecode-missing-interactive" });
+  const event = await new Promise((resolve) => { const timer = setTimeout(() => resolve(null), 1000); session.on((value) => { if (value.code === "process_error") { clearTimeout(timer); resolve(value); } }); });
+  assert.equal(event?.code, "process_error");
+  session.close();
+}
+{
   const session = interactive(".", { executable: process.execPath });
   let seen = null;
   session.on((event) => { seen = event; });

@@ -55,6 +55,8 @@ Malformed JSON emitted by an interactive worker is converted into a bounded
 the embedding application's event loop.
 Interactive stderr is continuously drained and retained to a bounded 256 KiB
 tail, available as a diagnostic-only `stderr` property.
+Spawn failures are emitted as typed `process_error` events to listeners rather
+than becoming uncaught child-process errors in the host application.
 
 ## Session lifecycle
 

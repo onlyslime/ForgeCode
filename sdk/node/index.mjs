@@ -133,6 +133,7 @@ export function interactive(workspace, { mode = "plan", executable = "forgecode"
   let buffer = ""; let stderr = ""; const events = []; const listeners = new Set();
   child.stdout.on("data", (chunk) => { buffer += chunk; const lines = buffer.split(/\r?\n/); buffer = lines.pop(); for (const line of lines) if (line.trim()) { try { const event = JSON.parse(line); events.push(event); if (events.length > maxEvents) events.splice(0, events.length - maxEvents); for (const listener of listeners) listener(event); } catch (error) { const event = { kind: "process_error", code: "invalid_json", message: error.message || "invalid JSON event" }; events.push(event); if (events.length > maxEvents) events.splice(0, events.length - maxEvents); for (const listener of listeners) listener(event); child.kill(); return; } } });
   child.stderr.on("data", (chunk) => { stderr += chunk.toString(); if (Buffer.byteLength(stderr, "utf8") > 256_000) stderr = stderr.slice(-128_000); });
+  child.on("error", (error) => { const event = { kind: "process_error", code: "process_error", message: (error?.message || "interactive process failed").slice(0, 500) }; events.push(event); if (events.length > maxEvents) events.splice(0, events.length - maxEvents); for (const listener of listeners) listener(event); closed = true; });
   let closed = false;
   return {
     process: child, get stderr() { return stderr; },

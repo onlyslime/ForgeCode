@@ -34,6 +34,8 @@ slice.
   `cancelled` errors and immediate child termination.
 - Cleaned Node abort listeners on every terminal path to prevent long-lived SDK
   hosts from accumulating request references.
+- Converted Node interactive child-process spawn failures into typed
+  `process_error` events instead of uncaught host exceptions.
 - Added Python `session_result()` convenience API to match the Node SDK result
   retrieval contract.
 - Exported the Python result helper through the package-level
