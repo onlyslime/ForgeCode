@@ -297,6 +297,14 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                     argv_value = ["--workspace", str(workspace_path), "sessions", "--limit", str(limit)]
                     if state is not None:
                         argv_value.extend(["--state", state])
+                elif method == "session.tree" and params.get("workspace") is not None:
+                    workspace = params.get("workspace")
+                    if not isinstance(workspace, str) or len(workspace) > 1_000 or any(ch in workspace for ch in "\r\n"):
+                        raise ValueError("session.tree.workspace is invalid")
+                    workspace_path = Path(workspace).expanduser().resolve()
+                    if not workspace_path.is_dir():
+                        raise ValueError("session.tree.workspace must be an existing directory")
+                    argv_value = ["--workspace", str(workspace_path), *argv_value]
                 if method == "session.open":
                     workspace = params.get("workspace", ".")
                     mode = params.get("mode", "plan")

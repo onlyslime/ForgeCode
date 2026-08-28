@@ -5,6 +5,13 @@ and metadata-only commits remain under the current version and are not listed as
 new releases. Verification notes identify the evidence used for each feature
 slice.
 
+## v0.0.32 — 2026-08-29
+
+- Bound RPC `session.tree` discovery to its explicitly supplied canonical
+  workspace, matching `session.list` and preventing cross-workspace metadata
+  reads from programmatic clients.
+- Verification: RPC lifecycle contract tests.
+
 ## v0.0.31 — 2026-08-29
 
 - Added Python `session_list_embedded()` helper, completing session discovery

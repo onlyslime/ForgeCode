@@ -53,6 +53,13 @@ def test_rpc_session_list_supports_state_filter(tmp_path):
     assert payload["data"]["count"] == 1
 
 
+def test_rpc_session_tree_honors_workspace_parameter(tmp_path):
+    payload = _call({"method": "session.tree", "params": {"workspace": str(tmp_path), "limit": 1}})
+    assert payload["ok"] is True
+    assert payload["command"] == "session tree"
+    assert payload["data"]["roots"] == []
+
+
 def test_rpc_config_profiles_honors_workspace_parameter(tmp_path):
     payload = _call({"method": "config.profiles", "params": {"workspace": str(tmp_path)}})
     assert payload["ok"] is True
