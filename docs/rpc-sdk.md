@@ -84,6 +84,8 @@ the retained result payload and terminal metadata.
 `session.close` rejects active running handles; clients must cancel or await
 completion before revocation so an in-flight worker cannot lose its recovery
 metadata.
+After cancellation, close also waits for any still-live isolated process to
+exit; the handle is not revoked while teardown is in flight.
 Paused handles are also considered active and cannot be closed until resumed
 or cancelled, preventing an orphaned suspended worker.
 `session.events` accepts bounded `after` and `limit` cursors and returns

@@ -246,6 +246,22 @@ def test_rpc_close_rejects_paused_worker(tmp_path):
     assert closed["error"]["code"] == "session_busy"
 
 
+def test_rpc_close_waits_for_cancelled_process_exit(tmp_path):
+    import subprocess
+    from forgecode import rpc
+    handle = _call({"method": "session.open", "params": {"workspace": str(tmp_path)}})["data"]["session"]
+    process = subprocess.Popen(["cmd", "/c", "ping -n 2 127.0.0.1 > nul"])
+    rpc._RPC_SESSIONS[handle]["state"] = "cancelled"
+    rpc._RPC_SESSIONS[handle]["process"] = process
+    try:
+        closed = _call({"method": "session.close", "params": {"session": handle}})
+        assert closed["ok"] is False
+        assert closed["error"]["code"] == "session_busy"
+    finally:
+        process.terminate()
+        process.wait(timeout=3)
+
+
 def test_rpc_session_run_rejects_cancelled_handle(tmp_path):
     handle = _call({"method": "session.open", "params": {"workspace": str(tmp_path)}})["data"]["session"]
     _call({"method": "session.cancel", "params": {"session": handle}})

@@ -354,7 +354,8 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                                 raise ValueError("workspace trust is not granted")
                         if method in {"session.pause", "session.resume", "session.cancel", "session.approval"} and info.get("state") in {"completed", "failed", "cancelled", "approval_denied"}:
                             raise ValueError("session is terminal and cannot be controlled")
-                        if method == "session.close" and info.get("state") in {"running", "paused"}:
+                        active_process = info.get("process")
+                        if method == "session.close" and (info.get("state") in {"running", "paused"} or (active_process is not None and active_process.poll() is None)):
                             raise ValueError("session is busy; cancel or await completion before close")
                         if method == "session.cancel":
                             info["state"] = "cancelled"
