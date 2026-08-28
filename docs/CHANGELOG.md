@@ -34,6 +34,10 @@ slice.
 - Normalized Node/Python SDK limits and process/JSON error contracts.
 - Verification: targeted RPC/embed/provider/telemetry gate (43 passed), Node
   smoke, Python compile, doctor JSONL, and diff checks.
+- Additional hardening: bounded SDK argv/params and request ids, typed process
+  and JSON errors, RPC busy/terminal/approval taxonomy, cancellation recovery,
+  canonical workspace persistence, trust fail-closed execution, and provider
+  error redaction.
 - Added profile/provider credential selectors to the Node login helper.
 - Normalized Node child-process spawn failures to typed `process_error` errors.
 - Verification: version/import consistency and targeted telemetry checks.
