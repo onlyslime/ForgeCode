@@ -252,6 +252,8 @@ def test_rpc_recovery_restores_cancel_request_marker(tmp_path):
     rpc._RPC_SESSIONS.pop(handle, None)
     restored = _call({"method": "session.open", "params": {"workspace": str(tmp_path), "session": handle}})
     assert restored["ok"] is True
+    assert restored["data"]["state"] == "cancelled"
+    assert restored["data"]["cancel_requested"] is True
     status = _call({"method": "session.status", "params": {"session": handle}})
     assert status["data"]["cancel_requested"] is True
 

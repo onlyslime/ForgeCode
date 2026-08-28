@@ -172,7 +172,7 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                                 raise ValueError("workspace trust is not granted")
                         handle = requested_handle
                         with _SESSION_LOCK: _RPC_SESSIONS[handle] = restored
-                        payload = {"schema_version": 1, "kind": "session", "ok": True, "command": "session.open", "data": {"session": handle, "workspace": restored["workspace"], "mode": restored["mode"], "recovered": True}, "exit_code": 0}
+                        payload = {"schema_version": 1, "kind": "session", "ok": True, "command": "session.open", "data": {"session": handle, "workspace": restored["workspace"], "mode": restored["mode"], "state": restored.get("state"), "sequence": restored.get("sequence", 0), "cancel_requested": bool(restored.get("cancel_requested", False)), "recovered": True}, "exit_code": 0}
                         if request_id is not None: payload["id"] = request_id
                         yield json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
                         continue
