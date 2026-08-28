@@ -20,6 +20,7 @@ from .application.commands import main
 from .security.trust import TrustStore, TrustError
 
 _SESSION_LOCK = threading.RLock()
+_WORKER_OUTPUT_LOCK = threading.Lock()
 _RPC_SESSIONS: dict[str, dict[str, Any]] = {}
 _RPC_REPLAYS: dict[str | int, tuple[str, ...]] = {}
 _RPC_FINGERPRINTS: dict[str | int, str] = {}
@@ -41,7 +42,11 @@ def _background_session_run(handle: str, argv: list[str]) -> None:
     code = 1
     error_code: str | None = None
     try:
-        with contextlib.redirect_stdout(captured):
+        # ``redirect_stdout`` mutates the process-global stream. Serialize
+        # only the short CLI invocation so concurrent control requests remain
+        # responsive without allowing worker output to cross-contaminate
+        # another JSONL response.
+        with _WORKER_OUTPUT_LOCK, contextlib.redirect_stdout(captured):
             code = main(argv)
     except Exception as exc:  # pragma: no cover - injected by callers
         error_code = type(exc).__name__
@@ -67,6 +72,7 @@ def _background_session_run(handle: str, argv: list[str]) -> None:
             _persist_session(handle, info)
         except OSError:
             pass
+        info.pop("worker", None)
 
 
 def _session_record_path(info: dict[str, Any], handle: str) -> Path:
