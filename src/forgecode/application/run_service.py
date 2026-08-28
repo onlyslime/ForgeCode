@@ -11,6 +11,7 @@ from ..agent import AgentConfig, AgentLoop, ContextBuilder, LoopResult
 from ..config import EffectiveConfig
 from ..models import CancellationToken, ModelProvider
 from ..security.workspace import WorkspaceGuard
+from ..security.trust import TrustStore, TrustError
 from ..telemetry import Telemetry
 from ..storage import CheckpointStore, SessionFormatError, SessionStore, TransactionStore
 from ..tools import ToolContext, ToolRegistry
@@ -166,8 +167,19 @@ class RunService:
         with self._active_lock:
             self._starting = True
         transaction_store = self.transaction_store or TransactionStore(self.guard, max_total_bytes=self.effective_config.transaction_max_bytes if self.effective_config else 50_000_000)
+        original_side_effect_check = self.pre_side_effect_check
+        def side_effect_check() -> bool | str:
+            if mode == "act":
+                try:
+                    if not TrustStore(self.guard.root).status().get("trusted", False):
+                        return "workspace trust was revoked during execution"
+                except TrustError:
+                    return "workspace trust could not be validated"
+            if original_side_effect_check is not None:
+                return original_side_effect_check()
+            return True
         token = cancellation_token or self.cancellation_token
-        context = ToolContext(self.guard, self.approval, mode=mode, secrets=secrets, cancellation_token=token, transaction_store=transaction_store, run_id=self.session.run_id, plan_id=self.plan_id, plan_item_id=self.plan_item_id, rules_fingerprint=self.rules_fingerprint, plan_fingerprint=self.plan_fingerprint, config_fingerprint=self.config_fingerprint, pre_side_effect_check=self.pre_side_effect_check, hooks=self.hooks)
+        context = ToolContext(self.guard, self.approval, mode=mode, secrets=secrets, cancellation_token=token, transaction_store=transaction_store, run_id=self.session.run_id, plan_id=self.plan_id, plan_item_id=self.plan_item_id, rules_fingerprint=self.rules_fingerprint, plan_fingerprint=self.plan_fingerprint, config_fingerprint=self.config_fingerprint, pre_side_effect_check=side_effect_check, hooks=self.hooks)
         context_builder = ContextBuilder(max_chars=self.effective_config.context_budget_chars if self.effective_config else 60_000)
         loop = AgentLoop(self.provider, self.registry, context, session=self.session, config=self.config, context_builder=context_builder, on_event=on_event, cancellation_token=token)
         if self.interactive_controls:

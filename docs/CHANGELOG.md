@@ -18,6 +18,7 @@ slice.
   contract.
 - Added telemetry event-family classification and unknown-event audit markers.
 - Made act-mode embedded reconnect fail closed when workspace trust is revoked.
+- Added trust revalidation at RunService side-effect boundaries during act runs.
 - Verification: version/import consistency and targeted telemetry checks.
 
 ## v0.0.26 — 2026-08-28

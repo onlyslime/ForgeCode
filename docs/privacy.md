@@ -33,6 +33,9 @@ bounded diffs/hashes required for undo. Trust records contain only canonical
 workspace identity, version and grant time. RPC handles/replay caches are
 in-memory, bounded, and expire; they do not persist prompts or credential
 values.
+Act-mode side-effect boundaries revalidate workspace trust before tool
+execution; revoking trust during a run therefore fails closed at the next
+boundary rather than allowing a queued write or command to proceed.
 
 ## Threat model
 
