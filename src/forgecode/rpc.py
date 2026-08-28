@@ -37,8 +37,17 @@ _MAX_SESSION_RESULT_BYTES = 262_144
 
 def _isolated_session_run(handle: str, argv: list[str]) -> None:
     """Execute a background request in a killable child process."""
-    with tempfile.TemporaryFile(mode="w+b") as output_file:
+    try:
+        output_file = tempfile.TemporaryFile(mode="w+b")
         process = subprocess.Popen([sys.executable, "-m", "forgecode", *argv], stdout=output_file, stderr=subprocess.STDOUT)
+    except (OSError, ValueError) as exc:
+        try:
+            output_file.close()
+        except (NameError, OSError):
+            pass
+        _finish_background_session(handle, 1, "", "process_error")
+        return
+    with output_file:
         with _SESSION_LOCK:
             info = _RPC_SESSIONS.get(handle)
             if info is not None:

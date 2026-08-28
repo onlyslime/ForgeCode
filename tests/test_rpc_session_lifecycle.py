@@ -181,6 +181,18 @@ def test_rpc_isolated_background_run_can_be_terminated(tmp_path):
     assert status["data"]["state"] == "cancelled"
 
 
+def test_rpc_isolated_worker_start_failure_releases_handle(tmp_path, monkeypatch):
+    from forgecode import rpc
+    handle = _call({"method": "session.open", "params": {"workspace": str(tmp_path)}})["data"]["session"]
+    rpc._RPC_SESSIONS[handle]["state"] = "running"
+    def fail(*_args, **_kwargs):
+        raise OSError("spawn denied")
+    monkeypatch.setattr(rpc.subprocess, "Popen", fail)
+    rpc._isolated_session_run(handle, ["run", "hello", "--jsonl"])
+    status = _call({"method": "session.status", "params": {"session": handle}})
+    assert status["data"]["state"] == "failed"
+
+
 def test_rpc_session_run_rejects_denied_approval(tmp_path):
     handle = _call({"method": "session.open", "params": {"workspace": str(tmp_path)}})["data"]["session"]
     _call({"method": "session.approval", "params": {"session": handle, "approved": False}})

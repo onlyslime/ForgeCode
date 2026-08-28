@@ -40,6 +40,8 @@ slice.
   workers can always be stopped while new execution remains denied.
 - Spool-isolated RPC stdout to bounded temporary storage, preventing large
   provider/tool output from exhausting daemon memory.
+- Finalized isolated RPC handles on child-process startup failure with a
+  structured process error instead of leaving them stuck in `running`.
 - Verification: full regression `449 passed, 8 skipped, 2 warnings`, RPC
   lifecycle suite, compile, and CLI/doctor checks.
 

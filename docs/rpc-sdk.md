@@ -67,6 +67,8 @@ startup cost and still uses the same CLI safety checks.
 Isolated stdout is spooled to a temporary file and only a bounded tail is
 parsed after exit, preventing large model/tool output from accumulating in
 daemon memory; oversized captures are marked `output_truncated`.
+If child-process creation fails, the handle is finalized as `failed` with a
+`process_error` event rather than remaining indefinitely `running`.
 Completed background runs retain a bounded list of structured CLI envelopes in
 `session.status` and in recovered `session.open` responses; oversized output
 is represented by a redacted truncation marker.
