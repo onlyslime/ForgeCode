@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { ForgeCodeError, invoke, invokeStream } from "../sdk/node/index.mjs";
+import { ForgeCodeError, invoke, invokeStream, interactive } from "../sdk/node/index.mjs";
 
 assert.equal(typeof ForgeCodeError, "function");
 assert.throws(() => invoke([], { timeoutMs: NaN }), TypeError);
@@ -7,6 +7,8 @@ assert.throws(() => invoke(["x".repeat(1001)]), TypeError);
 assert.throws(() => invoke([], { method: "doctor", params: "bad" }), TypeError);
 assert.throws(() => invoke([], { method: "doctor", params: { value: "x".repeat(1_000_001) } }), TypeError);
 assert.throws(() => invokeStream([], { maxItems: 0 }), TypeError);
+assert.throws(() => invokeStream([], { maxStderrBytes: 0 }), TypeError);
+assert.throws(() => interactive(".", { maxEvents: 0 }), TypeError);
 assert.throws(() => invokeStream(["x".repeat(1001)]), TypeError);
 try {
   await invoke([], { executable: process.execPath, method: "bad method", timeoutMs: 1000 });

@@ -22,6 +22,8 @@ slice.
   telemetry recorder for auditable provider/tool/session families.
 - Added a bounded `EmbeddedSession` event queue (`max_events`) to make Python
   embedding backpressure explicit and reject unsafe queue sizes.
+- Bounded Node SDK stderr diagnostics and interactive event retention with
+  explicit `maxStderrBytes`/`maxEvents` limits.
 - Verification: full regression `444 passed, 8 skipped, 2 warnings`, RPC
   lifecycle suite, compile, and CLI/doctor checks.
 

@@ -57,6 +57,7 @@ export function invokeStream(argv = [], options = {}) {
     boundedNumber(options.timeoutMs ?? 30000, "timeoutMs");
     boundedNumber(options.maxOutputBytes ?? 2_000_000, "maxOutputBytes", { integer: true });
     boundedNumber(options.maxItems ?? 1024, "maxItems", { integer: true });
+    boundedNumber(options.maxStderrBytes ?? 256_000, "maxStderrBytes", { integer: true });
   return new Promise((resolve, reject) => {
     const rpc = options.method !== undefined;
     const child = spawn(options.executable ?? "forgecode", rpc ? ["rpc"] : [...argv, "--jsonl"], { cwd: options.cwd, stdio: ["pipe", "pipe", "pipe"] });
@@ -78,7 +79,7 @@ export function invokeStream(argv = [], options = {}) {
         catch (error) { child.kill(); settled = true; clearTimeout(timer); reject(new ForgeCodeError(error.message, { code: "invalid_json" })); return; }
       }
     });
-    child.stderr.on("data", (chunk) => { err += chunk; });
+    child.stderr.on("data", (chunk) => { err += chunk; if (Buffer.byteLength(err, "utf8") > (options.maxStderrBytes ?? 256_000)) err = err.slice(-((options.maxStderrBytes ?? 256_000) / 2)); });
     child.on("error", (error) => { if (!settled) { settled = true; clearTimeout(timer); reject(new ForgeCodeError(error.message || "process failed", { code: "process_error" })); } });
     child.on("close", (code) => {
       if (settled) return; settled = true; clearTimeout(timer);
@@ -117,10 +118,11 @@ export const sessionControl = (session, action, options = {}) => method(`session
 export const sessionClose = (session, options = {}) => sessionControl(session, "close", options);
 export const sessionApproval = (session, approved, options = {}) => method("session.approval", { ...options, params: { ...(options.params ?? {}), session, approved } });
 
-export function interactive(workspace, { mode = "plan", executable = "forgecode" } = {}) {
+export function interactive(workspace, { mode = "plan", executable = "forgecode", maxEvents = 2048 } = {}) {
+  if (!Number.isInteger(maxEvents) || maxEvents < 1 || maxEvents > 100_000) throw new TypeError("maxEvents must be an integer between 1 and 100000");
   const child = spawn(executable, ["--workspace", workspace, "chat", "--mode", mode, "--jsonl"], { stdio: ["pipe", "pipe", "pipe"] });
   let buffer = ""; const events = []; const listeners = new Set();
-  child.stdout.on("data", (chunk) => { buffer += chunk; const lines = buffer.split(/\r?\n/); buffer = lines.pop(); for (const line of lines) if (line.trim()) { const event = JSON.parse(line); events.push(event); for (const listener of listeners) listener(event); } });
+  child.stdout.on("data", (chunk) => { buffer += chunk; const lines = buffer.split(/\r?\n/); buffer = lines.pop(); for (const line of lines) if (line.trim()) { const event = JSON.parse(line); events.push(event); if (events.length > maxEvents) events.splice(0, events.length - maxEvents); for (const listener of listeners) listener(event); } });
   return {
     process: child,
     send(text) { if (typeof text !== "string" || !text.trim() || text.length > 8000) throw new Error("message must be non-empty and bounded"); child.stdin.write(text.replace(/[\r\n]/g, " ") + "\n"); },

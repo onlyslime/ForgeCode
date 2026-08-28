@@ -28,6 +28,9 @@ Python `EmbeddedSession` bounds its in-memory event queue (`max_events`,
 default 1,024; maximum 100,000). This prevents a slow consumer from causing
 unbounded client-side memory growth; callers should poll regularly and use
 the persisted session/RPC cursors for durable recovery.
+The Node `invokeStream` helper similarly caps diagnostic stderr via
+`maxStderrBytes` (256 KiB by default), and `interactive` retains only a
+bounded `maxEvents` window (2,048 by default).
 
 ## Session lifecycle
 
