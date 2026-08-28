@@ -149,6 +149,8 @@ The Node client raises `ForgeCodeError` for timeout, output-limit, empty
 response, process spawn failures, invalid JSON (including malformed stream lines), and `ok=false` envelopes. `invoke` accepts bounded
 `timeoutMs` and `maxOutputBytes`; `invokeStream` supports the same method/params
 RPC transport for programmatic callers.
+Both helpers accept a standard `AbortSignal`; aborting terminates the child
+immediately and rejects with `ForgeCodeError` code `cancelled`.
 The Node `login({ profile, provider, apiKeyEnv })` helper forwards the same
 bounded selectors as the CLI and RPC login methods.
 

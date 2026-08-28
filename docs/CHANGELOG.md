@@ -30,6 +30,8 @@ slice.
   with worker termination instead of uncaught host exceptions.
 - Added bounded stderr draining for Node interactive workers to prevent pipe
   backpressure deadlocks; the retained diagnostic tail is exposed read-only.
+- Added `AbortSignal` cancellation to Node `invoke`/`invokeStream` with typed
+  `cancelled` errors and immediate child termination.
 - Added Python `session_result()` convenience API to match the Node SDK result
   retrieval contract.
 - Exported the Python result helper through the package-level

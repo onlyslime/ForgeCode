@@ -21,7 +21,7 @@ export class ForgeCodeError extends Error {
   }
 }
 
-export function invoke(argv = [], { cwd, executable = "forgecode", method, params = {}, id, timeoutMs = 30000, maxOutputBytes = 2_000_000 } = {}) {
+export function invoke(argv = [], { cwd, executable = "forgecode", method, params = {}, id, timeoutMs = 30000, maxOutputBytes = 2_000_000, signal } = {}) {
   validateArgv(argv);
   if (method !== undefined) validateParams(params);
   boundedNumber(timeoutMs, "timeoutMs"); boundedNumber(maxOutputBytes, "maxOutputBytes", { integer: true });
@@ -31,7 +31,9 @@ export function invoke(argv = [], { cwd, executable = "forgecode", method, param
     let out = "";
     let err = "";
     let settled = false;
+    const onAbort = () => { if (!settled) { child.kill(); settled = true; clearTimeout(timer); reject(new ForgeCodeError("request cancelled", { code: "cancelled" })); } };
     const timer = setTimeout(() => { if (!settled) { child.kill(); settled = true; reject(new ForgeCodeError("request timed out", { code: "timeout" })); } }, Math.max(1, timeoutMs));
+    if (signal !== undefined) { if (typeof signal.addEventListener !== "function") throw new TypeError("signal must be an AbortSignal"); if (signal.aborted) return onAbort(); signal.addEventListener("abort", onAbort, { once: true }); }
     if (rpc) child.stdin.write(JSON.stringify({ argv: [], method, params, ...(id === undefined ? {} : { id }) }) + "\n");
     child.stdin.end();
     child.stdout.on("data", (chunk) => { out += chunk; if (Buffer.byteLength(out) > maxOutputBytes && !settled) { child.kill(); settled = true; clearTimeout(timer); reject(new ForgeCodeError("response exceeds output limit", { code: "output_limit" })); } });
@@ -39,7 +41,7 @@ export function invoke(argv = [], { cwd, executable = "forgecode", method, param
     child.on("error", (error) => { if (!settled) { settled = true; clearTimeout(timer); reject(new ForgeCodeError(error.message || "process failed", { code: "process_error" })); } });
     child.on("close", (code) => {
       if (settled) return;
-      settled = true; clearTimeout(timer);
+      settled = true; clearTimeout(timer); signal?.removeEventListener?.("abort", onAbort);
       const line = out.trim().split(/\r?\n/).filter(Boolean).pop();
       if (!line) return reject(new ForgeCodeError(err.trim() || `forgecode exited ${code}`, { code: "empty_response", exitCode: code }));
       try {
@@ -63,7 +65,9 @@ export function invokeStream(argv = [], options = {}) {
     const child = spawn(options.executable ?? "forgecode", rpc ? ["rpc"] : [...argv, "--jsonl"], { cwd: options.cwd, stdio: ["pipe", "pipe", "pipe"] });
     if (rpc) { child.stdin.write(JSON.stringify({ argv: [], method: options.method, params: options.params ?? {}, ...(options.id === undefined ? {} : { id: options.id }) }) + "\n"); child.stdin.end(); }
     let buffer = ""; const events = []; let err = ""; let bytes = 0; let settled = false;
+    const onAbort = () => { if (!settled) { child.kill(); settled = true; clearTimeout(timer); reject(new ForgeCodeError("request cancelled", { code: "cancelled" })); } };
     const timer = setTimeout(() => { if (!settled) { child.kill(); settled = true; reject(new ForgeCodeError("request timed out", { code: "timeout" })); } }, Math.max(1, options.timeoutMs ?? 30000));
+    if (options.signal !== undefined) { if (typeof options.signal.addEventListener !== "function") throw new TypeError("signal must be an AbortSignal"); if (options.signal.aborted) return onAbort(); options.signal.addEventListener("abort", onAbort, { once: true }); }
     child.stdout.on("data", (chunk) => {
       bytes += chunk.byteLength;
       if (bytes > (options.maxOutputBytes ?? 2_000_000) && !settled) { child.kill(); settled = true; clearTimeout(timer); reject(new ForgeCodeError("response exceeds output limit", { code: "output_limit" })); return; }
@@ -82,7 +86,7 @@ export function invokeStream(argv = [], options = {}) {
     child.stderr.on("data", (chunk) => { err += chunk; if (Buffer.byteLength(err, "utf8") > (options.maxStderrBytes ?? 256_000)) err = err.slice(-((options.maxStderrBytes ?? 256_000) / 2)); });
     child.on("error", (error) => { if (!settled) { settled = true; clearTimeout(timer); reject(new ForgeCodeError(error.message || "process failed", { code: "process_error" })); } });
     child.on("close", (code) => {
-      if (settled) return; settled = true; clearTimeout(timer);
+      if (settled) return; settled = true; clearTimeout(timer); options.signal?.removeEventListener?.("abort", onAbort);
       if (buffer.trim()) {
         try {
           const envelope = JSON.parse(buffer);
