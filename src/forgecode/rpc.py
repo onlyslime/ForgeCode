@@ -17,6 +17,7 @@ from .application.commands import main
 
 _SESSION_LOCK = threading.RLock()
 _RPC_SESSIONS: dict[str, dict[str, Any]] = {}
+_RPC_REPLAYS: dict[str | int, tuple[str, ...]] = {}
 
 
 def serve_lines(lines: Iterable[str]) -> Iterable[str]:
@@ -28,6 +29,12 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
             request_id = request.get("id")
             if request_id is not None and (not isinstance(request_id, (str, int)) or isinstance(request_id, bool)):
                 raise ValueError("request id must be a string or integer")
+            if request_id is not None:
+                with _SESSION_LOCK:
+                    replay = _RPC_REPLAYS.get(request_id)
+                if replay is not None:
+                    yield from replay
+                    continue
             argv_value = request.get("argv", [])
             method = request.get("method")
             if method is not None:
@@ -55,7 +62,12 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                         _RPC_SESSIONS[handle] = {"workspace": workspace, "mode": mode, "state": "idle", "sequence": 0, "events": []}
                     payload = {"schema_version": 1, "kind": "session", "ok": True, "command": "session.open", "data": {"session": handle, "workspace": workspace, "mode": mode}, "exit_code": 0}
                     if request_id is not None: payload["id"] = request_id
-                    yield json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+                    encoded = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+                    if request_id is not None:
+                        with _SESSION_LOCK:
+                            _RPC_REPLAYS[request_id] = (encoded,)
+                            while len(_RPC_REPLAYS) > 1024: _RPC_REPLAYS.pop(next(iter(_RPC_REPLAYS)))
+                    yield encoded
                     continue
                 if method in {"session.close", "session.status", "session.events", "session.cancel", "session.pause", "session.resume"}:
                     handle = params.get("session") or params.get("session_id")
@@ -74,7 +86,12 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                     if method == "session.events": data["events"] = list(info.get("events", []))[-100:]
                     payload = {"schema_version": 1, "kind": "session", "ok": True, "command": method, "data": data, "exit_code": 0}
                     if request_id is not None: payload["id"] = request_id
-                    yield json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+                    encoded = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+                    if request_id is not None:
+                        with _SESSION_LOCK:
+                            _RPC_REPLAYS[request_id] = (encoded,)
+                            while len(_RPC_REPLAYS) > 1024: _RPC_REPLAYS.pop(next(iter(_RPC_REPLAYS)))
+                    yield encoded
                     continue
                 if method in {"run", "session.run"}:
                     prompt = params.get("prompt", "")

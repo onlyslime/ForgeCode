@@ -50,3 +50,13 @@ def test_rpc_session_control_is_sequenced_and_replayable(tmp_path):
     assert resumed["data"]["sequence"] == 2
     events = _call({"method": "session.events", "params": {"session": handle}})
     assert [item["type"] for item in events["data"]["events"]] == ["pause", "resume"]
+
+
+def test_rpc_request_id_replays_without_reapplying_control(tmp_path):
+    opened = _call({"id": "open-replay", "method": "session.open", "params": {"workspace": str(tmp_path)}})
+    handle = opened["data"]["session"]
+    first = _call({"id": "pause-replay", "method": "session.pause", "params": {"session": handle}})
+    second = _call({"id": "pause-replay", "method": "session.pause", "params": {"session": handle}})
+    assert first == second
+    status = _call({"method": "session.status", "params": {"session": handle}})
+    assert status["data"]["sequence"] == 1
