@@ -592,7 +592,13 @@ class AgentLoop:
 
     def _cancelled_result(self, messages: list[Message], verification_ok: bool | None, explored: list[str], *, reason: str | None = None, category: str = "cancelled") -> LoopResult:
         safe_reason = redact_text(str(reason or self.cancellation_token.reason or "run cancelled")[:1_000], self.context.secrets)
-        unresolved = bool(self._last_provider_unresolved)
+        # A detached provider worker is evidence for the audit trail, but it
+        # does not by itself create an unsafe filesystem/tool side effect.
+        # Explicit cancellation should therefore expose the stable
+        # ``cancelled`` terminal state for ordinary in-flight model requests.
+        # Escalate to recovery only when an unresolved worker coincides with a
+        # pending side-effecting action that requires reconciliation.
+        unresolved = bool(self._last_provider_unresolved) and bool(self._pending_actions)
         if not self.lifecycle.terminal:
             try:
                 # User cancellation remains the stable public ``cancelled``

@@ -5,6 +5,15 @@ and metadata-only commits remain under the current version and are not listed as
 new releases. Verification notes identify the evidence used for each feature
 slice.
 
+## v0.0.36 — 2026-08-29
+
+- Stabilized explicit cancellation while a legacy provider is still
+  unwinding: the loop reports `cancelled` unless an unresolved worker is tied
+  to a pending side-effecting action requiring recovery.
+- Preserved unresolved-provider audit events and recovery semantics for
+  deadlines and side-effect conflicts.
+- Verification: cancellation hardening regression and recovery tests.
+
 ## v0.0.35 — 2026-08-29
 
 - Added `--mode plan|act` to `config policy` and matching RPC/Node/Python
