@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.5.9 — 2026-08-29
+
+- Simplified interactive connection to explicit manual Provider ID, endpoint,
+  model ID, and API key entry with no preset values or model guesses.
+
 ## v0.5.8 — 2026-08-29
 
 - Replaced the full-screen provider dialog with an inline bounded overlay so

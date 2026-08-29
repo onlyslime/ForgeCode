@@ -2330,53 +2330,15 @@ def main(argv: list[str] | None = None) -> int:
             if connect_args:
                 provider = connect_args[0]
             else:
-                # Draw a bounded inline panel.  Full-screen prompt_toolkit
-                # dialogs repaint the entire terminal with their default blue
-                # background; OpenCode's picker is an overlay over its TUI.
-                print("┌─ ForgeCode · Connect ─────────────────────────────┐", flush=True)
-                print("│ Select a provider (number or name; blank cancels)    │", flush=True)
-                for index, name in enumerate(SUPPORTED_PROVIDERS, 1):
-                    marker = " (local)" if name == "ollama" else ""
-                    print(f"│ {index:>2}. {name}{marker} — {PROVIDER_CATALOG[name]['base_url']}", flush=True)
-                print("└─────────────────────────────────────────────────────┘", flush=True)
-                selection = input("Provider: ").strip()
-                provider = SUPPORTED_PROVIDERS[int(selection) - 1] if selection.isdigit() and 1 <= int(selection) <= len(SUPPORTED_PROVIDERS) else selection
+                provider = input("Provider ID: ").strip()
                 if not provider:
                     return {"error": "provider selection cancelled", "code": "connect_cancelled"}
             if provider not in SUPPORTED_PROVIDERS:
                 return {"error": f"unsupported provider: {provider}", "code": "unsupported_provider", "available": list(SUPPORTED_PROVIDERS)}
             defaults = PROVIDER_CATALOG[provider]
-            print(f"Connect model ({provider})", flush=True)
-            base_url = input(f"API endpoint [{defaults['base_url']}]: ").strip() or defaults["base_url"]
-            # OpenCode resolves model IDs from the live models.dev catalog
-            # (models.opencode.ai), rather than embedding a stale hand-picked
-            # list.  Fetch the same catalog with a short timeout for the
-            # picker; users can still enter a custom ID when offline.
-            model_choices: tuple[str, ...] = ()
-            try:
-                request = urllib.request.Request("https://models.opencode.ai/api.json", headers={"User-Agent": "forgecode"})
-                with urllib.request.urlopen(request, timeout=10) as response:
-                    catalog = json.loads(response.read().decode("utf-8"))
-                catalog_provider = "openai" if provider == "openai-compatible" else provider
-                provider_data = catalog.get(catalog_provider, {}) if isinstance(catalog, dict) else {}
-                models = provider_data.get("models", {}) if isinstance(provider_data, dict) else {}
-                if isinstance(models, dict):
-                    model_choices = tuple(sorted(str(model_id) for model_id, item in models.items() if isinstance(item, dict) and item.get("status") != "deprecated"))[:200]
-            except (OSError, ValueError, urllib.error.URLError):
-                model_choices = ()
-            model = ""
-            print("┌─ Model ────────────────────────────────────────────┐", flush=True)
-            if model_choices:
-                for index, item in enumerate(model_choices, 1):
-                    print(f"│ {index:>3}. {item}", flush=True)
-                print("│  c. Enter another model ID", flush=True)
-                print("└─────────────────────────────────────────────────────┘", flush=True)
-                selection = input("Model: ").strip()
-                model = model_choices[int(selection) - 1] if selection.isdigit() and 1 <= int(selection) <= len(model_choices) else (input("Model ID: ").strip() if selection.lower() == "c" else selection)
-            else:
-                print("│ Live model catalog unavailable; enter the exact model ID.", flush=True)
-                print("└─────────────────────────────────────────────────────┘", flush=True)
-                model = input("Model ID: ").strip()
+            print(f"Connect ({provider}) — enter values manually", flush=True)
+            base_url = input("API endpoint: ").strip()
+            model = input("Model ID: ").strip()
             if provider not in SUPPORTED_PROVIDERS:
                 return {"error": f"unsupported provider: {provider}", "code": "unsupported_provider"}
             if not base_url or not model:
