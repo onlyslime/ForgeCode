@@ -47,6 +47,8 @@
 - Added read-only interactive `/events` to show the last 40 persisted event
   types and outcomes, making long-run progress and failures inspectable without
   exposing event payload contents.
+- Event timeline rows now include bounded relative elapsed time, making provider
+  waits, retries, and tool activity visible at a glance.
 - Provider request identities retain zero-based per-turn suffixes for
   compatibility with existing audit consumers while the UI remains 1-based.
 - Interactive Act/Bypass sessions now ask once whether the current workspace

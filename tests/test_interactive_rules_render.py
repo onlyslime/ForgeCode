@@ -106,5 +106,5 @@ def test_human_context_status_renders_index_health():
 
 
 def test_human_events_status_renders_bounded_tail():
-    rendered = _human_result({"events_status": True, "events": [{"sequence": 4, "kind": "tool_result", "outcome": "success"}]})
-    assert "Recent events" in rendered and "tool_result · success" in rendered
+    rendered = _human_result({"events_status": True, "events": [{"sequence": 4, "kind": "tool_result", "outcome": "success", "elapsed_seconds": 1.25}]})
+    assert "Recent events" in rendered and "tool_result · success +1.2s" in rendered

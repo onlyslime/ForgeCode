@@ -1,6 +1,7 @@
 """Command-line entry point for the framework skeleton."""
 
 import argparse
+from datetime import datetime
 import asyncio
 from dataclasses import asdict, replace
 import json
@@ -2660,7 +2661,18 @@ def main(argv: list[str] | None = None) -> int:
             try:
                 persisted = list(session.read(strict=False))
                 tail = persisted[-40:]
-                return {"events_status": True, "events": [{"sequence": event.sequence, "kind": event.kind, "mode": event.mode, "outcome": event.outcome, "error_code": event.error_code} for event in tail]}
+                origin = None
+                rows = []
+                for event in tail:
+                    try:
+                        timestamp = datetime.fromisoformat(event.timestamp.replace("Z", "+00:00"))
+                        if origin is None:
+                            origin = timestamp
+                        elapsed = max(0.0, (timestamp - origin).total_seconds())
+                    except (TypeError, ValueError):
+                        elapsed = None
+                    rows.append({"sequence": event.sequence, "kind": event.kind, "mode": event.mode, "outcome": event.outcome, "error_code": event.error_code, "elapsed_seconds": round(elapsed, 3) if elapsed is not None else None})
+                return {"events_status": True, "events": rows}
             except (OSError, ValueError) as exc:
                 return {"events_status": False, "error": _redact_display(str(exc), [api_key])}
 
