@@ -220,6 +220,9 @@ updating a row.
 - Checkpoint corruption probe wrote malformed JSON, and `CheckpointStore.load`
   returned a bounded `ValueError`; a later save refused to overwrite the
   unreadable checkpoint. This preserves fail-closed recovery state.
+- Final offline gate used `run --demo --no-verify --max-steps 8`: the run
+  completed with 108 session events and zero read issues; `doctor --json`,
+  compileall, and `git diff --check` also passed. No pytest command was run.
 - Process-tree crash probe terminated an in-flight offline run after checkpoint
   creation. A fresh process found the durable JSONL/checkpoint and
   `run --resume --dry-run` returned `recovery_preview` in `discovering` state
