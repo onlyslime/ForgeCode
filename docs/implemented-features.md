@@ -26,7 +26,7 @@ full claim still has a limitation. Update this table whenever behavior changes.
 | Named test profiles and bounded verification | `test`, `testing.py` | direct runner probe: plan=skipped, deny=denied, allow=passed (exit 0); no pytest command used | verified |
 | Evidence-driven review and export verification | `review`, `review.py` | clean temporary workspace review and export returned `ok=true`, exit 0; repository scan remains blocked by fixture findings | partial |
 | Incremental context extensions | `context complete`, `context/repository.py` | source inspection; large-tree stress pending | partial |
-| Session tree/clone/import and trajectory evaluation | `session tree`, `eval` | help and empty-session boundary probes | partial |
+| Session tree/clone/import and trajectory evaluation | `session tree`, `eval` | completed-session tree/clone (no replay) verified; evaluator correctly returns `trajectory_incomplete` for unverified run | partial |
 | Interactive pause/resume/cancel and Escape handling | `chat`, `interactive_service.py` | controller pause/cancel boundary verified; PTY/Escape integration pending | partial |
 | RPC server plus Python/Node embedding | `rpc`, `rpc.py`, `sdk/node/index.mjs` | Python RPC JSONL smoke verified; Node SDK validation passed, executable discovery unavailable in current shell | partial |
 | Runtime tool narrowing (`--tools`, `--exclude-tools`, `--no-tools`) | CLI/config policy | policy help/source identified; deny-path matrix pending | partial |
@@ -109,6 +109,12 @@ updating a row.
   The repository-wide review still fails on 23 token-shaped test/source
   fixtures, so review remains partial for this repository until that policy is
   resolved.
+- On a real completed session, `session tree --json` returned one inspect-only
+  root and `session clone` created children with `replay=false` and parent
+  sequence metadata. Cloning at sequence 0 was accepted as a prefix child;
+  this is intentional but needs a dedicated semantic check before claiming
+  arbitrary sequence handling. `eval` correctly rejected the same trajectory
+  as `trajectory_incomplete` because verification was absent.
 - Node SDK calls validated parameter rejection (`params=null`, >1 MiB params)
   without starting a process. A valid call could not be completed because the
   shell has no `forgecode` executable on PATH; Python RPC remains verified.
