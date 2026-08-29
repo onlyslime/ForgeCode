@@ -2,7 +2,7 @@
 
 ## v0.7.0 — 2026-08-29
 
-- Full regression gate now passes: 479 tests passed, with 8 Windows
+- Full regression gate now passes: 484 tests passed, with 8 Windows
   symlink-privilege skips and two collection warnings.
 - Streaming providers now expose validated text deltas to the interactive
   renderer, making assistant prose appear progressively while preserving the
