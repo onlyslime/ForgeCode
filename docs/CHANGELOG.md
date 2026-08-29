@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.4.2 — 2026-08-29
+
+- Added `read_range` for precise bounded line-range inspection.
+- Added `list_symbols` for lightweight source structure discovery.
+- Added `file_metadata` for encoding, size, line count, mtime, and SHA-256
+  inspection.
+
 ## v0.4.1 — 2026-08-29
 
 - Added `find_files` for bounded glob discovery.
