@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.2.0 — 2026-08-29
+
+- Added a dedicated Windows terminal input buffer for chat, so Enter submits a
+  complete edited payload and pasted CRLF text is kept together.
+- Asynchronous model output now redraws above the active input area.
+- Verification: targeted interactive tests and Python compile check.
+
 ## v0.1.1 — 2026-08-29
 
 - Published the next patch release after validating interactive bypass-mode

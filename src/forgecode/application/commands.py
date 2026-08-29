@@ -44,6 +44,7 @@ from ..storage import Checkpoint, CheckpointStore, RecoveryConflict, SessionForm
 from ..tools import AgentMode, AllowAllApproval, DenyAllApproval, InteractiveApproval, ToolContext, build_default_registry
 from ..hooks import Hook, HookRegistry
 from .review_service import ReviewService
+from .terminal_buffer import read_line as read_terminal_line
 
 
 def _load_saved_credential(workspace: Path) -> None:
@@ -2479,6 +2480,7 @@ def main(argv: list[str] | None = None) -> int:
             raw_output=lambda text: print(text, end="", flush=True),
             input_bar=redraw_input_bar,
             clear_screen=clear_screen_command,
+            input_reader=read_terminal_line,
             approval_pending=approval_waiting.is_set,
             submit_approval=lambda line: approval_lines.put(line),
             json_mode=bool(getattr(args, "json", False)),
