@@ -45,8 +45,11 @@ updating a row.
   trust status, telemetry status, context search, and RPC two-request JSONL
   smoke all returned bounded machine-readable responses with exit code 0.
 - Boundary probes rejected `context complete ../` and an invalid zero result
-  limit with exit code 2. Python compilation via `uv run python -m compileall`
-  and Node syntax validation passed.
+  limit with exit code 2. Direct API probes confirmed WorkspaceGuard rejects
+  traversal, redaction removes supplied secrets, ApplyPatchTool rejects a
+  traversal patch without writing, hard-dangerous Git commands are classified,
+  and DenyAllApproval prevents shell execution. Python compilation via
+  `uv run python -m compileall` and Node syntax validation passed.
 - `forgecode review --json --no-verify-files` failed as designed when scanning
   the repository: its secret heuristic reported 23 token-shaped assignments,
   mostly deliberately fake credentials in source/tests. This is a release
@@ -54,3 +57,7 @@ updating a row.
   secrets; the detector and fixture allowlist need follow-up.
 - Direct `python` was unusable because the configured interpreter path was
   missing; all Python checks therefore used the `uv` environment.
+- The calculator demo CLI completed with a committed transaction and
+  `verification_ok=true`, but its built-in verification command invokes
+  pytest. Per this audit's rule, that run is recorded as a smoke observation
+  only and is not counted as no-pytest verification.
