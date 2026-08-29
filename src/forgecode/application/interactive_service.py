@@ -565,7 +565,25 @@ class InteractiveSession:
         return f"ForgeCode session run={run_id or '<new>'} workspace=. mode={mode} profile={profile} rules={rules_count} budget={budget}"
 
     def help_text(self) -> str:
-        return "/help /status /tools /model /plan [show|refresh] /mode plan|act|bypass /connect [provider] /login (alias) /rules /files [prefix] /skills [id] /tree /diff /review /test [command] /compact /undo [id|latest] /pause /resume /cancel /clear /quit (/exit); !<command> sends a bounded result to the model; !!<command> stays local"
+        return (
+            "Commands\n"
+            "────────\n"
+            "/help                 show this command guide\n"
+            "/status               show live worker, phase, and timing\n"
+            "/tools                list available tools and safety categories\n"
+            "/model [show|list]    inspect the active model configuration\n"
+            "/mode plan|act|bypass switch planning, approved edits, or trusted mode\n"
+            "/connect              configure URL, model, and API key\n"
+            "/rules /files /skills inspect project guidance and context sources\n"
+            "/tree /diff            inspect repository structure and Git changes\n"
+            "/review /test          run review or verification checks\n"
+            "/compact /undo         manage context and recoverable edits\n"
+            "/pause /resume /cancel control an active worker\n"
+            "/clear                 clear the visible transcript\n"
+            "/quit (/exit)          leave the session\n"
+            "\nTip: press Tab after '/' to complete a command. Prefix a shell command "
+            "with ! to send its bounded result to the model; use !! to keep it local."
+        )
 
     def dispatch(self, line: str) -> object | None:
         line = line.rstrip("\r\n")
