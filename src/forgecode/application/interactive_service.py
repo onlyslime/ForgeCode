@@ -350,6 +350,7 @@ class InteractiveSession:
     quit: Callable[[], object] = lambda: {"stopped": True}
     output: Callable[[str], None] = print
     raw_output: Callable[[str], None] = lambda text: print(text, end="", flush=True)
+    input_bar: Callable[[], None] = lambda: None
     clear_screen: Callable[[], object] = lambda: {"cleared": True}
     json_mode: bool = False
     # ``json_mode`` is retained for the v0.0.7 event shape.  ``jsonl_mode``
@@ -475,10 +476,7 @@ class InteractiveSession:
         is_tty = bool(getattr(stream, "isatty", lambda: False)()) and not (self.json_mode or self.jsonl_mode)
         while True:
             if is_tty:
-                # A compact inverse/black input bar makes the active CLI
-                # unmistakable while remaining plain text on non-colour
-                # terminals.
-                self.raw_output("\x1b[40;97m╭─ forgecode │ message\n╰─❯ \x1b[0m")
+                self.input_bar()
             try:
                 line = next(iterator)
             except StopIteration:
@@ -538,6 +536,8 @@ class InteractiveSession:
                         rendered = _human_result(value)
                         if rendered:
                             self.output(rendered)
+                if is_tty:
+                    self.input_bar()
             if self.stopped:
                 break
         return results

@@ -317,3 +317,9 @@ updating a row.
   assistant text under a clean response block, and removes common Markdown
   emphasis markers/backticks. `/connect` shows only a concise connection
   confirmation; `/clear` remains silent apart from the terminal reset.
+
+- Terminal layout correction (2026-08-29): the interactive renderer now
+  clears the active input line before asynchronous worker output and redraws a
+  boxed input bar afterward. This keeps responses in the transcript area and
+  the next input affordance at the bottom of the terminal as far as the host
+  terminal's line discipline permits; JSON/JSONL behavior is unchanged.

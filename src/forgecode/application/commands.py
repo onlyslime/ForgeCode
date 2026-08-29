@@ -2139,11 +2139,23 @@ def main(argv: list[str] | None = None) -> int:
                 else:
                     rendered = _human_result(value)
                     if rendered:
+                        if not machine_json:
+                            # Remove the active input line before appending a
+                            # response; the bar is redrawn immediately below.
+                            print("\x1b[2K\r", end="")
                         print("\n" + rendered + "\n")
+                        if not machine_json:
+                            redraw_input_bar()
 
         def interactive_output(text: str) -> None:
             with output_lock:
                 print(text)
+
+        def redraw_input_bar() -> None:
+            """Draw the persistent human input area at the current bottom."""
+            if machine_json:
+                return
+            print("\x1b[40;97m╭─ forgecode │ message\n╰─❯ \x1b[0m", end="", flush=True)
 
         def model_command(model_args: list[str]) -> Any:
             nonlocal settings
@@ -2412,6 +2424,7 @@ def main(argv: list[str] | None = None) -> int:
             quit=quit_session,
             output=interactive_output,
             raw_output=lambda text: print(text, end="", flush=True),
+            input_bar=redraw_input_bar,
             clear_screen=clear_screen_command,
             json_mode=bool(getattr(args, "json", False)),
             jsonl_mode=bool(getattr(args, "jsonl", False)),

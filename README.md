@@ -22,6 +22,7 @@ Chat Completions 返回结构化 tool calls，ForgeCode 在用户指定工作区
   API key 和 model）以及 `/clear`，并在真实终端显示黑底输入栏和就绪横幅；
   凭据只保存在当前进程环境。API key 输入为可见文本，请注意终端隐私。
   人类交互模式只显示连接结果和模型回复，不显示内部 `accepted`/队列字典。
+  终端输入栏会在异步回复后重绘，保持与消息记录分离。
 - **结构化 `apply_patch`**：支持 unified diff 和 `*** Begin Patch`，多文件/多
   hunk、行偏移、新建和显式删除；执行前检查路径、UTF-8、大小、上下文和符号
   链接边界，内存预验证后才原子写入，并展示有上限的 diff preview。
