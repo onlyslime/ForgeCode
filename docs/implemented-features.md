@@ -88,3 +88,8 @@ updating a row.
   `authorization: Bearer …` and bracketed values such as `token=[abc]`.
   Unquoted values followed by a literal closing bracket (`token=abc]`) retain
   that punctuation after masking; the secret itself is still removed.
+- HookRegistry direct probes confirmed observe-only exceptions do not block,
+  fail-closed exceptions do block, slow fail-closed hooks time out as
+  `unresolved`, recursive emission is blocked, and history redacts sensitive
+  dictionary keys. A 150-file temporary repository indexed successfully;
+  bounded search returned five results and the `.env` secret file was excluded.
