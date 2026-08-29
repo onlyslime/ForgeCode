@@ -16,7 +16,7 @@ full claim still has a limitation. Update this table whenever behavior changes.
 | Session JSONL persistence, checkpoints and recovery | `storage/`, `session`, `sessions` | synthetic checkpoint resume returns typed recovery conflict; changed file is detected by SHA-256; 8-thread/200-event append stress had zero issues; real process crash/restart stress remains pending | partial |
 | Transactions, hash conflict and undo | `transaction`, `rollback` | dry-run conflict probe | verified |
 | Provider protocol, retry/SSE validation and cancellation | `models/`, `agent/` | direct normal completion plus malformed JSON, duplicate `[DONE]`, and non-finite SSE rejection | verified |
-| Strict JSON/JSONL machine contract and exit codes | global `--json/--jsonl` | doctor success plus traversal, invalid limit, unknown tool, and conflicting-policy errors all emit one JSON envelope with exit 2; full command matrix pending | partial |
+| Strict JSON/JSONL machine contract and exit codes | global `--json/--jsonl` | 13-command success/error matrix emits one parseable JSON line, stable 0/2 codes, and no traceback; exhaustive provider/runtime matrix pending | partial |
 | Rules and scoped `AGENTS.md` precedence | `rules`, `rules.py` | nested-rule smoke | verified |
 | Explicit context references and bounded context index | `context`, `context/index.py` | index/search/path-boundary smoke | verified |
 | Structured plans and interactive controls | `plan`, `chat` | direct dispatcher and controller probes; bounded FIFO/pause/cancel verified | verified |
@@ -204,3 +204,9 @@ updating a row.
   100 reads; all attempts failed closed with the file-changed check (no mixed
   content was returned). Separate 2,000,001-byte and invalid-UTF-8 fixtures
   returned bounded `ValueError` messages and no traceback.
+- CLI contract matrix covered `tools`, `config validate`, invalid session/list
+  limits, missing session export/eval, conflicting review artifacts, and an
+  invalid regex. Every invocation produced exactly one parseable JSON line,
+  expected exit code (0 for success, 2 for client/input errors), and no
+  traceback. Provider/network and every subcommand combination remain outside
+  this bounded matrix.
