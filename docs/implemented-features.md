@@ -66,3 +66,10 @@ updating a row.
   `transaction --execute --auto-approve` restored the original SHA-256 and
   marked the parent `undone` with no transaction issues. This is direct
   evidence for the transaction/undo claim.
+- RPC fuzz smoke sent empty, malformed, unknown-method, control-character,
+  wrong-id-type, null-params, and run-without-trust requests. Every response
+  was JSON, no traceback appeared, and invalid requests were typed errors;
+  the server process remained alive across the stream. CLI boundary probes for
+  zero/huge limits and unknown/duplicate tool policy values also returned
+  structured errors without traceback. Interactive `run` without approval
+  correctly stopped with `approval_denied` (exit 1).
