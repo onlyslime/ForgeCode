@@ -9,16 +9,19 @@ def _is_reparse_or_symlink(path: Path) -> bool:
     ``Path.is_symlink`` covers POSIX links and Windows symbolic links.  A
     Windows junction is represented as a reparse point but is not always
     reported as a symlink, so inspect the file-attribute bit as a best effort
-    fallback.  Errors are deliberately treated as non-aliases here; callers
-    still perform the normal existence/read checks and fail closed on errors.
+    fallback.  Missing components are valid for create operations, while
+    metadata/permission errors are treated as aliases so the guard fails
+    closed instead of allowing an unreadable reparse point through.
     """
     try:
         if path.is_symlink():
             return True
         attributes = getattr(path.lstat(), "st_file_attributes", 0)
         return bool(attributes & 0x0400)  # FILE_ATTRIBUTE_REPARSE_POINT
-    except OSError:
+    except FileNotFoundError:
         return False
+    except OSError:
+        return True
 
 
 def assert_no_path_alias(path: str | Path, *, message: str = "path is a symlink or junction alias") -> Path:
