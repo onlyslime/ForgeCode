@@ -182,10 +182,11 @@ uv run forgecode review --jsonl
 uv run pytest
 ```
 
-`review` deliberately reports non-zero when the inspected tree contains
-credential-shaped test fixtures or other findings; that is a finding report,
-not a crash. Use the fresh offline demo above to see a clean pass, or inspect
-the bounded `findings`/`checks` fields in JSONL output.
+`review` reports non-zero for unlisted credential-shaped content, stale
+transaction hashes, or other findings; that is a finding report, not a crash.
+Known test fixtures are narrowly value-allowlisted, while arbitrary test
+tokens still fail the review. Inspect the bounded `findings`/`checks` fields
+in JSONL output.
 
 Read-only planning in the current workspace:
 

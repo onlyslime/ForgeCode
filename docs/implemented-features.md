@@ -278,3 +278,8 @@ updating a row.
 - Documentation accuracy correction (2026-08-29): README now qualifies Escape
   cancellation for live online providers/PTYs, matching the `partial` audit
   row; scripted/controller cancellation remains supported.
+
+- Documentation consistency check (2026-08-29): README review guidance now
+  distinguishes narrowly allowlisted known fixtures from arbitrary token-like
+  test content and stale transaction hashes; this matches the reverse-probe
+  and clean-repository review results.
