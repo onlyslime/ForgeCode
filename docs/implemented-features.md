@@ -10,13 +10,13 @@ full claim still has a limitation. Update this table whenever behavior changes.
 | Plan/Act mode and fail-closed tool policy | `plan`, `src/forgecode/agent/loop.py` | filtered registry returns typed `tool_unavailable` for side-effect calls, `unknown_tool` for forged names, and `mode_denied` in plan mode | verified |
 | Workspace path and symlink guard | `src/forgecode/security/workspace.py` | CLI parent traversal and direct `WorkspaceGuard` traversal rejection; symlink stress pending | partial |
 | Read/list/search UTF-8 tools | `tools`, `src/forgecode/tools/filesystem.py` | 150 UTF-8 files indexed/searched; list limit 100 truncates with omitted count; traversal and invalid-input checks are typed; race stress pending | partial |
-| Structured multi-file patch with atomic write | `apply_patch`, `tools/patch.py` | valid target-only patch and traversal rejection observed; malformed multi-file/rollback stress pending | partial |
+| Structured multi-file patch with atomic write | `apply_patch`, `tools/patch.py` | malformed second hunk is rejected during pre-parse and both target files remain byte-identical; write-failure injection still pending | partial |
 | Command risk classes, approval, timeout and output limits | `run_command`, `tools/shell.py` | dangerous classification, deny approval, 1 MiB output truncation, and typed timeout observed | verified |
 | Secret redaction and privacy boundary | `security/redaction.py`, `privacy.md` | review found test fixtures are flagged as token-shaped; runtime redaction stress pending | partial |
 | Session JSONL persistence, checkpoints and recovery | `storage/`, `session`, `sessions` | synthetic checkpoint resume returns typed recovery conflict; changed file is detected by SHA-256; real process crash/restart stress remains pending | partial |
 | Transactions, hash conflict and undo | `transaction`, `rollback` | dry-run conflict probe | verified |
 | Provider protocol, retry/SSE validation and cancellation | `models/`, `agent/` | direct normal completion plus malformed JSON, duplicate `[DONE]`, and non-finite SSE rejection | verified |
-| Strict JSON/JSONL machine contract and exit codes | global `--json/--jsonl` | doctor/config/RPC responses parsed as JSON; full exit matrix pending | partial |
+| Strict JSON/JSONL machine contract and exit codes | global `--json/--jsonl` | doctor success plus traversal, invalid limit, unknown tool, and conflicting-policy errors all emit one JSON envelope with exit 2; full command matrix pending | partial |
 | Rules and scoped `AGENTS.md` precedence | `rules`, `rules.py` | nested-rule smoke | verified |
 | Explicit context references and bounded context index | `context`, `context/index.py` | index/search/path-boundary smoke | verified |
 | Structured plans and interactive controls | `plan`, `chat` | direct dispatcher and controller probes; bounded FIFO/pause/cancel verified | verified |
@@ -178,3 +178,8 @@ updating a row.
   invoking a tool. A 150-file UTF-8 fixture confirmed search completeness and
   list truncation (`count=100`, `omitted=50`); invalid UTF-8 and traversal were
   rejected without traceback. Concurrent mutation races remain unverified.
+- Atomic patch probe supplied a valid first-file hunk followed by a mismatching
+  second-file hunk. The tool returned `patch_invalid` before approval/write and
+  both files retained their original bytes. CLI contract probes covered one
+  success and four failure cases; each failure produced exactly one JSON error
+  envelope and exit code 2 (no traceback).
