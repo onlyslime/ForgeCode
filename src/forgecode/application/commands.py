@@ -1878,6 +1878,11 @@ def main(argv: list[str] | None = None) -> int:
                 payload = {"stopped_reason": result.stopped_reason, "state": result.state, "succeeded": result.succeeded, "verification_ok": result.verification_ok, "run_id": result.run_id}
                 if result.error:
                     payload["error"] = _redact_display(result.error, [api_key])
+                # Interactive callers need to see the assistant's actual
+                # response, not only the lifecycle status envelope.
+                final_messages = [item for item in result.messages if item.role == "assistant" and item.content]
+                if final_messages:
+                    payload["message"] = _redact_display(final_messages[-1].content, [api_key])[:16_000]
                 return payload
             except ShortcutParseError as exc:
                 return {"accepted": False, "shortcut": True, "error": str(exc), "code": exc.code}

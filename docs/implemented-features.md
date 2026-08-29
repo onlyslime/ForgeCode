@@ -306,3 +306,8 @@ updating a row.
   counters and nested `*_details` objects used by gateways such as DeepSeek,
   while continuing to reject non-finite or negative numeric counters. A direct
   parser probe retained numeric token counts and ignored optional details.
+
+- Interactive response visibility correction (2026-08-29): chat results now
+  include the final assistant text as `message` alongside lifecycle status,
+  so a successful provider response is visible in the terminal instead of
+  appearing only as `succeeded=true`.
