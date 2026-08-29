@@ -113,6 +113,10 @@ updating a row.
   findings from the repository scan (12 remain, all in deliberate test
   fixtures or inline provider payloads). A clean workspace still passes; the
   repository review remains `partial` until fixture handling is decided.
+- Direct `evaluate_events` probes produced `completed`/score 1.0 only when a
+  terminal completed event and a real `verification_result(ok=true)` were both
+  present; a model-only final claim scored failed, and a cancellation scored
+  cancelled. This confirms model prose cannot manufacture trajectory success.
 - On a real completed session, `session tree --json` returned one inspect-only
   root and `session clone` created children with `replay=false` and parent
   sequence metadata. Cloning at sequence 0 was accepted as a prefix child;
