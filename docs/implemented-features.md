@@ -13,7 +13,7 @@ full claim still has a limitation. Update this table whenever behavior changes.
 | Structured multi-file patch with atomic write | `apply_patch`, `tools/patch.py` | malformed second hunk is rejected during pre-parse and both target files remain byte-identical; write-failure injection still pending | partial |
 | Command risk classes, approval, timeout and output limits | `run_command`, `tools/shell.py` | dangerous classification, deny approval, 1 MiB output truncation, and typed timeout observed | verified |
 | Secret redaction and privacy boundary | `security/redaction.py`, `privacy.md` | review found test fixtures are flagged as token-shaped; runtime redaction stress pending | partial |
-| Session JSONL persistence, checkpoints and recovery | `storage/`, `session`, `sessions` | synthetic checkpoint resume returns typed recovery conflict; changed file is detected by SHA-256; real process crash/restart stress remains pending | partial |
+| Session JSONL persistence, checkpoints and recovery | `storage/`, `session`, `sessions` | synthetic checkpoint resume returns typed recovery conflict; changed file is detected by SHA-256; 8-thread/200-event append stress had zero issues; real process crash/restart stress remains pending | partial |
 | Transactions, hash conflict and undo | `transaction`, `rollback` | dry-run conflict probe | verified |
 | Provider protocol, retry/SSE validation and cancellation | `models/`, `agent/` | direct normal completion plus malformed JSON, duplicate `[DONE]`, and non-finite SSE rejection | verified |
 | Strict JSON/JSONL machine contract and exit codes | global `--json/--jsonl` | doctor success plus traversal, invalid limit, unknown tool, and conflicting-policy errors all emit one JSON envelope with exit 2; full command matrix pending | partial |
@@ -183,3 +183,6 @@ updating a row.
   both files retained their original bytes. CLI contract probes covered one
   success and four failure cases; each failure produced exactly one JSON error
   envelope and exit code 2 (no traceback).
+- Concurrent persistence probe used eight threads appending 25 events each to
+  one session. All 200 events were retained, with zero read issues and zero
+  append errors, confirming the interprocess/thread lock on this platform.
