@@ -94,6 +94,8 @@ def test_embed_session_result_validates_handle():
         session_approval("x", "yes")
     with pytest.raises(ValueError):
         session_events("x", after=-1)
+    with pytest.raises(ValueError):
+        session_inspect("x", workspace="bad\npath")
 
 
 def test_embed_session_controls_use_rpc_envelopes(tmp_path):
