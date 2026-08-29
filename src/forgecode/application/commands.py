@@ -2282,24 +2282,24 @@ def main(argv: list[str] | None = None) -> int:
         def set_mode(mode: str) -> Any:
             nonlocal approval
             if mode in {"act", "bypass"}:
-                try:
-                    if not TrustStore(workspace).status().get("trusted", False) and not args.demo:
-                        return {"error": "workspace is not trusted; run `forgecode trust grant` before act mode", "code": "trust_required"}
-                except TrustError as exc:
-                    return {"error": str(exc), "code": "trust_error"}
-                latest_references = ReferenceResolver(guard).resolve_prompt(state["plan"].task)
-                latest_targets = [item.path for item in latest_references.items if item.path]
-                latest_rules = RuleEngine(guard).discover(latest_targets)
-                if latest_references.has_errors or latest_rules.has_errors:
-                    return {"error": "rules or referenced context could not be revalidated before Act"}
-                checked = state["plan"].mark_stale_if_changed(rules_fingerprint=latest_rules.fingerprint, context_fingerprint=latest_references.fingerprint)
-                if checked.stale:
-                    state["plan"] = checked
-                    return {"error": "plan is stale because project rules or referenced context changed; revise it before Act"}
-                if state.get("plan") is not None and not approval.approve("plan_act", {"plan_id": state["plan"].plan_id, "revision": state["plan"].revision, "items": [item.id for item in state["plan"].items]}):
-                    session.append("plan_denied", {"plan_id": state["plan"].plan_id}, mode="plan")
-                    return {"error": "Plan -> Act approval denied"}
                 if state.get("plan") is not None:
+                    try:
+                        if not TrustStore(workspace).status().get("trusted", False) and not args.demo:
+                            return {"error": "workspace is not trusted; run `forgecode trust grant` before act mode", "code": "trust_required"}
+                    except TrustError as exc:
+                        return {"error": str(exc), "code": "trust_error"}
+                    latest_references = ReferenceResolver(guard).resolve_prompt(state["plan"].task)
+                    latest_targets = [item.path for item in latest_references.items if item.path]
+                    latest_rules = RuleEngine(guard).discover(latest_targets)
+                    if latest_references.has_errors or latest_rules.has_errors:
+                        return {"error": "rules or referenced context could not be revalidated before Act"}
+                    checked = state["plan"].mark_stale_if_changed(rules_fingerprint=latest_rules.fingerprint, context_fingerprint=latest_references.fingerprint)
+                    if checked.stale:
+                        state["plan"] = checked
+                        return {"error": "plan is stale because project rules or referenced context changed; revise it before Act"}
+                    if not approval.approve("plan_act", {"plan_id": state["plan"].plan_id, "revision": state["plan"].revision, "items": [item.id for item in state["plan"].items]}):
+                        session.append("plan_denied", {"plan_id": state["plan"].plan_id}, mode="plan")
+                        return {"error": "Plan -> Act approval denied"}
                     state["plan"] = state["plan"].approve_for_act()
                     session.append("plan_approved", {"plan_id": state["plan"].plan_id, "revision": state["plan"].revision}, mode=mode)
             state["mode"] = mode
