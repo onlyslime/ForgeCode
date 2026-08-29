@@ -111,6 +111,11 @@ def session_tree(*, workspace: str | None = None, limit: int = 200, request_id: 
 
 
 def config_policy(*, workspace: str | None = None, profile: str | None = None, tools: str | None = None, exclude_tools: str | None = None, no_tools: bool = False, request_id: str | int | None = None, raise_for_status: bool = False) -> list[dict[str, Any]]:
+    if not isinstance(no_tools, bool):
+        raise ValueError("no_tools must be boolean")
+    for name, value in (("profile", profile), ("tools", tools), ("exclude_tools", exclude_tools)):
+        if value is not None and (not isinstance(value, str) or not value or len(value) > 4_000 or any(ch in value for ch in "\r\n")):
+            raise ValueError(f"{name} must be bounded newline-safe text")
     params: dict[str, Any] = {"no_tools": no_tools}
     for key, value in (("workspace", workspace), ("profile", profile), ("tools", tools), ("exclude_tools", exclude_tools)):
         if value is not None: params[key] = value

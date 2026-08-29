@@ -13,6 +13,8 @@ slice.
 - Verification: CLI policy contract, RPC, Node, and Python embedding tests.
 - Policy output now includes redacted rule source metadata (fingerprint, path,
   scope, priority, digest, diagnostics) without including rule text.
+- Added direct RPC and Python embedding contract coverage for policy parameter
+  mapping, rule redaction, and boolean/size validation.
 
 ## v0.0.33 — 2026-08-29
 

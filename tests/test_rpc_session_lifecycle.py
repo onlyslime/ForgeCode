@@ -91,6 +91,16 @@ def test_rpc_session_open_canonicalizes_workspace(tmp_path, monkeypatch):
     assert payload["data"]["workspace"] == str(tmp_path.resolve())
 
 
+def test_rpc_config_policy_is_redacted_and_parameterized(tmp_path):
+    (tmp_path / "AGENTS.md").write_text("private project instructions\n", encoding="utf-8")
+    payload = _call({"id": "policy", "method": "config.policy", "params": {"workspace": str(tmp_path), "tools": "read_file"}})
+    assert payload["ok"] is True
+    data = payload["data"]
+    assert data["runtime_policy"] == {"allow": ["read_file"], "deny": []}
+    assert data["rules"]["sources"][0]["path"] == "AGENTS.md"
+    assert "text" not in data["rules"]["sources"][0]
+
+
 def test_rpc_session_persistence_tolerates_unsupported_fsync(tmp_path, monkeypatch):
     import forgecode.rpc as rpc
     monkeypatch.setattr(rpc.os, "fsync", lambda _fd: (_ for _ in ()).throw(OSError("unsupported")))
