@@ -154,6 +154,26 @@ def session_run(session: str, prompt: str, *, workspace: str | None = None, requ
     return list(stream([request], raise_for_status=raise_for_status))
 
 
+def session_inspect(session: str, *, workspace: str | None = None, request_id: str | int | None = None, raise_for_status: bool = False) -> list[dict[str, Any]]:
+    if not isinstance(session, str) or not session or len(session) > 512 or any(ch in session for ch in "\r\n"): raise ValueError("session must be bounded newline-safe text")
+    params: dict[str, Any] = {"session": session}
+    if workspace is not None: params["workspace"] = workspace
+    request = {"method": "session.inspect", "params": params}
+    if request_id is not None: request["id"] = request_id
+    return list(stream([request], raise_for_status=raise_for_status))
+
+
+def session_events(session: str, *, workspace: str | None = None, after: int = 0, limit: int = 100, request_id: str | int | None = None, raise_for_status: bool = False) -> list[dict[str, Any]]:
+    if not isinstance(session, str) or not session or len(session) > 512 or any(ch in session for ch in "\r\n"): raise ValueError("session must be bounded newline-safe text")
+    if isinstance(after, bool) or not isinstance(after, int) or after < 0: raise ValueError("after must be a non-negative integer")
+    if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 100: raise ValueError("limit must be between 1 and 100")
+    params: dict[str, Any] = {"session": session, "after": after, "limit": limit}
+    if workspace is not None: params["workspace"] = workspace
+    request = {"method": "session.events", "params": params}
+    if request_id is not None: request["id"] = request_id
+    return list(stream([request], raise_for_status=raise_for_status))
+
+
 def session_cancel(session: str, **kwargs: Any) -> list[dict[str, Any]]:
     return _session_control("cancel", session, **kwargs)
 
@@ -219,7 +239,7 @@ def stream(requests: Iterable[dict[str, Any]], *, raise_for_status: bool = False
         yield envelope
 
 
-__all__ = ["ForgeCodeError", "invoke", "session_open", "session_run", "session_result", "session_wait", "session_list", "session_tree", "session_cancel", "session_pause", "session_resume", "session_approval", "config_policy", "stream"]
+__all__ = ["ForgeCodeError", "invoke", "session_open", "session_run", "session_inspect", "session_events", "session_result", "session_wait", "session_list", "session_tree", "session_cancel", "session_pause", "session_resume", "session_approval", "config_policy", "stream"]
 
 
 class EmbeddedSession:

@@ -14,6 +14,12 @@ slice.
   deadlines and side-effect conflicts.
 - Verification: cancellation hardening regression and recovery tests.
 
+## v0.0.40 — 2026-08-29
+
+- Added Python embedding `session_inspect` and `session_events` read APIs for
+  durable-session metadata and incremental audit retrieval.
+- Verification: embedding contract, compile, and RPC envelope tests.
+
 ## v0.0.39 — 2026-08-29
 
 - Added Python embedding `session_open` and `session_run` helpers so

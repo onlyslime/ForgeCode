@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from forgecode.embed import ForgeCodeError, config_policy, invoke, session_open, session_run, session_result, session_wait, session_tree, session_cancel, session_pause, session_resume, session_approval, stream
+from forgecode.embed import ForgeCodeError, config_policy, invoke, session_open, session_run, session_inspect, session_events, session_result, session_wait, session_tree, session_cancel, session_pause, session_resume, session_approval, stream
 import forgecode
 
 
@@ -71,6 +71,8 @@ def test_embed_session_result_validates_handle():
     assert forgecode.session_result_embedded is session_result
     assert forgecode.session_open_embedded is session_open
     assert forgecode.session_run_embedded is session_run
+    assert forgecode.session_inspect_embedded is session_inspect
+    assert forgecode.session_events_embedded is session_events
     assert forgecode.session_wait_embedded is session_wait
     assert forgecode.session_tree_embedded is session_tree
     assert forgecode.session_cancel_embedded is session_cancel
@@ -90,6 +92,8 @@ def test_embed_session_result_validates_handle():
         session_cancel("x", workspace="bad\npath")
     with pytest.raises(ValueError):
         session_approval("x", "yes")
+    with pytest.raises(ValueError):
+        session_events("x", after=-1)
 
 
 def test_embed_session_controls_use_rpc_envelopes(tmp_path):
