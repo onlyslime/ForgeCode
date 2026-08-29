@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.5.1 — 2026-08-29
+
+- Fixed the interactive TTY prompt to catch invalid slash commands and render
+  a recoverable error instead of terminating the chat process.
+
 ## v0.5.0 — 2026-08-29
 
 - Started the repair-focused release line. This release only updates the

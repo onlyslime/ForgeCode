@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from typing import Callable
-from .interactive_service import _human_result
+from .interactive_service import SlashCommandError, _human_result
 
 
 def run_prompt_ui(session, *, mode: Callable[[], str]) -> None:
@@ -67,7 +67,10 @@ def run_prompt_ui(session, *, mode: Callable[[], str]) -> None:
             if session.approval_pending():
                 session.submit_approval(text.strip())
                 continue
-            value = session.dispatch(text)
+            try:
+                value = session.dispatch(text)
+            except SlashCommandError as exc:
+                value = {"error": str(exc)}
             if value is not None:
                 rendered = _human_result(value)
                 if rendered:
