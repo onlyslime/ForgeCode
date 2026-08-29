@@ -66,7 +66,8 @@ def test_human_tools_result_groups_capabilities():
 
 def test_human_completed_result_keeps_summary_metrics_together():
     rendered = _human_result(
-        {"state": "completed", "message": "All done", "duration_seconds": 2.4, "tool_steps": 3, "verification_ok": True}
+        {"state": "completed", "message": "All done", "duration_seconds": 2.4, "tool_steps": 3, "verification_ok": True, "changed_files": ["src/main.py"]}
     )
     assert "✓ Verification passed" in rendered
     assert "Worked for 2.4s · 3 tool steps" in rendered
+    assert "Files changed: src/main.py" in rendered

@@ -181,6 +181,9 @@ def _human_result(value: object) -> str | None:
         summary = "Completed\n─────────\n" + status
         if metrics:
             summary += "\n" + " · ".join(metrics)
+        changed = value.get("changed_files")
+        if isinstance(changed, list) and changed:
+            summary += "\nFiles changed: " + ", ".join(str(path) for path in changed[:20])
         return summary + "\n\n" + _pretty_text(value["message"])
     if value.get("error"):
         return f"Error: {_pretty_text(value.get('error'))}"

@@ -1911,6 +1911,7 @@ def main(argv: list[str] | None = None) -> int:
                     tool_steps = 0
                     current_phase = ""
                     streamed_content = False
+                    changed_files: set[str] = set()
                     file_snapshots: dict[str, str] = {}
                     def progress_event(kind: str, payload: dict[str, Any]) -> None:
                         nonlocal tool_steps, current_phase, streamed_content
@@ -1993,6 +1994,7 @@ def main(argv: list[str] | None = None) -> int:
                                 metadata = payload["metadata"]
                                 changed_path = metadata.get("path") or arguments.get("path")
                                 if tool in {"write_file", "apply_patch"} and changed_path:
+                                    changed_files.add(str(changed_path))
                                     before_exists = str(changed_path) in file_snapshots
                                     status_code = "M" if before_exists else "A"
                                     print(f"  \x1b[1;33m{status_code} {changed_path}\x1b[0m")
@@ -2021,7 +2023,7 @@ def main(argv: list[str] | None = None) -> int:
                         session.append("plan_updated", {"plan": current.to_dict()}, mode=state["mode"])
                     except ValueError:
                         pass
-                payload = {"stopped_reason": result.stopped_reason, "state": result.state, "succeeded": result.succeeded, "verification_ok": result.verification_ok, "run_id": result.run_id, "duration_seconds": round(time.monotonic() - started_at, 3), "tool_steps": tool_steps}
+                payload = {"stopped_reason": result.stopped_reason, "state": result.state, "succeeded": result.succeeded, "verification_ok": result.verification_ok, "run_id": result.run_id, "duration_seconds": round(time.monotonic() - started_at, 3), "tool_steps": tool_steps, "changed_files": sorted(changed_files)}
                 if result.error:
                     payload["error"] = _redact_display(result.error, [api_key])
                 # Interactive callers need to see the assistant's actual
