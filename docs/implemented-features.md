@@ -27,7 +27,7 @@ full claim still has a limitation. Update this table whenever behavior changes.
 | Evidence-driven review and export verification | `review`, `review.py` | repository review now excludes test fixtures from secret scan, reports 0 findings/exit 0; clean temporary workspace review/export also pass | verified |
 | Incremental context extensions | `context complete`, `context/repository.py` | temporary repository update/delete/add stress: digest update, removal, bounded search, and diagnostics all passed | verified |
 | Session tree/clone/import and trajectory evaluation | `session tree`, `eval` | canonical cross-workspace import and byte mutation rejection verified; synthetic valid lifecycle plus verification event returns CLI `eval` status `completed`, score 1.0; full replay semantics remain intentionally absent | partial |
-| Interactive pause/resume/cancel and Escape handling | `chat`, `interactive_service.py` | active controller cancellation stops a live worker and drains safely; PTY/Escape integration pending | partial |
+| Interactive pause/resume/cancel and Escape handling | `chat`, `interactive_service.py` | active controller cancellation stops a live worker and drains safely; scripted JSONL Escape/EOF, help, mode validation, unknown command, and quit all terminate cleanly; live PTY provider cancellation pending | partial |
 | RPC server plus Python/Node embedding | `rpc`, `rpc.py`, `sdk/node/index.mjs` | Python and Node SDK doctor/provider-health calls plus stream event-list smoke | verified |
 | Runtime tool narrowing (`--tools`, `--exclude-tools`, `--no-tools`) | CLI/config policy | `--no-tools` and allowlist lacking `write_file` fail closed during demo setup; exclude path reaches bounded run failure without traceback | verified |
 | Offline mode and telemetry policy | `config`, `telemetry` | config validate and telemetry status pass without network | verified |
@@ -226,6 +226,10 @@ updating a row.
 - Plan-mode integration probe ran the offline demo with `--mode plan`; it
   completed successfully, created no demo fixture files, and recorded only a
   read-only `workspace_summary` tool result (no command or write events).
+- Scripted `chat --jsonl --mode plan` input containing Escape, `/help`, an
+  invalid `/mode`, an unknown command, and `/quit` produced six bounded JSONL
+  records, exit 0, and no traceback. Active-provider PTY Escape delivery is
+  still environment-dependent and remains a separate gap.
 - Process-tree crash probe terminated an in-flight offline run after checkpoint
   creation. A fresh process found the durable JSONL/checkpoint and
   `run --resume --dry-run` returned `recovery_preview` in `discovering` state
