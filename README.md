@@ -40,7 +40,9 @@ Chat Completions 返回结构化 tool calls，ForgeCode 在用户指定工作区
 - `rpc` 接受 JSONL 请求并复用 CLI envelope；Node 客户端位于 `sdk/node/index.mjs`。
 - RPC/SDK 生命周期与隐私边界见 [`docs/rpc-sdk.md`](docs/rpc-sdk.md) 和 [`docs/privacy.md`](docs/privacy.md)。
 - 配置支持 `offline` 与 `telemetry = off|local|on`；offline 强制禁止外发，local 仅写入本地审计 JSONL。
-- 交互输入中的 Escape 控制字节会立即请求取消，并复用既有 cancel/pause 边界。
+- 交互输入中的 Escape 控制字节会请求取消，并复用既有 cancel/pause 边界；
+  对正在运行的在线 provider，是否能由真实 PTY 传递到 worker 仍取决于终端
+  与 provider 的取消支持。
 - `sessions --state <state>`、RPC `session.list` 以及 Node/Python
   `sessionList`/`session_list` 提供有界、可脚本化的后台会话发现；workspace
   会先规范化并校验，避免跨工作区读取元数据。

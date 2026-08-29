@@ -274,3 +274,7 @@ updating a row.
   generated manifest/blob were removed, the same repository review passed.
   This demonstrates that review fails closed on stale transaction state and
   does not silently treat a missing/changed file as clean.
+
+- Documentation accuracy correction (2026-08-29): README now qualifies Escape
+  cancellation for live online providers/PTYs, matching the `partial` audit
+  row; scripted/controller cancellation remains supported.
