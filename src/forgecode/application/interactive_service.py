@@ -354,7 +354,6 @@ class InteractiveSession:
     raw_output: Callable[[str], None] = lambda text: print(text, end="", flush=True)
     input_bar: Callable[[], None] = lambda: None
     clear_screen: Callable[[], object] = lambda: {"cleared": True}
-    input_reader: Callable[[str], str] | None = None
     approval_pending: Callable[[], bool] = lambda: False
     submit_approval: Callable[[str], None] = lambda _line: None
     json_mode: bool = False
@@ -483,14 +482,11 @@ class InteractiveSession:
         results: list[object] = []
         iterator = iter(stream)
         is_tty = bool(getattr(stream, "isatty", lambda: False)()) and not (self.json_mode or self.jsonl_mode)
-        if is_tty:
-            self.input_bar()
         while True:
+            if is_tty:
+                self.input_bar()
             try:
-                line = self.input_reader("") if is_tty and self.input_reader is not None else next(iterator)
-            except KeyboardInterrupt:
-                self.cancel()
-                break
+                line = next(iterator)
             except StopIteration:
                 break
             if self.stopped:
