@@ -49,6 +49,8 @@
   exposing event payload contents.
 - Event timeline rows now include bounded relative elapsed time, making provider
   waits, retries, and tool activity visible at a glance.
+- `/events` accepts an optional limit from 1 to 100, allowing focused inspection
+  of the latest session activity without changing the persisted audit log.
 - Provider request identities retain zero-based per-turn suffixes for
   compatibility with existing audit consumers while the UI remains 1-based.
 - Interactive Act/Bypass sessions now ask once whether the current workspace

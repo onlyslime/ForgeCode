@@ -2656,11 +2656,11 @@ def main(argv: list[str] | None = None) -> int:
             except (ContextIndexError, OSError, ValueError) as exc:
                 return {"context_status": False, "error": _redact_display(str(exc), [api_key])}
 
-        def events_info_command() -> Any:
+        def events_info_command(limit: int = 40) -> Any:
             """Return a small, content-free tail of the session audit log."""
             try:
                 persisted = list(session.read(strict=False))
-                tail = persisted[-40:]
+                tail = persisted[-max(1, min(100, int(limit))):]
                 origin = None
                 rows = []
                 for event in tail:

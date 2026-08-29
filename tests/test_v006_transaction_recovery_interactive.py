@@ -266,11 +266,12 @@ def test_interactive_context_and_events_commands_stay_local():
     service = InteractiveSession(
         lambda message: calls.append(message) or {"message": message},
         context_info=lambda: {"context_status": True, "metadata": {"counts": {"files": 2}}, "stale": [], "errors": []},
-        events_info=lambda: {"events_status": True, "events": [{"sequence": 1, "kind": "run_created"}]},
+        events_info=lambda _limit=40: {"events_status": True, "events": [{"sequence": 1, "kind": "run_created"}]},
         output=lambda _text: None,
     )
     assert service.dispatch("/context")["context_status"] is True
     assert service.dispatch("/events")["events_status"] is True
+    assert service.dispatch("/events 1")["events_status"] is True
     assert calls == []
 
 
