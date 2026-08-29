@@ -12,7 +12,7 @@ full claim still has a limitation. Update this table whenever behavior changes.
 | Read/list/search UTF-8 tools | `tools`, `src/forgecode/tools/filesystem.py` | 150 UTF-8 files indexed/searched; list limit 100 truncates with omitted count; >2 MB, invalid UTF-8, traversal, and read/write race inputs fail closed; broader platform race stress pending | partial |
 | Structured multi-file patch with atomic write | `apply_patch`, `tools/patch.py` | malformed second hunk is rejected pre-write; injected second-file I/O failure returns `write_failed`, rolls back first file, and preserves both originals | verified |
 | Command risk classes, approval, timeout and output limits | `run_command`, `tools/shell.py` | dangerous classification, deny approval, 1 MiB output truncation, and typed timeout observed | verified |
-| Secret redaction and privacy boundary | `security/redaction.py`, `privacy.md` | named/bearer/bracketed secrets redact correctly; review scanner excludes test fixtures and repository review has zero findings | verified |
+| Secret redaction and privacy boundary | `security/redaction.py`, `privacy.md` | named/bearer/bracketed secrets redact correctly; review scanner scans tests with a narrow fixture-value allowlist and repository review has zero findings | verified |
 | Session JSONL persistence, checkpoints and recovery | `storage/`, `session`, `sessions` | forced process-tree termination left a durable checkpoint; a fresh `run --resume --dry-run` returned bounded `recovery_preview` (`state=discovering`) with no side effects; stale-file and corruption checks remain fail-closed; full resumed execution still pending | partial |
 | Transactions, hash conflict and undo | `transaction`, `rollback` | dry-run conflict probe | verified |
 | Provider protocol, retry/SSE validation and cancellation | `models/`, `agent/` | direct normal completion plus malformed JSON, duplicate `[DONE]`, and non-finite SSE rejection | verified |
@@ -24,7 +24,7 @@ full claim still has a limitation. Update this table whenever behavior changes.
 | Provider diagnostics and profile selection | `provider`, `config profiles` | `provider health/list` and `config profiles --json` pass offline | verified |
 | Lifecycle hooks with fail-closed behavior | `hooks.py` | direct exception, timeout, recursion, cancellation and redaction probes | verified |
 | Named test profiles and bounded verification | `test`, `testing.py` | direct runner probe: plan=skipped, deny=denied, allow=passed (exit 0); no pytest command used | verified |
-| Evidence-driven review and export verification | `review`, `review.py` | repository review now excludes test fixtures from secret scan, reports 0 findings/exit 0; clean temporary workspace review/export also pass | verified |
+| Evidence-driven review and export verification | `review`, `review.py` | repository review scans tests with a narrow fixture-value allowlist, reports 0 findings/exit 0; clean temporary workspace review/export also pass | verified |
 | Incremental context extensions | `context complete`, `context/repository.py` | temporary repository update/delete/add stress: digest update, removal, bounded search, and diagnostics all passed | verified |
 | Session tree/clone/import and trajectory evaluation | `session tree`, `eval` | canonical cross-workspace import and byte mutation rejection verified; synthetic valid lifecycle plus verification event returns CLI `eval` status `completed`, score 1.0; full replay semantics remain intentionally absent | partial |
 | Interactive pause/resume/cancel and Escape handling | `chat`, `interactive_service.py` | active controller cancellation stops a live worker and drains safely; scripted JSONL Escape/EOF, help, mode validation, unknown command, and quit all terminate cleanly; live PTY provider cancellation pending | partial |
@@ -217,6 +217,10 @@ updating a row.
   checking a path are treated as unsafe (missing components remain valid for
   creation). Symlink creation was attempted but denied by this Windows
   environment, so the OS-specific positive rejection path remains noted.
+
+- Final consistency gate passed: a fresh offline demo completed with 108
+  events; repository review scanned 137 text files with zero findings;
+  `doctor --json`, Python compileall, and diff checks passed without pytest.
 - Checkpoint corruption probe wrote malformed JSON, and `CheckpointStore.load`
   returned a bounded `ValueError`; a later save refused to overwrite the
   unreadable checkpoint. This preserves fail-closed recovery state.
