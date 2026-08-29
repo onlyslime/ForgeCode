@@ -14,6 +14,12 @@ slice.
   deadlines and side-effect conflicts.
 - Verification: cancellation hardening regression and recovery tests.
 
+## v0.0.42 — 2026-08-29
+
+- Added Python embedding `config_profiles` provider/model discovery, bringing
+  configuration introspection parity with the Node SDK and RPC CLI.
+- Verification: embedding contract, RPC, compile, and doctor checks.
+
 ## v0.0.41 — 2026-08-29
 
 - Added Node SDK convenience controls `sessionCancel`, `sessionPause`, and

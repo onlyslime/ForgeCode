@@ -211,6 +211,16 @@ def config_policy(*, workspace: str | None = None, profile: str | None = None, m
     return list(stream([request], raise_for_status=raise_for_status))
 
 
+def config_profiles(*, workspace: str | None = None, request_id: str | int | None = None, raise_for_status: bool = False) -> list[dict[str, Any]]:
+    if workspace is not None and (not isinstance(workspace, str) or not workspace or len(workspace) > 1_000 or any(ch in workspace for ch in "\r\n")):
+        raise ValueError("workspace must be bounded newline-safe text")
+    params: dict[str, Any] = {}
+    if workspace is not None: params["workspace"] = workspace
+    request = {"method": "config.profiles", "params": params}
+    if request_id is not None: request["id"] = request_id
+    return list(stream([request], raise_for_status=raise_for_status))
+
+
 def stream(requests: Iterable[dict[str, Any]], *, raise_for_status: bool = False, max_items: int = 1024, max_response_bytes: int = 2_000_000) -> Iterable[dict[str, Any]]:
     """Process JSON-compatible RPC requests in order."""
     if isinstance(max_items, bool) or not isinstance(max_items, int) or max_items < 1 or max_items > 100_000:
@@ -251,7 +261,7 @@ def stream(requests: Iterable[dict[str, Any]], *, raise_for_status: bool = False
         yield envelope
 
 
-__all__ = ["ForgeCodeError", "invoke", "session_open", "session_run", "session_inspect", "session_events", "session_result", "session_wait", "session_list", "session_tree", "session_cancel", "session_pause", "session_resume", "session_approval", "config_policy", "stream"]
+__all__ = ["ForgeCodeError", "invoke", "session_open", "session_run", "session_inspect", "session_events", "session_result", "session_wait", "session_list", "session_tree", "session_cancel", "session_pause", "session_resume", "session_approval", "config_profiles", "config_policy", "stream"]
 
 
 class EmbeddedSession:

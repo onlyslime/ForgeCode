@@ -173,6 +173,8 @@ Python embedding mirrors this contract with `forgecode.embed.ForgeCodeError`.
 same bounded workspace, mode, session, and prompt fields as the RPC contract.
 `session_inspect` and `session_events` expose bounded read-only metadata and
 incremental audit events.
+`config_profiles` provides provider/model profile discovery with the same
+workspace-bound RPC request semantics.
 It also exposes `session_cancel`, `session_pause`, `session_resume`, and
 `session_approval`; each forwards the same workspace-bound RPC control and
 returns the standard JSON envelope.
