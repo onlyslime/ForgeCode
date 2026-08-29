@@ -238,3 +238,14 @@ updating a row.
   `run --resume --dry-run` returned `recovery_preview` in `discovering` state
   with no side effects. The interrupted atomic checkpoint write left an orphan
   `.tmp` file in the ignored runtime directory; recovery ignored it safely.
+
+- Follow-up CLI gate (2026-08-29): `tools --json`, `config validate --json`,
+  `context complete ../ --json`, and `session tree --limit 0|201 --json`
+  each emitted one bounded JSON error/success envelope with the documented
+  exit code; both offline demo modes (`run --demo --no-verify --max-steps 8`
+  and `--mode plan`) completed with exit code 0. Generated demo fixtures were
+  removed after the check. This does not upgrade the remaining partial rows:
+  symlink-positive tests, automatic post-crash continuation, exhaustive
+  provider/exit-code combinations, clone replay, live online cancellation,
+  and real-PTY Escape cancellation still lack authoritative end-to-end
+  evidence.
