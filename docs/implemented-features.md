@@ -84,3 +84,7 @@ updating a row.
   `SessionFormatError` without a traceback. ConfigLoader/CLI probes rejected
   malformed TOML, plaintext secret fields, and unknown tool names with typed
   `config_invalid` errors and exit code 2.
+- Additional redaction fuzzing found and fixed duplicate masking for
+  `authorization: Bearer …` and bracketed values such as `token=[abc]`.
+  Unquoted values followed by a literal closing bracket (`token=abc]`) retain
+  that punctuation after masking; the secret itself is still removed.

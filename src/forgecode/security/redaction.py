@@ -12,7 +12,7 @@ _BEARER_RE = re.compile(r"(?i)\bbearer\s+[a-z0-9._~+/=-]+")
 _NAMED_SECRET_RE = re.compile(
     r"(?i)\b(api[_-]?key|apikey|access[_-]?token|refresh[_-]?token|token|password|secret|cookie|authorization)\b"
     r"(\s*[:=]\s*)"
-    r"(?:\"[^\"]*\"|'[^']*'|[^\s,;}\]]+)"
+    r"(?:\"[^\"]*\"|'[^']*'|\[[^\]]*\]|[^\s,;}\]]+)"
 )
 _SENSITIVE_KEY_PARTS = ("api_key", "api-key", "apikey", "authorization", "token", "password", "secret", "cookie", "credential")
 
@@ -20,11 +20,13 @@ _SENSITIVE_KEY_PARTS = ("api_key", "api-key", "apikey", "authorization", "token"
 def redact_text(value: object, secrets: Iterable[str] = ()) -> str:
     """Redact configured values and common credential-shaped text."""
     rendered = str(value)
-    # Apply shape-based redaction first.  Doing configured-value replacement
-    # first can turn a value into ``[REDACTED]``; the closing bracket would
-    # then be misread as trailing untrusted text by ``_NAMED_SECRET_RE``.
-    rendered = _BEARER_RE.sub("Bearer [REDACTED]", rendered)
+    # Use a private sentinel while applying the bearer rule. This prevents a
+    # bearer token following ``authorization=`` from being consumed as the
+    # named value while also avoiding a second match on ``[REDACTED]``.
+    bearer_sentinel = "\x00FORGECODE_BEARER_REDACTED\x00"
+    rendered = _BEARER_RE.sub(bearer_sentinel, rendered)
     rendered = _NAMED_SECRET_RE.sub(lambda match: f"{match.group(1)}{match.group(2)}[REDACTED]", rendered)
+    rendered = rendered.replace(bearer_sentinel, "Bearer [REDACTED]")
     for secret in sorted((secret for secret in secrets if secret), key=len, reverse=True):
         rendered = rendered.replace(secret, "[REDACTED]")
     return rendered
