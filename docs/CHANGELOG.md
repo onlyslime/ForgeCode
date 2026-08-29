@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.3.6 — 2026-08-29
+
+- Added a compact startup status card with mode, model, tool count, and
+  workspace state.
+- Added visible Understand/Inspect/Modify/Verify phase separators and numbered
+  tool steps to the human timeline.
+- Added a structured `Completed` summary with verification status and tool-step
+  count.
+
 ## v0.3.5 — 2026-08-29
 
 - Improved the human timeline with bounded file-content previews (line

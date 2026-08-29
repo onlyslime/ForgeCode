@@ -1906,9 +1906,10 @@ def main(argv: list[str] | None = None) -> int:
                 try:
                     started_at = time.monotonic()
                     tool_steps = 0
+                    current_phase = ""
                     file_snapshots: dict[str, str] = {}
                     def progress_event(kind: str, payload: dict[str, Any]) -> None:
-                        nonlocal tool_steps
+                        nonlocal tool_steps, current_phase
                         if machine_json:
                             return
                         labels = {"tool_call": "▸", "tool_result": "✓" if payload.get("ok") else "✗", "verification_result": "✓" if payload.get("ok") else "✗", "command_result": "✓" if payload.get("ok") else "✗", "command_timeout": "✗", "mode": "•", "model_message": "◆", "model_progress": "…"}
@@ -1922,6 +1923,18 @@ def main(argv: list[str] | None = None) -> int:
                         color = "\x1b[32m" if labels[kind] == "✓" else ("\x1b[31m" if labels[kind] == "✗" else "\x1b[36m")
                         with output_lock:
                             elapsed = time.monotonic() - started_at
+                            phase = ""
+                            if kind in {"model_progress", "model_message"}:
+                                phase = "Understand" if int(payload.get("step", 0)) == 0 else "Inspect"
+                            elif tool in {"read_file", "search", "list_files", "workspace_summary", "repository_map"}:
+                                phase = "Inspect"
+                            elif tool in {"write_file", "apply_patch"}:
+                                phase = "Modify"
+                            elif kind in {"verification_result", "command_result", "command_timeout"} or tool == "run_command":
+                                phase = "Verify"
+                            if phase and phase != current_phase:
+                                current_phase = phase
+                                print(f"\n\x1b[1;36m─── {phase} ───\x1b[0m")
                             if kind == "model_progress":
                                 turn = int(payload.get("step", 0)) + 1
                                 print(f"\x1b[2K\r\x1b[35m… assistant turn {turn}  ({elapsed:.1f}s)\x1b[0m {payload.get('message', '')}  \x1b[90m[{tool_steps} tool steps]\x1b[0m")
@@ -1935,7 +1948,7 @@ def main(argv: list[str] | None = None) -> int:
                                     print(content)
                                 redraw_input_bar()
                                 return
-                            print(f"\x1b[2K\r{color}{labels[kind]} {text}  ({elapsed:.1f}s)\x1b[0m")
+                            print(f"\x1b[2K\r{color}{labels[kind]} [{tool_steps + (1 if kind == 'tool_call' else 0)}] {text}  ({elapsed:.1f}s)\x1b[0m")
                             if kind == "tool_call":
                                 tool_steps += 1
                             if kind == "tool_result" and tool == "read_file" and payload.get("ok"):
@@ -1965,6 +1978,12 @@ def main(argv: list[str] | None = None) -> int:
                                         line_color = "\x1b[32m" if line.startswith("+") and not line.startswith("+++") else ("\x1b[31m" if line.startswith("-") and not line.startswith("---") else "\x1b[90m")
                                         print(f"  \x1b[100m{line_color}{line}\x1b[0m")
                             if kind == "tool_result" and isinstance(payload.get("metadata"), dict):
+                                metadata = payload["metadata"]
+                                changed_path = metadata.get("path") or arguments.get("path")
+                                if tool in {"write_file", "apply_patch"} and changed_path:
+                                    before_exists = str(changed_path) in file_snapshots
+                                    status_code = "M" if before_exists else "A"
+                                    print(f"  \x1b[1;33m{status_code} {changed_path}\x1b[0m")
                                 diff = payload["metadata"].get("diff")
                                 if isinstance(diff, str):
                                     for line in diff[:4_000].splitlines()[:40]:
@@ -2570,6 +2589,9 @@ def main(argv: list[str] | None = None) -> int:
             print("│   ◆ FORGECODE // READY ◆     │")
             print("│   local coding harness       │")
             print("╰──────────────────────────────╯\n")
+            effective_model = settings.effective.model if settings.effective else settings.model
+            print(f"\x1b[90mstatus  ready   mode: {state['mode']}   model: {effective_model or 'not configured'}\x1b[0m")
+            print(f"\x1b[90mtools   {len(registry.names())} enabled   workspace: trusted\x1b[0m\n")
         if initial_prompt:
             initial_result = interactive.dispatch(initial_prompt)
             if initial_result is not None:

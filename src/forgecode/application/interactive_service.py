@@ -41,7 +41,9 @@ def _human_result(value: object) -> str | None:
         suffix = f"\n\nWorked for {_format_duration(duration)}" if isinstance(duration, (int, float)) else ""
         if isinstance(value.get("tool_steps"), int):
             suffix += f" · {value['tool_steps']} tool steps"
-        return _pretty_text(value["message"]) + suffix
+        verification = value.get("verification_ok")
+        status = "✓ Verification passed" if verification is True else ("✗ Verification failed" if verification is False else "• Verification not configured")
+        return "Completed\n─────────\n" + status + "\n\n" + _pretty_text(value["message"]) + suffix
     if value.get("error"):
         return f"Error: {_pretty_text(value.get('error'))}"
     if value.get("stopped") is True or value.get("cleared") is True:
