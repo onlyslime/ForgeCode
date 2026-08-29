@@ -299,3 +299,10 @@ updating a row.
 - Added `/clear` (screen reset only), a compact text ready banner, and a
   black-background input bar on interactive terminals. JSON/JSONL transports
   remain prompt-free and machine-readable.
+
+## 2026-08-29 provider compatibility correction
+
+- OpenAI-compatible response parsing now tolerates optional `null` usage
+  counters and nested `*_details` objects used by gateways such as DeepSeek,
+  while continuing to reject non-finite or negative numeric counters. A direct
+  parser probe retained numeric token counts and ignored optional details.

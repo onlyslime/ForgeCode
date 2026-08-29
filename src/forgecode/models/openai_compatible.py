@@ -210,6 +210,32 @@ def _error_message(payload: bytes, secret: str | None) -> str:
     return _redact(text, secret)
 
 
+def _normalize_usage(raw: Any, *, stream: bool = False) -> dict[str, int | float]:
+    """Keep numeric token counters while tolerating provider detail objects.
+
+    OpenAI-compatible gateways commonly add ``*_details`` objects or null
+    counters (DeepSeek does this for cached/reasoning usage).  Those optional
+    annotations are not required by the agent loop; strict validation still
+    rejects non-finite and negative numeric counters.
+    """
+    if not isinstance(raw, dict) or len(raw) > 32:
+        raise ProviderError("model response usage must be a bounded object", category="protocol_error")
+    safe: dict[str, int | float] = {}
+    for key, value in raw.items():
+        if not isinstance(key, str) or not key or len(key) > 128:
+            raise ProviderError("model response usage has an invalid field name", category="protocol_error")
+        if value is None or isinstance(value, dict):
+            continue
+        if isinstance(value, float) and not math.isfinite(value):
+            raise ProviderError("model response usage contains a non-finite number", category="protocol_error")
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise ProviderError("model response usage fields must be finite numbers", category="protocol_error")
+        if value < 0:
+            raise ProviderError("model response usage cannot be negative", category="protocol_error")
+        safe[key] = value
+    return safe
+
+
 def _message_to_payload(message: Message) -> dict[str, Any]:
     payload: dict[str, Any] = {"role": message.role, "content": message.content}
     if message.tool_call_id:
@@ -307,19 +333,7 @@ def parse_chat_completion(payload: dict[str, Any]) -> ModelResponse:
         usage = {}
     if not isinstance(usage, dict):
         raise ProviderError("model response usage must be an object", category="protocol_error")
-    safe_usage: dict[str, int | float] = {}
-    if len(usage) > 32:
-        raise ProviderError("model response usage contains too many fields", category="response_limit")
-    for key, value in usage.items():
-        if not isinstance(key, str) or not key or len(key) > 128:
-            raise ProviderError("model response usage has an invalid field name", category="protocol_error")
-        if isinstance(value, float) and not math.isfinite(value):
-            raise ProviderError("model response usage contains a non-finite number", category="protocol_error")
-        if isinstance(value, bool) or not isinstance(value, (int, float)):
-            raise ProviderError("model response usage fields must be finite numbers", category="protocol_error")
-        if value < 0:
-            raise ProviderError("model response usage cannot be negative", category="protocol_error")
-        safe_usage[key] = value
+    safe_usage = _normalize_usage(usage)
     if calls and finish_reason is not None and finish_reason != "tool_calls":
         raise ProviderError("tool calls require finish_reason=tool_calls", category="protocol_error")
     if not calls and finish_reason == "tool_calls":
@@ -420,16 +434,7 @@ def assemble_chat_stream(events: Iterable[dict[str, Any]], *, max_content_chars:
             raw_usage = event.get("usage")
             if not isinstance(raw_usage, dict) or len(raw_usage) > 32:
                 raise ProviderError("stream usage must be a bounded object", category="stream_protocol_error")
-            safe_usage: dict[str, int | float] = {}
-            for key, value in raw_usage.items():
-                if not isinstance(key, str) or not key or len(key) > 128:
-                    raise ProviderError("stream usage has an invalid field name", category="stream_protocol_error")
-                if isinstance(value, float) and not math.isfinite(value):
-                    raise ProviderError("stream usage contains a non-finite number", category="stream_protocol_error")
-                if isinstance(value, bool) or not isinstance(value, (int, float)) or value < 0:
-                    raise ProviderError("stream usage fields must be finite non-negative numbers", category="stream_protocol_error")
-                safe_usage[key] = value
-            usage = safe_usage
+            usage = _normalize_usage(raw_usage, stream=True)
             continue
         if finished:
             raise ProviderError("stream emitted data after finish_reason", category="stream_protocol_error")
@@ -498,16 +503,7 @@ def assemble_chat_stream(events: Iterable[dict[str, Any]], *, max_content_chars:
                 raise ProviderError("stream usage must be an object", category="stream_protocol_error")
             if len(event["usage"]) > 32:
                 raise ProviderError("stream usage contains too many fields", category="response_limit")
-            safe_usage: dict[str, int | float] = {}
-            for key, value in event["usage"].items():
-                if not isinstance(key, str) or not key or len(key) > 128:
-                    raise ProviderError("stream usage has an invalid field name", category="stream_protocol_error")
-                if isinstance(value, float) and not math.isfinite(value):
-                    raise ProviderError("stream usage contains a non-finite number", category="stream_protocol_error")
-                if isinstance(value, bool) or not isinstance(value, (int, float)) or value < 0:
-                    raise ProviderError("stream usage fields must be finite non-negative numbers", category="stream_protocol_error")
-                safe_usage[key] = value
-            usage = safe_usage
+            usage = _normalize_usage(event["usage"], stream=True)
     parsed_calls: list[ToolCall] = []
     seen_ids: set[str] = set()
     for index in order:
