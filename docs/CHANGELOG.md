@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.2.11 — 2026-08-29
+
+- Added `fcc --bypass` to launch directly in bypass mode.
+- Added interactive slash-command completion; typing `/m` suggests commands
+  such as `/mode` and `/model`.
+
 ## v0.2.10 — 2026-08-29
 
 - Added a conversational execution contract: the model is instructed to give a

@@ -12,6 +12,18 @@ def run_prompt_ui(session, *, mode: Callable[[], str]) -> None:
     from prompt_toolkit.formatted_text import HTML
     from prompt_toolkit.key_binding import KeyBindings
     from prompt_toolkit.styles import Style
+    from prompt_toolkit.completion import Completer, Completion
+
+    slash_commands = ("/help", "/status", "/model", "/plan", "/mode", "/connect", "/login", "/rules", "/files", "/skills", "/tree", "/review", "/test", "/compact", "/undo", "/pause", "/resume", "/cancel", "/clear", "/quit")
+
+    class SlashCompleter(Completer):
+        def get_completions(self, document, complete_event):
+            word = document.text_before_cursor.split()[-1] if document.text_before_cursor.split() else ""
+            if not word.startswith("/"):
+                return
+            for command in slash_commands:
+                if command.startswith(word):
+                    yield Completion(command, start_position=-len(word), display=command)
 
     bindings = KeyBindings()
 
@@ -30,7 +42,7 @@ def run_prompt_ui(session, *, mode: Callable[[], str]) -> None:
         "continuation": "bg:#202123 #f5f5f5",
         "bottom-toolbar": "bg:#202123 #f5f5f5",
     })
-    prompt_session = PromptSession(multiline=True, key_bindings=bindings, style=style)
+    prompt_session = PromptSession(multiline=True, key_bindings=bindings, style=style, completer=SlashCompleter(), complete_while_typing=True)
 
     def prompt() -> HTML:
         return HTML(f"<prompt>╭─ forgecode │ {mode()}\n╰─❯ </prompt>")

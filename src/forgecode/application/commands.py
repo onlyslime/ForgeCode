@@ -453,6 +453,7 @@ def _parser() -> argparse.ArgumentParser:
     chat_parser = subparsers.add_parser("chat", aliases=["start", "fc"], help="scriptable interactive coding session")
     chat_parser.add_argument("prompt", nargs="*", help="optional initial task")
     chat_parser.add_argument("--mode", choices=[mode.value for mode in AgentMode], default=AgentMode.ACT.value)
+    chat_parser.add_argument("--bypass", action="store_true", help="start chat directly in bypass mode (no approval prompts)")
     chat_parser.add_argument("--auto-approve", "--yes", action="store_true")
     chat_parser.add_argument("--demo", action="store_true")
     chat_parser.add_argument("--demo-task", choices=("calculator", "json"), default="calculator")
@@ -704,6 +705,8 @@ def main(argv: list[str] | None = None) -> int:
     setattr(args, "_legacy_json_run", bool(args.command == "run" and raw_has_json and not raw_has_jsonl and not raw_has_mode))
     setattr(args, "_legacy_json_chat_existing", bool(args.command in {"chat", "start"} and raw_has_json and not raw_has_jsonl and "--session" in raw_argv))
     command = args.command or "doctor"
+    if command in {"chat", "start"} and getattr(args, "bypass", False):
+        args.mode = AgentMode.BYPASS.value
     # ``--json`` and ``--jsonl`` are two spellings of the same canonical
     # machine protocol.  Accepting both silently makes option precedence
     # dependent on parser nesting and can produce duplicate/conflicting
