@@ -8,10 +8,10 @@ full claim still has a limitation. Update this table whenever behavior changes.
 | Capability | Entry point / source | Manual audit evidence | Status |
 |---|---|---|---|
 | Plan/Act mode and fail-closed tool policy | `plan`, `src/forgecode/agent/loop.py` | policy output shows side-effect tools disabled without trust; forged-call stress pending | partial |
-| Workspace path and symlink guard | `src/forgecode/security/workspace.py` | `context complete ../` rejected with exit 2; symlink stress pending | partial |
-| Read/list/search UTF-8 tools | `tools`, `src/forgecode/tools/filesystem.py` | source path identified; fixture/limit stress pending | partial |
-| Structured multi-file patch with atomic write | `apply_patch`, `tools/patch.py` | source path identified; valid/invalid patch stress pending | partial |
-| Command risk classes, approval, timeout and output limits | `run_command`, `tools/shell.py` | source path identified; safe/dangerous/timeout stress pending | partial |
+| Workspace path and symlink guard | `src/forgecode/security/workspace.py` | CLI parent traversal and direct `WorkspaceGuard` traversal rejection; symlink stress pending | partial |
+| Read/list/search UTF-8 tools | `tools`, `src/forgecode/tools/filesystem.py` | source inspection plus bounded UTF-8/traversal checks; larger fixture and race stress pending | partial |
+| Structured multi-file patch with atomic write | `apply_patch`, `tools/patch.py` | valid target-only patch and traversal rejection observed; malformed multi-file/rollback stress pending | partial |
+| Command risk classes, approval, timeout and output limits | `run_command`, `tools/shell.py` | dangerous classification, deny approval, 1 MiB output truncation, and typed timeout observed | verified |
 | Secret redaction and privacy boundary | `security/redaction.py`, `privacy.md` | review found test fixtures are flagged as token-shaped; runtime redaction stress pending | partial |
 | Session JSONL persistence, checkpoints and recovery | `storage/`, `session`, `sessions` | `sessions --json` read existing bounded records; crash/recovery stress pending | partial |
 | Transactions, hash conflict and undo | `transaction`, `rollback` | dry-run conflict probe | verified |
@@ -29,7 +29,7 @@ full claim still has a limitation. Update this table whenever behavior changes.
 | Session tree/clone/import and trajectory evaluation | `session tree`, `eval` | completed-session tree/clone (no replay) verified; evaluator correctly returns `trajectory_incomplete` for unverified run | partial |
 | Interactive pause/resume/cancel and Escape handling | `chat`, `interactive_service.py` | controller pause/cancel boundary verified; PTY/Escape integration pending | partial |
 | RPC server plus Python/Node embedding | `rpc`, `rpc.py`, `sdk/node/index.mjs` | Python and Node SDK doctor/provider-health calls plus stream event-list smoke | verified |
-| Runtime tool narrowing (`--tools`, `--exclude-tools`, `--no-tools`) | CLI/config policy | policy help/source identified; deny-path matrix pending | partial |
+| Runtime tool narrowing (`--tools`, `--exclude-tools`, `--no-tools`) | CLI/config policy | `--no-tools` and allowlist lacking `write_file` fail closed during demo setup; exclude path reaches bounded run failure without traceback | verified |
 | Offline mode and telemetry policy | `config`, `telemetry` | config validate and telemetry status pass without network | verified |
 
 ## Audit notes
@@ -156,3 +156,9 @@ updating a row.
   `replay=false`. Flipping one byte changed the reported `source_digest` but
   was still accepted, so import works while tamper-rejection/integrity
   enforcement remains a documented gap.
+- Additional boundary checks: `WorkspaceGuard.resolve("../x.txt")` raised a
+  typed `WorkspaceViolation`; `context complete ../` returned JSON exit 2;
+  runtime `run --no-tools` and a restrictive `--tools` allowlist refused demo
+  fixture setup because `write_file` was unavailable, while an exclude-tools
+  run failed at its bounded step limit without a traceback. These checks
+  support fail-closed narrowing, but do not replace full provider execution.
