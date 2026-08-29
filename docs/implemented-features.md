@@ -24,11 +24,11 @@ full claim still has a limitation. Update this table whenever behavior changes.
 | Provider diagnostics and profile selection | `provider`, `config profiles` | `provider health/list` and `config profiles --json` pass offline | verified |
 | Lifecycle hooks with fail-closed behavior | `hooks.py` | direct exception, timeout, recursion, cancellation and redaction probes | verified |
 | Named test profiles and bounded verification | `test`, `testing.py` | direct runner probe: plan=skipped, deny=denied, allow=passed (exit 0); no pytest command used | verified |
-| Evidence-driven review and export verification | `review`, `review.py` | fresh workspace review smoke | partial |
+| Evidence-driven review and export verification | `review`, `review.py` | clean temporary workspace review and export returned `ok=true`, exit 0; repository scan remains blocked by fixture findings | partial |
 | Incremental context extensions | `context complete`, `context/repository.py` | source inspection; large-tree stress pending | partial |
 | Session tree/clone/import and trajectory evaluation | `session tree`, `eval` | help and empty-session boundary probes | partial |
 | Interactive pause/resume/cancel and Escape handling | `chat`, `interactive_service.py` | controller pause/cancel boundary verified; PTY/Escape integration pending | partial |
-| RPC server plus Python/Node embedding | `rpc`, `rpc.py`, `sdk/node/index.mjs` | JSONL request/response smoke | partial |
+| RPC server plus Python/Node embedding | `rpc`, `rpc.py`, `sdk/node/index.mjs` | Python RPC JSONL smoke verified; Node SDK validation passed, executable discovery unavailable in current shell | partial |
 | Runtime tool narrowing (`--tools`, `--exclude-tools`, `--no-tools`) | CLI/config policy | policy help/source identified; deny-path matrix pending | partial |
 | Offline mode and telemetry policy | `config`, `telemetry` | config validate and telemetry status pass without network | verified |
 
@@ -104,6 +104,14 @@ updating a row.
 - Session tree boundary fuzzing initially exposed that `--limit 0` was silently
   clamped to one node. The CLI now rejects zero and values above 200 with a
   structured `invalid_limit` error (exit 2), matching the `sessions` command.
+- A clean temporary workspace containing one plain-text file passed `review`
+  and `review --export report.json` with `ok=true`, exit 0, and zero findings.
+  The repository-wide review still fails on 23 token-shaped test/source
+  fixtures, so review remains partial for this repository until that policy is
+  resolved.
+- Node SDK calls validated parameter rejection (`params=null`, >1 MiB params)
+  without starting a process. A valid call could not be completed because the
+  shell has no `forgecode` executable on PATH; Python RPC remains verified.
 - InteractiveSession probes confirmed `/help`, `/mode`, unknown-command errors,
   `/quit`, and prefix-only `!`/`!!` parsing. InteractiveRunController accepted
   two bounded follow-ups, rejected a full queue, reported pending pause and
