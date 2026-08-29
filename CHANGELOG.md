@@ -5,6 +5,14 @@ and metadata-only commits remain under the current version and are not listed as
 new releases. Verification notes identify the evidence used for each feature
 slice.
 
+## v0.1.0 — 2026-08-29
+
+- Declares the first minor release milestone for the runnable CLI harness.
+- Consolidates the provider connection flow, human terminal presentation, and
+  safety/audit boundaries delivered through the v0.0.x development series.
+- Verification: `forgecode doctor --json`, Python compile check, review scan,
+  and interactive CLI smoke checks.
+
 ## v0.0.36 — 2026-08-29
 
 - Stabilized explicit cancellation while a legacy provider is still
