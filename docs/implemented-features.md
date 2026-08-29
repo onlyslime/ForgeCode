@@ -217,6 +217,9 @@ updating a row.
 - Final consistency gate passed: a fresh offline demo completed with 108
   events; repository review scanned 137 text files with zero findings;
   `doctor --json`, Python compileall, and diff checks passed without pytest.
+- Review reverse probe placed an unlisted long token in `tests/suspicious.py`;
+  the scanner correctly returned one high-severity finding and exit 1. This
+  confirms the fixture allowlist does not suppress arbitrary test credentials.
 - Checkpoint corruption probe wrote malformed JSON, and `CheckpointStore.load`
   returned a bounded `ValueError`; a later save refused to overwrite the
   unreadable checkpoint. This preserves fail-closed recovery state.
