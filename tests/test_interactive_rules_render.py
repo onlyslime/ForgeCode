@@ -28,3 +28,10 @@ def test_human_rules_result_shows_errors():
     )
     assert "status: error" in rendered
     assert "outside workspace (x)" in rendered
+
+
+def test_human_files_and_skills_results_render():
+    files = _human_result({"prefix": "src", "results": ["src/main.py"], "advisory": True})
+    assert "Files" in files and "src/main.py" in files and "matches: 1" in files
+    skills = _human_result({"skills": [{"manifest": {"id": "demo", "name": "Demo", "entry_type": "markdown", "description": "A demo"}}], "errors": []})
+    assert "Skills" in skills and "demo — Demo" in skills and "A demo" in skills

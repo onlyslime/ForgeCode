@@ -58,6 +58,38 @@ def _human_result(value: object) -> str | None:
             else:
                 lines.append(f"✓ {row}")
         return "\n".join(lines)
+    if "results" in value and "prefix" in value and value.get("advisory") is True:
+        results = value.get("results") or []
+        lines = ["Files", "─────", f"prefix: {value.get('prefix') or '<all>'}", f"matches: {len(results)}"]
+        if results:
+            lines.append("")
+            lines.extend(f"  • {item}" for item in results)
+        else:
+            lines.append("No matching files")
+        return "\n".join(lines)
+    if "skills" in value and "errors" in value:
+        skills = value.get("skills") or []
+        errors = value.get("errors") or []
+        lines = ["Skills", "──────", f"discovered: {len(skills)}"]
+        if skills:
+            lines.append("")
+            for item in skills:
+                if not isinstance(item, dict):
+                    continue
+                manifest = item.get("manifest") if isinstance(item.get("manifest"), dict) else {}
+                skill_id = manifest.get("id", "unknown")
+                name = manifest.get("name", skill_id)
+                kind = manifest.get("entry_type", "markdown")
+                state = "enabled" if manifest.get("enabled", True) else "disabled"
+                lines.append(f"  • {skill_id} — {name} [{kind}, {state}]")
+                description = str(manifest.get("description") or "").strip()
+                if description:
+                    lines.append(f"    {description}")
+        if errors:
+            lines.append("")
+            lines.append("Errors:")
+            lines.extend(f"  ✗ {error}" for error in errors)
+        return "\n".join(lines)
     # ``/rules`` returns the RuleSet payload directly.  Keep this separate
     # from the generic dictionary fallback so the interactive TTY makes the
     # discovered sources and diagnostics visible (machine JSON is unchanged).
