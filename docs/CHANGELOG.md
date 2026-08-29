@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.7.0 — 2026-08-29
+
+- Added grouped, human-readable `/tools` output for read-only, change,
+  execution, and evidence capabilities.
+- Refined completed-run summaries so verification, elapsed time, and tool-step
+  metrics appear together as a clear outcome card.
+- Opened the presentation-focused release line for a polished, legible
+  demonstration of ForgeCode's normal agent workflow.
+
 ## v0.6.3 — 2026-08-29
 
 - Added an npm distribution wrapper that launches a bundled native ForgeCode

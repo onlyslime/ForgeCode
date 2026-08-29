@@ -51,12 +51,34 @@ def _human_result(value: object) -> str | None:
     if value.get("tools_status") is True:
         rows = value.get("tools") or []
         lines = ["Available tools", "───────────────"]
+        groups: dict[str, list[object]] = {"Read-only": [], "Changes": [], "Execution": [], "Evidence": [], "Other": []}
+        evidence_names = {"review", "test", "git_status", "git_diff", "transaction", "rollback", "eval"}
+        execution_names = {"run_command", "run_background", "process_status", "poll_process", "kill_process"}
+        change_names = {"write_file", "apply_patch", "git_commit"}
         for row in rows:
-            if isinstance(row, dict):
-                state = "✓" if row.get("available", True) else "—"
-                lines.append(f"{state} {row.get('name', 'unknown')}: {row.get('description', '')}")
+            if not isinstance(row, dict):
+                groups["Other"].append(row)
+                continue
+            name = str(row.get("name", "unknown"))
+            if name in evidence_names:
+                group = "Evidence"
+            elif name in execution_names:
+                group = "Execution"
+            elif name in change_names or row.get("side_effecting"):
+                group = "Changes"
             else:
-                lines.append(f"✓ {row}")
+                group = "Read-only"
+            groups[group].append(row)
+        for group, members in groups.items():
+            if not members:
+                continue
+            lines.extend(("", group))
+            for row in members:
+                if isinstance(row, dict):
+                    state = "✓" if row.get("available", True) else "—"
+                    lines.append(f"  {state} {row.get('name', 'unknown')}: {row.get('description', '')}")
+                else:
+                    lines.append(f"  ✓ {row}")
         return "\n".join(lines)
     if "nodes" in value and "roots" in value and "edges" in value:
         nodes = value.get("nodes") or []
@@ -149,12 +171,17 @@ def _human_result(value: object) -> str | None:
         return "\n".join(lines)
     if value.get("message") and value.get("state") == "completed":
         duration = value.get("duration_seconds")
-        suffix = f"\n\nWorked for {_format_duration(duration)}" if isinstance(duration, (int, float)) else ""
+        metrics = []
+        if isinstance(duration, (int, float)):
+            metrics.append(f"Worked for {_format_duration(duration)}")
         if isinstance(value.get("tool_steps"), int):
-            suffix += f" · {value['tool_steps']} tool steps"
+            metrics.append(f"{value['tool_steps']} tool steps")
         verification = value.get("verification_ok")
         status = "✓ Verification passed" if verification is True else ("✗ Verification failed" if verification is False else "• Verification not configured")
-        return "Completed\n─────────\n" + status + "\n\n" + _pretty_text(value["message"]) + suffix
+        summary = "Completed\n─────────\n" + status
+        if metrics:
+            summary += "\n" + " · ".join(metrics)
+        return summary + "\n\n" + _pretty_text(value["message"])
     if value.get("error"):
         return f"Error: {_pretty_text(value.get('error'))}"
     if value.get("stopped") is True or value.get("cleared") is True:

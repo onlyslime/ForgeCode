@@ -44,3 +44,29 @@ def test_human_tree_review_and_compact_results_render():
     assert "Review" in review and "rollback: available" in review
     compact = _human_result({"before_chars": 100, "after_chars": 40, "omitted_messages": 2, "summary": "kept recent context"})
     assert "Context compacted" in compact and "kept recent context" in compact
+
+
+def test_human_tools_result_groups_capabilities():
+    rendered = _human_result(
+        {
+            "tools_status": True,
+            "tools": [
+                {"name": "read_file", "description": "Read a file", "side_effecting": False},
+                {"name": "apply_patch", "description": "Apply a patch", "side_effecting": True},
+                {"name": "run_command", "description": "Run a command", "side_effecting": True},
+                {"name": "review", "description": "Review evidence", "side_effecting": False},
+            ],
+        }
+    )
+    assert "Read-only" in rendered
+    assert "Changes" in rendered
+    assert "Execution" in rendered
+    assert "Evidence" in rendered
+
+
+def test_human_completed_result_keeps_summary_metrics_together():
+    rendered = _human_result(
+        {"state": "completed", "message": "All done", "duration_seconds": 2.4, "tool_steps": 3, "verification_ok": True}
+    )
+    assert "✓ Verification passed" in rendered
+    assert "Worked for 2.4s · 3 tool steps" in rendered
