@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.6.0 — 2026-08-29
+
+- Started the整理-focused release line. This version entry only establishes
+  the release baseline; functional cleanup changes will be added separately.
+
 ## v0.5.11 — 2026-08-29
 
 - Disabled fragile SSE negotiation for DeepSeek endpoints and use the bounded
