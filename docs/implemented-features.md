@@ -150,3 +150,7 @@ updating a row.
   process exited cleanly with JSONL header/result and no traceback, reporting
   `no active worker`; cancellation of an actively running provider still
   requires a live provider/PTY scenario and remains partial.
+- `session export` on a real 108-event session returned bounded redacted JSONL
+  with preserved sequence/run metadata and no traceback. The export is
+  suitable as evidence input; full cross-workspace `session import` and
+  tamper-rejection remain pending.
