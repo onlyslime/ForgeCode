@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.2.9 — 2026-08-29
+
+- Interactive chat now renders assistant progress messages as soon as each
+  model turn completes, instead of showing only the final response. Tool
+  progress remains visible and machine JSON output is unchanged.
+
 ## v0.2.8 — 2026-08-29
 
 - Replaced the `fc` launcher with `fcc` to avoid PowerShell's built-in alias.
