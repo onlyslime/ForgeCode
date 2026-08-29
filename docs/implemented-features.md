@@ -261,3 +261,10 @@ updating a row.
   narrowing, allowlist, exclusion, `--no-tools`, duplicate names, overlap,
   and unknown names passed or failed closed as expected through
   `parse_tool_policy_options`; no tool was invoked during the probe.
+
+- Final clean-workspace gate (2026-08-29): removed only the identified
+  ignored demo transaction manifest/blob left by the offline fixture run;
+  `review --json --no-verify-files` then scanned 137 text files and 102 Python
+  files with zero findings and exit `0`. `doctor --json`, `compileall`, and
+  `git diff --check` also passed. This cleanup is runtime-state maintenance,
+  not a change to the tracked source implementation.
