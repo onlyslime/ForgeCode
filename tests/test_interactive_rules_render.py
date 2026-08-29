@@ -109,3 +109,4 @@ def test_human_events_status_renders_bounded_tail():
     rendered = _human_result({"events_status": True, "filter": "error", "events": [{"sequence": 4, "kind": "tool_result", "outcome": "success", "elapsed_seconds": 1.25, "duration_seconds": 0.4}, {"sequence": 5, "kind": "error", "outcome": "failed", "error_code": "provider_timeout", "elapsed_seconds": 2.0, "duration_seconds": 1.75}]})
     assert "Recent events" in rendered and "filter: error" in rendered and "tool_result · success +1.2s" in rendered
     assert "error · failed [provider_timeout] +2.0s (1.8s)" in rendered
+    assert "No matching events" in _human_result({"events_status": True, "filter": "error", "events": []})

@@ -111,6 +111,8 @@ def _human_result(value: object) -> str | None:
         lines = ["Recent events", "─────────────", f"showing: {len(events)}"]
         if value.get("filter"):
             lines.append(f"filter: {value['filter']}")
+        if not events:
+            lines.append("No matching events")
         for item in events:
             if isinstance(item, dict):
                 outcome = f" · {item['outcome']}" if item.get("outcome") else ""

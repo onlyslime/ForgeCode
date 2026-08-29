@@ -66,6 +66,8 @@
   receives bounded limit and kind parameters.
 - Event timeline rows now include validated per-event duration when available,
   alongside relative position in the run.
+- Empty `/events` filters now explicitly report `No matching events`, separating
+  a healthy no-match query from an unavailable or unreadable audit stream.
 - Provider request identities retain zero-based per-turn suffixes for
   compatibility with existing audit consumers while the UI remains 1-based.
 - Interactive Act/Bypass sessions now ask once whether the current workspace
