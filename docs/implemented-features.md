@@ -7,7 +7,7 @@ full claim still has a limitation. Update this table whenever behavior changes.
 
 | Capability | Entry point / source | Manual audit evidence | Status |
 |---|---|---|---|
-| Plan/Act mode and fail-closed tool policy | `plan`, `src/forgecode/agent/loop.py` | filtered registry returns typed `tool_unavailable` for side-effect calls, `unknown_tool` for forged names, and `mode_denied` in plan mode | verified |
+| Plan/Act mode and fail-closed tool policy | `plan`, `src/forgecode/agent/loop.py` | filtered registry returns typed `tool_unavailable` for side-effect calls, `unknown_tool` for forged names; real offline `run --mode plan` completed with no fixture writes or command events | verified |
 | Workspace path and symlink guard | `src/forgecode/security/workspace.py` | CLI parent traversal and direct guard rejection; existing symlink/junction entries are rejected lexically, metadata errors now fail closed; OS link creation unavailable here | partial |
 | Read/list/search UTF-8 tools | `tools`, `src/forgecode/tools/filesystem.py` | 150 UTF-8 files indexed/searched; list limit 100 truncates with omitted count; >2 MB, invalid UTF-8, traversal, and read/write race inputs fail closed; broader platform race stress pending | partial |
 | Structured multi-file patch with atomic write | `apply_patch`, `tools/patch.py` | malformed second hunk is rejected pre-write; injected second-file I/O failure returns `write_failed`, rolls back first file, and preserves both originals | verified |
@@ -223,6 +223,9 @@ updating a row.
 - Final offline gate used `run --demo --no-verify --max-steps 8`: the run
   completed with 108 session events and zero read issues; `doctor --json`,
   compileall, and `git diff --check` also passed. No pytest command was run.
+- Plan-mode integration probe ran the offline demo with `--mode plan`; it
+  completed successfully, created no demo fixture files, and recorded only a
+  read-only `workspace_summary` tool result (no command or write events).
 - Process-tree crash probe terminated an in-flight offline run after checkpoint
   creation. A fresh process found the durable JSONL/checkpoint and
   `run --resume --dry-run` returned `recovery_preview` in `discovering` state
