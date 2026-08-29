@@ -11,6 +11,8 @@
   during provider waits; machine JSON/JSONL output is unchanged.
 - `/tools` machine envelopes now include stable capability categories matching
   the human-readable inventory.
+- Provider request identities retain zero-based per-turn suffixes for
+  compatibility with existing audit consumers while the UI remains 1-based.
 - Interactive Act/Bypass sessions now ask once whether the current workspace
   should be trusted for side effects; declining keeps the session read-only.
 - Machine-readable chat output no longer receives terminal redraw escape codes.

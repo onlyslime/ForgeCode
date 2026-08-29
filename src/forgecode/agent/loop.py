@@ -801,7 +801,9 @@ class AgentLoop:
                 response = await self._await_provider(
                     request_messages,
                     self.registry.schemas(self.context.mode),
-                    self._provider_context(step),
+                    # Steps are human-facing 1-based; request identities keep
+                    # the historical zero-based suffix used by audit clients.
+                    self._provider_context(step - 1),
                     remaining,
                 )
                 if self.context.hooks is not None:
