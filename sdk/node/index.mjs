@@ -140,8 +140,8 @@ export const sessionList = ({ workspace, state, limit, ...options } = {}) => (va
   params: {
     ...(options.params ?? {}),
     ...(workspace === undefined ? {} : { workspace }),
-    ...(state === undefined ? {} : { state }),
-    ...(limit === undefined ? {} : { limit }),
+    ...(state === undefined ? {} : (["running", "paused", "completed", "failed", "cancelled", "recovery_required"].includes(state) ? { state } : (() => { throw new TypeError("session state is invalid"); })())),
+    ...(limit === undefined ? {} : (typeof limit === "number" && Number.isInteger(limit) && limit >= 1 && limit <= 200 ? { limit } : (() => { throw new TypeError("limit must be between 1 and 200"); })())),
   },
 }));
 export const sessionOpen = ({ workspace, mode, session, ...options } = {}) => (validateWorkspace(workspace), session !== undefined && (validateSession(session), true), mode !== undefined && !["plan", "act"].includes(mode) ? (() => { throw new TypeError("mode must be plan or act"); })() : method("session.open", {
@@ -156,7 +156,7 @@ export const sessionOpen = ({ workspace, mode, session, ...options } = {}) => (v
 export const sessionStatus = (session, { workspace, ...options } = {}) => { validateSession(session); validateWorkspace(workspace); return method("session.status", { ...options, params: { ...(options.params ?? {}), session, ...(workspace === undefined ? {} : { workspace }) } }); };
 export const sessionResult = (session, { workspace, ...options } = {}) => { validateSession(session); validateWorkspace(workspace); return method("session.result", { ...options, params: { ...(options.params ?? {}), session, ...(workspace === undefined ? {} : { workspace }) } }); };
 export const sessionWait = (session, { workspace, timeout, ...options } = {}) => { validateSession(session); validateWorkspace(workspace); return method("session.wait", { ...options, params: { ...(options.params ?? {}), session, ...(workspace === undefined ? {} : { workspace }), ...(timeout === undefined ? {} : { timeout }) } }); };
-export const sessionEvents = (session, { workspace, after, limit, ...options } = {}) => { validateSession(session); validateWorkspace(workspace); return method("session.events", { ...options, params: { ...(options.params ?? {}), session, ...(workspace === undefined ? {} : { workspace }), ...(after === undefined ? {} : { after }), ...(limit === undefined ? {} : { limit }) } }); };
+export const sessionEvents = (session, { workspace, after, limit, ...options } = {}) => { validateSession(session); validateWorkspace(workspace); if (after !== undefined && (typeof after !== "number" || !Number.isInteger(after) || after < 0)) throw new TypeError("after must be a non-negative integer"); if (limit !== undefined && (typeof limit !== "number" || !Number.isInteger(limit) || limit < 1 || limit > 100)) throw new TypeError("limit must be between 1 and 100"); return method("session.events", { ...options, params: { ...(options.params ?? {}), session, ...(workspace === undefined ? {} : { workspace }), ...(after === undefined ? {} : { after }), ...(limit === undefined ? {} : { limit }) } }); };
 export const sessionRun = (session, prompt, { workspace, ...options } = {}) => { validateSession(session); validateWorkspace(workspace); if (typeof prompt !== "string" || !prompt.trim() || prompt.length > 8000) throw new TypeError("prompt must be non-empty and bounded"); return method("session.run", { ...options, params: { ...(options.params ?? {}), session, prompt, ...(workspace === undefined ? {} : { workspace }) } }); };
 export const sessionControl = (session, action, { workspace, ...options } = {}) => {
   validateSession(session);

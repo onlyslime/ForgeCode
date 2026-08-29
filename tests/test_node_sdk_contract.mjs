@@ -21,6 +21,8 @@ assert.throws(() => sessionOpen({ workspace: "bad\npath" }), TypeError);
 assert.throws(() => sessionOpen({ mode: "unsafe" }), TypeError);
 assert.throws(() => sessionOpen({ session: "bad\nsession" }), TypeError);
 assert.throws(() => sessionRun("session", ""), TypeError);
+assert.throws(() => sessionList({ state: "bogus" }), TypeError);
+assert.throws(() => sessionEvents("session", { after: -1 }), TypeError);
 {
   const controller = new AbortController(); controller.abort();
   await assert.rejects(invoke([], { executable: process.execPath, signal: controller.signal }), (error) => error.code === "cancelled");
