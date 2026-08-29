@@ -7,9 +7,9 @@ full claim still has a limitation. Update this table whenever behavior changes.
 
 | Capability | Entry point / source | Manual audit evidence | Status |
 |---|---|---|---|
-| Plan/Act mode and fail-closed tool policy | `plan`, `src/forgecode/agent/loop.py` | policy output shows side-effect tools disabled without trust; forged-call stress pending | partial |
+| Plan/Act mode and fail-closed tool policy | `plan`, `src/forgecode/agent/loop.py` | filtered registry returns typed `tool_unavailable` for side-effect calls, `unknown_tool` for forged names, and `mode_denied` in plan mode | verified |
 | Workspace path and symlink guard | `src/forgecode/security/workspace.py` | CLI parent traversal and direct `WorkspaceGuard` traversal rejection; symlink stress pending | partial |
-| Read/list/search UTF-8 tools | `tools`, `src/forgecode/tools/filesystem.py` | source inspection plus bounded UTF-8/traversal checks; larger fixture and race stress pending | partial |
+| Read/list/search UTF-8 tools | `tools`, `src/forgecode/tools/filesystem.py` | 150 UTF-8 files indexed/searched; list limit 100 truncates with omitted count; traversal and invalid-input checks are typed; race stress pending | partial |
 | Structured multi-file patch with atomic write | `apply_patch`, `tools/patch.py` | valid target-only patch and traversal rejection observed; malformed multi-file/rollback stress pending | partial |
 | Command risk classes, approval, timeout and output limits | `run_command`, `tools/shell.py` | dangerous classification, deny approval, 1 MiB output truncation, and typed timeout observed | verified |
 | Secret redaction and privacy boundary | `security/redaction.py`, `privacy.md` | review found test fixtures are flagged as token-shaped; runtime redaction stress pending | partial |
@@ -172,3 +172,9 @@ updating a row.
   `recovery_conflict`; after modifying the file, the report additionally named
   `file fingerprint changed since checkpoint`. This proves fail-closed stale
   recovery, but not automatic recovery after an OS/process crash.
+- Tool-policy fuzz probe sent a forged tool name, a policy-removed side-effect
+  tool, and a malformed argument object. The registry returned bounded typed
+  errors (`unknown_tool`, `tool_unavailable`, and argument validation) without
+  invoking a tool. A 150-file UTF-8 fixture confirmed search completeness and
+  list truncation (`count=100`, `omitted=50`); invalid UTF-8 and traversal were
+  rejected without traceback. Concurrent mutation races remain unverified.
