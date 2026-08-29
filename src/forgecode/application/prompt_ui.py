@@ -38,7 +38,7 @@ def run_prompt_ui(session, *, mode: Callable[[], str]) -> None:
     with patch_stdout(raw=True):
         while not session.stopped:
             try:
-                text = prompt_session.prompt(prompt, prompt_continuation=lambda width, line: HTML("<continuation>│ </continuation>"))
+                text = prompt_session.prompt(prompt, prompt_continuation=lambda width, line, wrap_count: HTML("<continuation>│ </continuation>"))
             except (EOFError, KeyboardInterrupt):
                 session.cancel()
                 break

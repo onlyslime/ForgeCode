@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.1.6 — 2026-08-29
+
+- Fixed multiline prompt rendering on prompt_toolkit versions that pass the
+  wrap-count argument to continuation callbacks.
+
 ## v0.1.5 — 2026-08-29
 
 - Styled multiline continuation rows so the entire input buffer keeps the
