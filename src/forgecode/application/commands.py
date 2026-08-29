@@ -2330,8 +2330,8 @@ def main(argv: list[str] | None = None) -> int:
             # Provider is an internal adapter detail; users only need the
             # endpoint, model ID, and credential. Infer a known adapter from
             # the endpoint hostname after the URL is entered.
-            base_url = input("API endpoint: ").strip()
-            model = input("Model ID: ").strip()
+            base_url = input("URL: ").strip()
+            model = input("ID: ").strip()
             provider = next((name for name, data in PROVIDER_CATALOG.items() if base_url.startswith(data["base_url"])), "openai-compatible")
             defaults = PROVIDER_CATALOG[provider]
             if provider not in SUPPORTED_PROVIDERS:
@@ -2340,7 +2340,7 @@ def main(argv: list[str] | None = None) -> int:
                 return {"error": "API endpoint URL and model name are required", "code": "connect_incomplete"}
             requires_key = provider_requires_credential(provider)
             if requires_key:
-                entered = input(f"API key ({defaults['api_key_env']}): ").strip() or os.getenv(defaults["api_key_env"], "")
+                entered = input("KEY: ").strip() or os.getenv(defaults["api_key_env"], "")
                 if not entered:
                     return {"error": "API key must not be empty", "code": "credential_missing"}
                 # Keep the credential process-local and never write it to config/session.
