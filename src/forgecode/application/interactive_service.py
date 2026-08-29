@@ -13,6 +13,7 @@ import json
 import re
 import shlex
 import threading
+import time
 from typing import Callable, Iterable, TextIO
 
 
@@ -47,6 +48,7 @@ def _human_result(value: object) -> str | None:
             f"transactions: {value.get('transactions', 0)}",
             f"verification: {verification_text}",
             f"worker: {'running' if worker.get('active') else 'idle'} (queued: {worker.get('queue_items', 0)})",
+            *( [f"elapsed: {_format_duration(worker['elapsed_seconds'])}"] if isinstance(worker.get('elapsed_seconds'), (int, float)) else [] ),
         ))
     if value.get("tools_status") is True:
         rows = value.get("tools") or []
@@ -307,6 +309,7 @@ class InteractiveRunController:
     _cancel_requested: bool = field(default=False, init=False, repr=False)
     _pending_pause: bool = field(default=False, init=False, repr=False)
     _pending_cancel: bool = field(default=False, init=False, repr=False)
+    _started_monotonic: float | None = field(default=None, init=False, repr=False)
     _thread: threading.Thread | None = field(default=None, init=False, repr=False)
     _condition: threading.Condition = field(default_factory=threading.Condition, init=False, repr=False)
 
@@ -317,8 +320,10 @@ class InteractiveRunController:
 
     def snapshot(self) -> dict[str, object]:
         with self._condition:
+            elapsed = None if self._started_monotonic is None else max(0.0, time.monotonic() - self._started_monotonic)
             return {
                 "active": self._active,
+                "elapsed_seconds": round(elapsed, 3) if elapsed is not None else None,
                 "queue_items": len(self._queue),
                 "queue_chars": self._queue_chars,
                 "stopped": self._stopped,
@@ -352,6 +357,7 @@ class InteractiveRunController:
             self._cancel_requested = False
             self._pending_pause = False
             self._pending_cancel = False
+            self._started_monotonic = time.monotonic()
             self.event_sink("run_enqueued", {"chars": len(text), "queue_items": 0})
             self._thread = threading.Thread(target=self._worker, args=(text,), name="forgecode-interactive", daemon=True)
             self._thread.start()
@@ -390,6 +396,7 @@ class InteractiveRunController:
                     self._queue.clear()
                     self._queue_chars = 0
                     self._active = False
+                    self._started_monotonic = None
                     if not self._stopped:
                         self._cancel_requested = False
                     self._condition.notify_all()

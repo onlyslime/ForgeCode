@@ -71,3 +71,12 @@ def test_human_completed_result_keeps_summary_metrics_together():
     assert "✓ Verification passed" in rendered
     assert "Worked for 2.4s · 3 tool steps" in rendered
     assert "Files changed: src/main.py" in rendered
+
+
+def test_human_status_renders_active_elapsed_time():
+    rendered = _human_result({
+        "run_id": "run-1", "mode": "act", "transactions": 0,
+        "last_state": "acting", "latest_verification": None,
+        "worker": {"active": True, "queue_items": 1, "elapsed_seconds": 12.3},
+    })
+    assert "elapsed: 12.3s" in rendered
