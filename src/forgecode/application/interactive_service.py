@@ -374,7 +374,7 @@ class InteractiveSession:
         return f"ForgeCode session run={run_id or '<new>'} workspace=. mode={mode} profile={profile} rules={rules_count} budget={budget}"
 
     def help_text(self) -> str:
-        return "/help /status /model /plan [show|refresh] /mode plan|act /connect /login /rules /files [prefix] /skills [id] /tree /review /test [command] /compact /undo [id|latest] /pause /resume /cancel /clear /quit; !<command> sends a bounded result to the model; !!<command> stays local"
+        return "/help /status /model /plan [show|refresh] /mode plan|act|bypass /connect /login /rules /files [prefix] /skills [id] /tree /review /test [command] /compact /undo [id|latest] /pause /resume /cancel /clear /quit; !<command> sends a bounded result to the model; !!<command> stays local"
 
     def dispatch(self, line: str) -> object | None:
         line = line.rstrip("\r\n")
@@ -408,8 +408,8 @@ class InteractiveSession:
             if len(args) > 1 or (args and args[0] not in {"show", "refresh"}): raise SlashCommandError("usage: /plan [show|refresh]")
             return self.plan(args)
         if command == "mode":
-            if len(args) != 1 or args[0] not in {"plan", "act"}:
-                raise SlashCommandError("usage: /mode plan|act")
+            if len(args) != 1 or args[0] not in {"plan", "act", "bypass"}:
+                raise SlashCommandError("usage: /mode plan|act|bypass")
             return self.set_mode(args[0])
         if command == "model":
             if args and args[0] not in {"show", "list", "select"}:
