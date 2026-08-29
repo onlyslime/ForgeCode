@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { ForgeCodeError, invoke, invokeStream, interactive, sessionApproval, sessionControl, sessionList, sessionOpen, sessionResult, sessionRun, sessionTree, trust } from "../sdk/node/index.mjs";
+import { ForgeCodeError, invoke, invokeStream, interactive, sessionApproval, sessionControl, sessionEvents, sessionList, sessionOpen, sessionResult, sessionRun, sessionTree, trust } from "../sdk/node/index.mjs";
 
 assert.equal(typeof ForgeCodeError, "function");
 assert.equal(typeof sessionList, "function");
