@@ -59,9 +59,8 @@ substantive user-visible release content.
 - `docs/strategy/` stores local strategy/status notes and is intentionally
   ignored; never stage, push, or package its contents unless the owner changes
   this policy explicitly.
-- Keep `docs/implemented-features.md` current. It is the source of truth for
-  user-visible capabilities claimed as implemented: each row must cite the
-  source entry point, manual verification command/evidence, and any known gap.
+- Keep the capability sections in `README.md` and `README.zh.md` current as the
+  source of truth for user-visible capabilities claimed as implemented.
 
 ## Efficiency and test execution
 

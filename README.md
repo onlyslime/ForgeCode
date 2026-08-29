@@ -39,26 +39,20 @@ fcc
 
 ### GitHub ZIP download
 
-Extract the ZIP, open PowerShell in the extracted project directory, and let
-uv create the project environment:
+Extract the ZIP and open PowerShell in the extracted project directory. Install
+ForgeCode as a global tool:
 
 ```powershell
-uv sync
-uv run forgecode doctor
-uv run fcc
-```
-
-`uv sync` is the project/development path; it does not install a global
-command. To make this checkout's `fcc` available from every directory, run
-the following once from the project directory:
-
-```powershell
-uv tool install --editable .
+uv tool install .
 uv tool update-shell
 ```
 
-After opening a new PowerShell window, use `fcc` anywhere. The editable
-installation follows the extracted directory, so keep it in place.
+Open a new PowerShell window and use `fcc` from any directory:
+
+```powershell
+fcc --version
+fcc
+```
 
 For an online provider, run ForgeCode and enter the three values it gives you:
 
@@ -92,6 +86,49 @@ Type `/help` in `fcc` for the complete list. Useful starting points are
 `/compact`, `/cancel`, `/quit`, and `/exit`. `!command` sends a bounded command
 result to the model; `!!command` keeps it local.
 
+## Architecture
+
+ForgeCode keeps the complete agent boundary in this repository:
+
+```text
+CLI / interactive UI
+  -> application services and typed configuration
+  -> rules, references, and task plan
+  -> AgentLoop
+       -> provider adapter (OpenAI-compatible or offline demo)
+       -> ContextBuilder and bounded history
+       -> ToolRegistry (schemas, validation, mode policy)
+            -> WorkspaceGuard -> file tools and structured patches
+            -> command/test runners (risk, approval, timeout)
+       -> sessions, checkpoints, transactions, review and audit JSONL
+```
+
+Each model turn uses provider-neutral messages and validated tool calls. Tool
+results, errors, approvals, timeouts, cancellations, and verification evidence
+are returned to the model and persisted with matching call IDs. Plan is
+read-only; Act requires approval for side effects; Bypass is an explicit
+trusted-workspace choice. Paths pass through `WorkspaceGuard`, writes are
+atomic, patches are previewed and reversible, and dangerous commands are
+hard-blocked. The classifier is a policy boundary, not an OS sandbox.
+
+## Capabilities
+
+- Provider-neutral tool calling with OpenAI-compatible and deterministic offline
+  providers, retry/deadline handling, SSE validation, and cancellation.
+- Workspace-aware listing, UTF-8 reading, search, summaries, multi-file patches,
+  atomic writes, and redacted bounded output.
+- Plan, Act, and Bypass modes; risk classification, approval, timeout/output
+  limits, process-tree termination, and runtime tool narrowing.
+- Scoped `AGENTS.md` rules, explicit references, incremental context indexing,
+  skills, and lifecycle hooks with validation and quotas.
+- Durable sessions/checkpoints, hash-aware transactions and undo, pause/resume/
+  cancel/Escape, compaction, session tree/import, and recovery inspection.
+- Named tests, bounded verification/repair, evidence-driven review/export,
+  trajectory evaluation, provider diagnostics, telemetry status, and Python/
+  Node JSONL SDKs.
+- Human REPL and strict JSON/JSONL interfaces share the same safety contracts;
+  progress, errors, exit codes, and audit metadata remain visible.
+
 ## Repository
 
 ```text
@@ -102,8 +139,7 @@ sdk/node/         small JSONL client
 ```
 
 The project is intentionally local. It is not an IDE, browser controller,
-cloud runner, or operating-system sandbox. Read the [architecture](docs/architecture.md),
-[examples](docs/demo-script.md), [capability audit](docs/implemented-features.md),
+cloud runner, or operating-system sandbox. Read the [examples](docs/demo-script.md)
 and [changelog](docs/CHANGELOG.md) for details.
 
 Current release: `v0.6.3`.
