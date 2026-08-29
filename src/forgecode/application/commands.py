@@ -1917,7 +1917,7 @@ def main(argv: list[str] | None = None) -> int:
                         nonlocal tool_steps, current_phase, streamed_content
                         if machine_json:
                             return
-                        labels = {"tool_call": "▸", "tool_result": "✓" if payload.get("ok") else "✗", "verification_result": "✓" if payload.get("ok") else "✗", "command_result": "✓" if payload.get("ok") else "✗", "command_timeout": "✗", "mode": "•", "model_message": "◆", "model_progress": "…", "model_delta": ""}
+                        labels = {"tool_call": "▸", "tool_result": "✓" if payload.get("ok") else "✗", "verification_result": "✓" if payload.get("ok") else "✗", "command_result": "✓" if payload.get("ok") else "✗", "command_timeout": "✗", "mode": "•", "model_message": "◆", "model_progress": "…", "model_delta": "", "provider_retry": "↻", "provider_attempt": "·"}
                         if kind not in labels:
                             return
                         tool = str(payload.get("tool") or "")
@@ -1952,6 +1952,14 @@ def main(argv: list[str] | None = None) -> int:
                                 if content:
                                     streamed_content = True
                                     print(f"\x1b[35m{content}\x1b[0m", end="", flush=True)
+                                return
+                            if kind == "provider_retry":
+                                print(f"\x1b[33m↻ provider retry {payload.get('next_attempt', '?')} · {payload.get('category', 'transient error')}\x1b[0m")
+                                redraw_input_bar()
+                                return
+                            if kind == "provider_attempt" and payload.get("outcome") not in {"success", "retry"}:
+                                print(f"\x1b[31m✗ provider attempt {payload.get('attempt', '?')} · {payload.get('error_category', payload.get('outcome', 'failed'))}\x1b[0m")
+                                redraw_input_bar()
                                 return
                             if kind == "model_message":
                                 content = str(payload.get("content") or "").strip()
