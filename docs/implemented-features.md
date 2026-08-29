@@ -151,6 +151,8 @@ updating a row.
   `no active worker`; cancellation of an actively running provider still
   requires a live provider/PTY scenario and remains partial.
 - `session export` on a real 108-event session returned bounded redacted JSONL
-  with preserved sequence/run metadata and no traceback. The export is
-  suitable as evidence input; full cross-workspace `session import` and
-  tamper-rejection remain pending.
+  with preserved sequence/run metadata and no traceback. Importing that
+  artifact into a separate temporary workspace succeeded with 108 events and
+  `replay=false`. Flipping one byte changed the reported `source_digest` but
+  was still accepted, so import works while tamper-rejection/integrity
+  enforcement remains a documented gap.
