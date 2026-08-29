@@ -17,6 +17,9 @@ function validateParams(params) {
 function validateWorkspace(workspace) {
   if (workspace !== undefined && (typeof workspace !== "string" || !workspace || workspace.length > 1000 || /[\r\n]/.test(workspace))) throw new TypeError("workspace must be bounded newline-safe text");
 }
+function validateTrustAction(action) {
+  if (action !== "status" && action !== "grant" && action !== "revoke") throw new TypeError("trust action must be status, grant, or revoke");
+}
 
 export class ForgeCodeError extends Error {
   constructor(message, { code = "sdk_error", envelope = null, exitCode = null } = {}) {
@@ -106,7 +109,7 @@ export function invokeStream(argv = [], options = {}) {
 }
 
 export const trust = (action = "status", { workspace, ...options } = {}) => invoke([
-  ...(validateWorkspace(workspace), workspace === undefined ? [] : ["--workspace", workspace]),
+  ...(validateTrustAction(action), validateWorkspace(workspace), workspace === undefined ? [] : ["--workspace", workspace]),
   "trust", action,
 ], options);
 export const login = ({ profile, provider, apiKeyEnv, ...options } = {}) => invoke([], {
