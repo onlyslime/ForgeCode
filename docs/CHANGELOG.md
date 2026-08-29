@@ -2,6 +2,9 @@
 
 ## v0.7.0 — 2026-08-29
 
+- Streaming providers now expose validated text deltas to the interactive
+  renderer, making assistant prose appear progressively while preserving the
+  complete provider response and tool-call validation.
 - Interactive Act/Bypass sessions now ask once whether the current workspace
   should be trusted for side effects; declining keeps the session read-only.
 - Machine-readable chat output no longer receives terminal redraw escape codes.

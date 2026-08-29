@@ -325,6 +325,7 @@ class AgentLoop:
             cancellation_token=self.cancellation_token,
             cancellation_requested=self.context.cancellation_requested,
             request_id=f"{self.run_id or 'run'}:{step}",
+            on_text_delta=lambda text: self._record("model_delta", {"step": step, "content": text[:2_000]}),
         )
 
     async def _complete_provider(self, messages: list[Message], tools: list[dict[str, Any]], provider_context: ProviderContext) -> Any:

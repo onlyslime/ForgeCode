@@ -1910,12 +1910,13 @@ def main(argv: list[str] | None = None) -> int:
                     started_at = time.monotonic()
                     tool_steps = 0
                     current_phase = ""
+                    streamed_content = False
                     file_snapshots: dict[str, str] = {}
                     def progress_event(kind: str, payload: dict[str, Any]) -> None:
-                        nonlocal tool_steps, current_phase
+                        nonlocal tool_steps, current_phase, streamed_content
                         if machine_json:
                             return
-                        labels = {"tool_call": "▸", "tool_result": "✓" if payload.get("ok") else "✗", "verification_result": "✓" if payload.get("ok") else "✗", "command_result": "✓" if payload.get("ok") else "✗", "command_timeout": "✗", "mode": "•", "model_message": "◆", "model_progress": "…"}
+                        labels = {"tool_call": "▸", "tool_result": "✓" if payload.get("ok") else "✗", "verification_result": "✓" if payload.get("ok") else "✗", "command_result": "✓" if payload.get("ok") else "✗", "command_timeout": "✗", "mode": "•", "model_message": "◆", "model_progress": "…", "model_delta": ""}
                         if kind not in labels:
                             return
                         tool = str(payload.get("tool") or "")
@@ -1939,16 +1940,24 @@ def main(argv: list[str] | None = None) -> int:
                                 current_phase = phase
                                 print(f"\n\x1b[1;36m─── {phase} ───\x1b[0m")
                             if kind == "model_progress":
+                                streamed_content = False
                                 turn = int(payload.get("step", 0)) + 1
                                 print(f"\x1b[2K\r\x1b[35m… assistant turn {turn}  ({elapsed:.1f}s)\x1b[0m {payload.get('message', '')}  \x1b[90m[{tool_steps} tool steps]\x1b[0m")
                                 redraw_input_bar()
+                                return
+                            if kind == "model_delta":
+                                content = str(payload.get("content") or "")
+                                if content:
+                                    streamed_content = True
+                                    print(f"\x1b[35m{content}\x1b[0m", end="", flush=True)
                                 return
                             if kind == "model_message":
                                 content = str(payload.get("content") or "").strip()
                                 if content:
                                     turn = int(payload.get("step", 0)) + 1
-                                    print(f"\x1b[2K\r\x1b[35m◆ assistant turn {turn}  ({elapsed:.1f}s)\x1b[0m")
-                                    print(content)
+                                    print(f"\n\x1b[2K\r\x1b[35m◆ assistant turn {turn}  ({elapsed:.1f}s)\x1b[0m")
+                                    if not streamed_content:
+                                        print(content)
                                 redraw_input_bar()
                                 return
                             print(f"\x1b[2K\r{color}{labels[kind]} [{tool_steps + (1 if kind == 'tool_call' else 0)}] {text}  ({elapsed:.1f}s)\x1b[0m")

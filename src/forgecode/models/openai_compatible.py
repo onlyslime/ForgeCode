@@ -416,7 +416,7 @@ def _sse_json_events(chunks: Iterable[bytes], *, max_bytes: int = 4_000_000, max
     return events, done
 
 
-def assemble_chat_stream(events: Iterable[dict[str, Any]], *, max_content_chars: int = 200_000, max_argument_chars: int = 200_000, cancellation: CancellationToken | Callable[[], bool] | None = None) -> ModelResponse:
+def assemble_chat_stream(events: Iterable[dict[str, Any]], *, max_content_chars: int = 200_000, max_argument_chars: int = 200_000, cancellation: CancellationToken | Callable[[], bool] | None = None, on_text_delta: Callable[[str], None] | None = None) -> ModelResponse:
     """Assemble deltas and validate complete tool calls before returning."""
     content_parts: list[str] = []
     finish_reason: str | None = None
@@ -454,6 +454,13 @@ def assemble_chat_stream(events: Iterable[dict[str, Any]], *, max_content_chars:
             if not isinstance(text, str):
                 raise ProviderError("stream content delta is not text", category="stream_protocol_error")
             content_parts.append(text)
+            if text and on_text_delta is not None:
+                try:
+                    on_text_delta(text)
+                except Exception:
+                    # Presentation callbacks must never weaken provider
+                    # validation or turn a valid response into a failure.
+                    pass
             if sum(len(part) for part in content_parts) > max_content_chars:
                 raise ProviderError("stream content exceeded the configured size limit", category="response_limit")
         raw_calls = delta.get("tool_calls", [])
@@ -737,7 +744,7 @@ class OpenAICompatibleProvider:
                                 timeout=timeout,
                                 cancellation=request_context.cancellation_token or request_context.cancellation_requested,
                             )
-                            response = assemble_chat_stream(events, cancellation=request_context.cancellation_token or request_context.cancellation_requested)
+                            response = assemble_chat_stream(events, cancellation=request_context.cancellation_token or request_context.cancellation_requested, on_text_delta=request_context.on_text_delta)
                             attempt_finished(attempt_info, outcome="success")
                             return response
                         except asyncio.CancelledError:

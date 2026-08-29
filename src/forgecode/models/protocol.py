@@ -60,6 +60,7 @@ class ProviderContext:
     cancellation_token: CancellationToken | None = None
     cancellation_requested: Callable[[], bool] | None = None
     request_id: str = ""
+    on_text_delta: Callable[[str], None] | None = None
 
     def __post_init__(self) -> None:
         if self.deadline_monotonic is not None and (
@@ -70,6 +71,8 @@ class ProviderContext:
             raise ValueError("deadline_monotonic must be a finite number or None")
         if not isinstance(self.request_id, str) or len(self.request_id) > 256:
             raise ValueError("request_id must be bounded text")
+        if self.on_text_delta is not None and not callable(self.on_text_delta):
+            raise ValueError("on_text_delta must be callable or None")
         if self.cancellation_requested is not None and not callable(self.cancellation_requested):
             raise ValueError("cancellation_requested must be callable or None")
 

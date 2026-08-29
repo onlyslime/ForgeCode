@@ -164,6 +164,19 @@ def test_sse_assembler_completes_fragmented_tool_arguments_only_at_done():
     assert done and response.message.tool_calls[0].arguments == {"path": "a.py"}
 
 
+def test_sse_assembler_emits_text_deltas_without_changing_response():
+    chunks = [
+        b'data: {"choices":[{"index":0,"delta":{"content":"hello "}}]}\n',
+        b'data: {"choices":[{"index":0,"delta":{"content":"world"},"finish_reason":"stop"}]}\n',
+        b'data: [DONE]\n',
+    ]
+    events, _ = _sse_json_events(chunks)
+    deltas: list[str] = []
+    response = assemble_chat_stream(events, on_text_delta=deltas.append)
+    assert response.message.content == "hello world"
+    assert deltas == ["hello ", "world"]
+
+
 def test_broken_sse_and_incomplete_json_return_no_tool_call():
     with pytest.raises(ProviderError, match=r"before \[DONE\]"):
         _sse_json_events([b'data: {"choices":[]}\n'])
