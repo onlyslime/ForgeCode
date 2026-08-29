@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.5.11 — 2026-08-29
+
+- Disabled fragile SSE negotiation for DeepSeek endpoints and use the bounded
+  JSON response path, preventing incomplete tool-call argument failures.
+
 ## v0.5.10 — 2026-08-29
 
 - Simplified interactive login to exactly three prompts: endpoint URL, model

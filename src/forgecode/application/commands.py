@@ -80,7 +80,10 @@ def _build_provider(effective):
         # Human chat defaults to SSE when the provider supports it; ``auto``
         # keeps compatibility by falling back to a normal completion if the
         # transport has no streaming implementation.
-        streaming=bool(effective and effective.streaming in {"auto", "on", "required"}),
+        # DeepSeek deployments in the wild occasionally replay SSE frames;
+        # use the bounded JSON response path for that adapter to avoid both
+        # duplicate-frame and incomplete-tool-argument failures.
+        streaming=bool(effective and effective.streaming in {"auto", "on", "required"}) and "deepseek.com" not in (effective.base_url.lower() if effective else ""),
         stream_required=bool(effective and effective.streaming == "required"),
         timeout=effective.provider_timeout_seconds if effective else 60.0,
     )
