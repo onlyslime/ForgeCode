@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.5.4 — 2026-08-29
+
+- Unified interactive `/login` with `/connect` and added an explicit provider
+  selection screen.
+- Models are no longer silently defaulted; users must enter the model while a
+  recommendation is shown.
+- Fixed bypass-mode interactive checkpoints and rendered command feedback.
+
 ## v0.5.3 — 2026-08-29
 
 - Consolidated provider setup around `/connect`; `/login` is now a compatibility

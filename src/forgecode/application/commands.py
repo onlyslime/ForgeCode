@@ -2327,13 +2327,26 @@ def main(argv: list[str] | None = None) -> int:
             """Configure a provider for this chat process without persisting secrets."""
             nonlocal settings, api_key
             effective = settings.effective
-            provider = connect_args[0] if connect_args else (effective.provider if effective else "openai-compatible")
+            if connect_args:
+                provider = connect_args[0]
+            else:
+                print("Available providers:")
+                for index, name in enumerate(SUPPORTED_PROVIDERS, 1):
+                    catalog = PROVIDER_CATALOG[name]
+                    marker = " (local)" if name == "ollama" else ""
+                    print(f"  {index}. {name}{marker} — {catalog['base_url']}")
+                selection = input("Provider (name or number): ").strip()
+                if selection.isdigit() and 1 <= int(selection) <= len(SUPPORTED_PROVIDERS):
+                    provider = SUPPORTED_PROVIDERS[int(selection) - 1]
+                else:
+                    provider = selection
             if provider not in SUPPORTED_PROVIDERS:
                 return {"error": f"unsupported provider: {provider}", "code": "unsupported_provider", "available": list(SUPPORTED_PROVIDERS)}
             defaults = PROVIDER_CATALOG[provider]
             print(f"Connect model ({provider})")
             base_url = input(f"API endpoint [{defaults['base_url']}]: ").strip() or defaults["base_url"]
-            model = input(f"Model [{defaults['model']}]: ").strip() or defaults["model"]
+            print(f"Recommended model: {defaults['model']}")
+            model = input("Model (required): ").strip()
             if provider not in SUPPORTED_PROVIDERS:
                 return {"error": f"unsupported provider: {provider}", "code": "unsupported_provider"}
             if not base_url or not model:
@@ -2522,7 +2535,9 @@ def main(argv: list[str] | None = None) -> int:
                     guard,
                     run_id=session.run_id,
                     state=str(checkpoint_state),
-                    mode=state["mode"],
+                    # Checkpoint schema records executable modes only; bypass
+                    # uses the same act lifecycle but skips approvals.
+                    mode="act" if state["mode"] == "bypass" else state["mode"],
                     sequence=session.last_sequence,
                     verification=state.get("last_verification"),
                     plan_fingerprint=state["plan"].evidence_fingerprint() if state.get("plan") else "",

@@ -557,7 +557,7 @@ class InteractiveSession:
         if command == "login":
             if args:
                 raise SlashCommandError("usage: /login (alias for /connect)")
-            return {"message": "Use /connect to choose a provider and configure credentials; /login is kept as a compatibility alias."}
+            return self.connect([])
         if command == "rules":
             if args: raise SlashCommandError("usage: /rules")
             return self.rules()
