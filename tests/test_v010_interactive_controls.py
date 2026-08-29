@@ -39,6 +39,16 @@ def test_controller_fifo_queue_is_bounded_and_cancel_drops_followups():
     assert any(kind == "followup_rejected" for kind, _ in events)
 
 
+def test_controller_snapshot_retains_last_run_metrics_after_completion():
+    controller = InteractiveRunController(lambda _message: {"message": "ok"})
+    assert controller.submit("one")["accepted"] is True
+    assert controller.join(2)
+    snapshot = controller.snapshot()
+    assert snapshot["active"] is False
+    assert isinstance(snapshot["last_elapsed_seconds"], float)
+    assert snapshot["last_tool_steps"] == 0
+
+
 def test_agent_loop_pause_after_provider_return_then_resume(tmp_path: Path):
     guard = WorkspaceGuard(tmp_path)
     session = SessionStore(tmp_path / "run.jsonl", run_id="pause-run", mode="act")

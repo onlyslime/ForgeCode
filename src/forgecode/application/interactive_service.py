@@ -51,6 +51,7 @@ def _human_result(value: object) -> str | None:
             f"worker: {'running' if worker.get('active') else 'idle'} (queued: {worker.get('queue_items', 0)})",
             *( [f"elapsed: {_format_duration(worker['elapsed_seconds'])}"] if isinstance(worker.get('elapsed_seconds'), (int, float)) else [] ),
             *( [f"phase: {worker['phase']} · tools: {worker.get('tool_steps', 0)}"] if worker.get('phase') else [] ),
+            *( [f"last run: {_format_duration(worker['last_elapsed_seconds'])} · {worker.get('last_tool_steps', 0)} tool steps"] if isinstance(worker.get('last_elapsed_seconds'), (int, float)) and not worker.get('active') else [] ),
         ))
     if value.get("tools_status") is True:
         rows = value.get("tools") or []
@@ -315,6 +316,8 @@ class InteractiveRunController:
     _pending_pause: bool = field(default=False, init=False, repr=False)
     _pending_cancel: bool = field(default=False, init=False, repr=False)
     _started_monotonic: float | None = field(default=None, init=False, repr=False)
+    _last_elapsed_seconds: float | None = field(default=None, init=False, repr=False)
+    _last_tool_steps: int = field(default=0, init=False, repr=False)
     _tool_steps: int = field(default=0, init=False, repr=False)
     _phase: str = field(default="", init=False, repr=False)
     _thread: threading.Thread | None = field(default=None, init=False, repr=False)
@@ -338,6 +341,8 @@ class InteractiveRunController:
                 "stopped": self._stopped,
                 "cancellation_requested": self._cancel_requested,
                 "pause_requested": self._pending_pause,
+                "last_elapsed_seconds": self._last_elapsed_seconds,
+                "last_tool_steps": self._last_tool_steps,
             }
 
     def submit(self, message: str) -> dict[str, object]:
@@ -404,6 +409,9 @@ class InteractiveRunController:
                 # returns.  A new submission is allowed only after this worker
                 # has become inactive and explicitly resets the flag.
                 if self._stopped or self._cancel_requested or not self._queue:
+                    if self._started_monotonic is not None:
+                        self._last_elapsed_seconds = round(max(0.0, time.monotonic() - self._started_monotonic), 3)
+                    self._last_tool_steps = self._tool_steps
                     self._queue.clear()
                     self._queue_chars = 0
                     self._active = False
