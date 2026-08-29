@@ -311,3 +311,9 @@ updating a row.
   include the final assistant text as `message` alongside lifecycle status,
   so a successful provider response is visible in the terminal instead of
   appearing only as `succeeded=true`.
+
+- Human REPL presentation correction (2026-08-29): non-machine chat output now
+  suppresses internal `accepted`/queue/status dictionaries, renders successful
+  assistant text under a clean response block, and removes common Markdown
+  emphasis markers/backticks. `/connect` shows only a concise connection
+  confirmation; `/clear` remains silent apart from the terminal reset.

@@ -10,12 +10,37 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 import json
+import re
 import shlex
 import threading
 from typing import Callable, Iterable, TextIO
 
 
 SHORTCUT_MAX_COMMAND_CHARS = 4_000
+
+
+def _pretty_text(value: object) -> str:
+    """Render model prose for the human REPL without exposing Markdown noise."""
+    text = str(value).replace("**", "").replace("__", "")
+    text = re.sub(r"`([^`]+)`", r"\1", text)
+    text = re.sub(r"^\s*#{1,6}\s*", "", text, flags=re.MULTILINE)
+    return text.strip()
+
+
+def _human_result(value: object) -> str | None:
+    if not isinstance(value, dict):
+        return _pretty_text(value)
+    if value.get("accepted") is True and value.get("message") == "run started":
+        return None
+    if value.get("connected") is True:
+        return f"Connected: {value.get('model') or 'model'} @ {value.get('base_url') or 'endpoint'}"
+    if value.get("message") and value.get("state") == "completed":
+        return _pretty_text(value["message"])
+    if value.get("error"):
+        return f"Error: {_pretty_text(value.get('error'))}"
+    if value.get("stopped") is True or value.get("cleared") is True:
+        return None
+    return None
 
 
 @dataclass(frozen=True)
@@ -470,7 +495,12 @@ class InteractiveSession:
                     self.output(json.dumps(record, ensure_ascii=False, default=str, allow_nan=False))
                 elif value is not None:
                     results.append(value)
-                    self.output(json.dumps({"type": "interactive_result", "payload": value}, ensure_ascii=False, default=str) if self.json_mode else str(value))
+                    if self.json_mode:
+                        self.output(json.dumps({"type": "interactive_result", "payload": value}, ensure_ascii=False, default=str))
+                    else:
+                        rendered = _human_result(value)
+                        if rendered:
+                            self.output(rendered)
                 continue
             # Preserve the historical sequential semantics for stateful slash
             # commands while leaving control commands responsive during an
@@ -502,7 +532,12 @@ class InteractiveSession:
                         record = {"schema_version": 1, "kind": "error", "ok": False, "command": "chat", "error": {"code": code[:128], "message": message[:2_000]}, "type": "interactive_result", "payload": value}
                     self.output(json.dumps(record, ensure_ascii=False, default=str, allow_nan=False))
                 else:
-                    self.output(json.dumps({"type": "interactive_result", "payload": value}, ensure_ascii=False, default=str) if self.json_mode else str(value))
+                    if self.json_mode:
+                        self.output(json.dumps({"type": "interactive_result", "payload": value}, ensure_ascii=False, default=str))
+                    else:
+                        rendered = _human_result(value)
+                        if rendered:
+                            self.output(rendered)
             if self.stopped:
                 break
         return results

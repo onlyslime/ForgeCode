@@ -20,7 +20,7 @@ from typing import Any
 
 from .. import __version__
 from ..agent import AgentConfig, AgentLoop, ContextCompactor, RunState, SessionContextRebuilder
-from .interactive_service import CommandShortcut, InteractiveRunController, InteractiveSession, ShortcutParseError, _interactive_error_code, _interactive_success, parse_command_shortcut
+from .interactive_service import CommandShortcut, InteractiveRunController, InteractiveSession, ShortcutParseError, _human_result, _interactive_error_code, _interactive_success, parse_command_shortcut
 from .run_service import RunService
 from .session_service import aggregate_events
 from ..context import ContextIndex, ContextIndexError, RepositoryMapBuilder
@@ -2137,7 +2137,9 @@ def main(argv: list[str] | None = None) -> int:
                         record.update({"type": "interactive_result", "payload": value})
                     _emit_machine(record)
                 else:
-                    print(value)
+                    rendered = _human_result(value)
+                    if rendered:
+                        print("\n" + rendered + "\n")
 
         def interactive_output(text: str) -> None:
             with output_lock:
