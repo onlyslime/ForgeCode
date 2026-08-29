@@ -663,7 +663,14 @@ def _run_secrets_check(guard: WorkspaceGuard, *, max_files: int, secrets: Iterab
                 literal = match.group(1) if match and match.lastindex else ""
                 lowered_literal = literal.lower()
                 placeholder = lowered_literal in {"os.getenv", "getenv", "environment", "your-key", "your_key", "fake-key", "do-not-store", "do-not-read"}
-                expression = lowered_literal.startswith(("os.", "self.", "args.", "config.", "effective.", "str.", "get_"))
+                remainder = line[match.end():].lstrip() if match else ""
+                expression = (
+                    lowered_literal.startswith(("os.", "self.", "args.", "config.", "effective.", "str.", "get_"))
+                    or "." in literal
+                    or " or " in remainder
+                    or remainder.startswith("or ")
+                    or remainder.startswith(("(", "["))
+                )
                 likely_secret = bool(match and not placeholder and not expression)
                 if likely_secret or any(value and value in line for value in secret_values):
                     evidence = f"file:{relative}#L{number}:{pattern_id}"

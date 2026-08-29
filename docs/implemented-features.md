@@ -109,6 +109,10 @@ updating a row.
   The repository-wide review still fails on 23 token-shaped test/source
   fixtures, so review remains partial for this repository until that policy is
   resolved.
+- Review heuristic refinement removed five non-secret variable/expression
+  findings from the repository scan (12 remain, all in deliberate test
+  fixtures or inline provider payloads). A clean workspace still passes; the
+  repository review remains `partial` until fixture handling is decided.
 - On a real completed session, `session tree --json` returned one inspect-only
   root and `session clone` created children with `replay=false` and parent
   sequence metadata. Cloning at sequence 0 was accepted as a prefix child;
