@@ -102,7 +102,10 @@ export function invokeStream(argv = [], options = {}) {
   });
 }
 
-export const trust = (action = "status", options = {}) => invoke(["trust", action], options);
+export const trust = (action = "status", { workspace, ...options } = {}) => invoke([
+  ...(workspace === undefined ? [] : ["--workspace", workspace]),
+  "trust", action,
+], options);
 export const login = ({ profile, provider, apiKeyEnv, ...options } = {}) => invoke([], {
   ...options,
   method: "login",
