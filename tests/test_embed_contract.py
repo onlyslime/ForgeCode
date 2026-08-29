@@ -43,6 +43,10 @@ def test_embed_stream_validates_request_objects_and_size():
         list(stream([{"payload": "x" * 1_000_001}]))
     with pytest.raises(ValueError):
         list(stream([{"value": float("nan")}]))
+    with pytest.raises(ValueError):
+        list(stream([{"id": True, "method": "doctor"}]))
+    with pytest.raises(ValueError):
+        list(stream([{"id": "x" * 257, "method": "doctor"}]))
 
 
 def test_embed_stream_strict_mode_raises_on_failed_rpc():

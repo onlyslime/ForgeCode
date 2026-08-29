@@ -223,6 +223,12 @@ def stream(requests: Iterable[dict[str, Any]], *, raise_for_status: bool = False
         for item in requests:
             if not isinstance(item, dict):
                 raise ValueError("stream requests must be objects")
+            request_id = item.get("id")
+            if request_id is not None:
+                if isinstance(request_id, bool) or not isinstance(request_id, (str, int)):
+                    raise ValueError("request id must be a string or integer")
+                if isinstance(request_id, str) and (not request_id or len(request_id) > 256 or any(ch in request_id for ch in "\r\n")):
+                    raise ValueError("request id must be non-empty, bounded, and newline-safe")
             try:
                 encoded = json.dumps(item, ensure_ascii=False, allow_nan=False)
             except (TypeError, ValueError) as exc:
