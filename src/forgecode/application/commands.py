@@ -863,7 +863,7 @@ def main(argv: list[str] | None = None) -> int:
     # without trust so assessment smoke tests stay self-contained.
     effective_mode = getattr(args, "mode", None) or (settings.effective.default_mode if settings.effective else None)
     provider_configured = bool(settings.model and (not provider_requires_credential(settings.effective.provider if settings.effective else "openai-compatible") or (settings.api_key_env and os.getenv(settings.api_key_env, ""))))
-    if command in {"run", "chat", "start"} and effective_mode == "act" and (getattr(args, "require_trust", False) or provider_configured) and not getattr(args, "demo", False):
+    if command in {"run", "chat", "start"} and effective_mode in {"act", "bypass"} and (getattr(args, "require_trust", False) or provider_configured) and not getattr(args, "demo", False):
         try:
             trust = TrustStore(workspace).status()
         except TrustError as exc:
@@ -1801,7 +1801,8 @@ def main(argv: list[str] | None = None) -> int:
                 return ""
             finally:
                 approval_waiting.clear()
-        approval = DenyAllApproval() if configured_approval == "deny" and not (args.auto_approve or args.demo) else InteractiveApproval(auto_approve=args.auto_approve or args.demo or configured_approval == "auto", input_fn=approval_input, output_fn=_approval_output(machine_json), prompt_to_output=machine_json, secrets=[api_key])
+        bypass = state["mode"] == AgentMode.BYPASS.value
+        approval = AllowAllApproval() if bypass else (DenyAllApproval() if configured_approval == "deny" and not (args.auto_approve or args.demo) else InteractiveApproval(auto_approve=args.auto_approve or args.demo or configured_approval == "auto", input_fn=approval_input, output_fn=_approval_output(machine_json), prompt_to_output=machine_json, secrets=[api_key]))
         if args.demo and not any((workspace / name).exists() for name in ("demo_calculator.py", "demo_config.json")):
             # The demo fixture is a bounded, explicit offline setup action.
             # Prepare it before reading stdin so legacy scripted chat clients
@@ -2279,9 +2280,8 @@ def main(argv: list[str] | None = None) -> int:
             return {"mode": "plan", "plan": state["plan"].to_dict() if state["plan"] else None, "message": "planning mode; side effects are disabled"}
 
         def set_mode(mode: str) -> Any:
-            if mode == "act" and state.get("plan") is None:
-                return {"error": "create/review a plan before switching to act"}
-            if mode == "act":
+            nonlocal approval
+            if mode in {"act", "bypass"}:
                 try:
                     if not TrustStore(workspace).status().get("trusted", False) and not args.demo:
                         return {"error": "workspace is not trusted; run `forgecode trust grant` before act mode", "code": "trust_required"}
@@ -2296,12 +2296,15 @@ def main(argv: list[str] | None = None) -> int:
                 if checked.stale:
                     state["plan"] = checked
                     return {"error": "plan is stale because project rules or referenced context changed; revise it before Act"}
-                if not approval.approve("plan_act", {"plan_id": state["plan"].plan_id, "revision": state["plan"].revision, "items": [item.id for item in state["plan"].items]}):
+                if state.get("plan") is not None and not approval.approve("plan_act", {"plan_id": state["plan"].plan_id, "revision": state["plan"].revision, "items": [item.id for item in state["plan"].items]}):
                     session.append("plan_denied", {"plan_id": state["plan"].plan_id}, mode="plan")
                     return {"error": "Plan -> Act approval denied"}
-                state["plan"] = state["plan"].approve_for_act()
-                session.append("plan_approved", {"plan_id": state["plan"].plan_id, "revision": state["plan"].revision}, mode="act")
+                if state.get("plan") is not None:
+                    state["plan"] = state["plan"].approve_for_act()
+                    session.append("plan_approved", {"plan_id": state["plan"].plan_id, "revision": state["plan"].revision}, mode=mode)
             state["mode"] = mode
+            if mode == AgentMode.BYPASS.value:
+                approval = AllowAllApproval()
             return {"mode": mode}
 
         def review() -> Any:

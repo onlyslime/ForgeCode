@@ -14,6 +14,7 @@ from ..models.protocol import CancellationToken
 class AgentMode(StrEnum):
     PLAN = "plan"
     ACT = "act"
+    BYPASS = "bypass"
 
 
 class PauseRequested(RuntimeError):
@@ -169,7 +170,7 @@ class ToolRegistry:
 
     def definitions(self, mode: AgentMode | str | None = None) -> tuple[ToolDefinition, ...]:
         definitions = tuple(tool.definition for tool in self._tools.values())
-        if mode is None or AgentMode(mode) is AgentMode.ACT:
+        if mode is None or AgentMode(mode) in {AgentMode.ACT, AgentMode.BYPASS}:
             return definitions
         return tuple(definition for definition in definitions if not definition.side_effecting)
 
