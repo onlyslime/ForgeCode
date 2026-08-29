@@ -31,7 +31,7 @@ Every commit and release tag uses `vA.B.C`.
 
 ### Version history maintenance
 
-- Maintain the tracked Markdown changelog at `docs/CHANGELOG.md`. Every
+- Maintain the tracked Markdown changelog at `CHANGELOG.md`. Every
   versioned feature release must add a dated entry describing user-visible
   behavior, compatibility notes, and verification evidence; reconstruct older
   entries from the existing roadmap/acceptance files and git history when
@@ -59,6 +59,9 @@ substantive user-visible release content.
 - `docs/strategy/` stores local strategy/status notes and is intentionally
   ignored; never stage, push, or package its contents unless the owner changes
   this policy explicitly.
+- Keep `docs/implemented-features.md` current. It is the source of truth for
+  user-visible capabilities claimed as implemented: each row must cite the
+  source entry point, manual verification command/evidence, and any known gap.
 
 ## Efficiency and test execution
 

@@ -246,18 +246,20 @@ tests/               deterministic offline regression tests
 docs/assignment/     assessment PDF
 docs/research/       research plan and feature report
 docs/demo-script.md  reproducible two-minute demo script
-docs/releases/       versioned roadmaps and acceptance/release reports
+docs/implemented-features.md  claimed capabilities and manual audit status
 docs/goals/          ignored timestamped goal prompts (private)
 docs/strategy/       ignored local planning/status notes
+docs/releases/       ignored historical roadmaps and acceptance reports
 ```
 
 See [docs/README.md](docs/README.md) for the documentation map, and
 [docs/architecture.md](docs/architecture.md) for data flow and safety
 semantics, [docs/demo-script.md](docs/demo-script.md) for the assessment
 walk-through, [AGENTS.md](AGENTS.md) for repository rules, and
-[docs/VERSIONING.md](docs/VERSIONING.md) for version policy. The bounded
-release evidence is kept under
-[`docs/releases/`](docs/releases/).
+[docs/VERSIONING.md](docs/VERSIONING.md) for version policy, and
+[docs/implemented-features.md](docs/implemented-features.md) for the maintained
+implementation audit. Historical release evidence remains locally under
+`docs/releases/` and is intentionally not committed.
 
 ## Safety and scope
 

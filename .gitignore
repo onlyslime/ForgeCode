@@ -36,6 +36,9 @@ docs/goals/*
 # Local strategy and status notes (kept locally, never committed)
 docs/strategy/
 
+# Historical release roadmaps and acceptance reports (kept locally, never committed)
+docs/releases/
+
 # OS and editor files
 .DS_Store
 Thumbs.db
@@ -50,3 +53,6 @@ tmp/
 temp/
 *.tmp
 *.swp
+
+# Historical release notes are kept locally, not tracked
+docs/releases/
