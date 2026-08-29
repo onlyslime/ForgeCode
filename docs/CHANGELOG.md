@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.3.0 — 2026-08-29
+
+- Started the 0.3 release line with the current interactive launcher modes,
+  slash-command completion, live progress display, and robust tool-call
+  context handling.
+
 ## v0.2.12 — 2026-08-29
 
 - Added `fcc --plan` and `fcc --act` launch shortcuts alongside
