@@ -4,6 +4,7 @@ from .patch import ApplyPatchTool, ChangeOperation, ChangePlan, ChangeResult, Pa
 from .summary import WorkspaceSummaryTool
 from .repository_map import RepositoryMapTool
 from .shell import AllowAllApproval, DenyAllApproval, InteractiveApproval, ShellTool
+from .git import GitDiffTool, GitStatusTool
 from ..hooks import Hook, HookIssue, HookRegistry
 
 
@@ -17,6 +18,8 @@ def build_default_registry(guard) -> ToolRegistry:
     registry.register(WorkspaceSummaryTool(guard))
     registry.register(RepositoryMapTool(guard))
     registry.register(ShellTool(guard))
+    registry.register(GitStatusTool(guard))
+    registry.register(GitDiffTool(guard))
     return registry
 
 
@@ -41,5 +44,7 @@ __all__ = [
     "Hook",
     "HookIssue",
     "HookRegistry",
+    "GitDiffTool",
+    "GitStatusTool",
     "build_default_registry",
 ]

@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.4.0 — 2026-08-29
+
+- Started the tools-focused release line with dedicated read-only `git_status`
+  and `git_diff` tools for auditable repository inspection and review.
+- The tools are workspace-scoped, bounded, and available through the normal
+  registry and `/tools` inventory.
+
 ## v0.3.7 — 2026-08-29
 
 - Added the interactive `/tools` command with descriptions and mode-aware
