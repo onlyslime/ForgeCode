@@ -14,7 +14,7 @@ documents when you need more detail:
   and the evidence behind each claim (assessment/review).
 - `research/`: the research plan and report (project background).
 - `assignment/`: the supplied assessment prompt; it is tracked for context.
-- `VERSIONING.md` and the root `CHANGELOG.md`: release and history policy.
+- `VERSIONING.md` and `CHANGELOG.md`: release and history policy.
 
 The material in `goals/`, `strategy/`, and `releases/` is intentionally local
 working history. It may be useful to maintainers, but is not part of the
@@ -27,7 +27,7 @@ public reading path and must not be committed or packaged.
 - `capability-trace.md` maps user-visible capabilities to source, tests, and
   runnable evidence.
 - `demo-script.md` is the short offline assessment walkthrough.
-- `../CHANGELOG.md` and `VERSIONING.md` define release conventions and history.
+- `CHANGELOG.md` and `VERSIONING.md` define release conventions and history.
 - `implemented-features.md` is the maintained list of claimed capabilities and
   its manual audit status.
 - `research/` contains the research plan and report; `assignment/` contains

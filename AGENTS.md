@@ -31,7 +31,7 @@ Every commit and release tag uses `vA.B.C`.
 
 ### Version history maintenance
 
-- Maintain the tracked Markdown changelog at `CHANGELOG.md`. Every
+- Maintain the tracked Markdown changelog at `docs/CHANGELOG.md`. Every
   versioned feature release must add a dated entry describing user-visible
   behavior, compatibility notes, and verification evidence; reconstruct older
   entries from the existing roadmap/acceptance files and git history when
