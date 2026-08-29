@@ -249,3 +249,10 @@ updating a row.
   provider/exit-code combinations, clone replay, live online cancellation,
   and real-PTY Escape cancellation still lack authoritative end-to-end
   evidence.
+
+- Session branch boundary gate (2026-08-29): cloning a real session at
+  sequence `0` succeeds with an explicit `replay=false` parent record;
+  negative sequence input returns `invalid_session`/exit `2`, and bounded
+  `session tree --limit 5` returns parseable node/edge metadata. Clone is
+  therefore an inspect-only evidence branch by design; automatic replay of
+  recorded side effects is not an implemented capability.
