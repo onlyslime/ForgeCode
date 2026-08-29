@@ -44,6 +44,8 @@
 - Context health responses now omit full index entries and return only bounded
   metadata, keeping interactive and machine envelopes predictable on large
   repositories.
+- Context health now reports bounded symbol totals and language distribution,
+  making index quality visible without exposing source content.
 - Added read-only interactive `/events` to show the last 40 persisted event
   types and outcomes, making long-run progress and failures inspectable without
   exposing event payload contents.

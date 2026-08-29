@@ -2636,6 +2636,18 @@ def main(argv: list[str] | None = None) -> int:
                 index = ContextIndex(guard)
                 raw_metadata = index.show()
                 counts = raw_metadata.get("counts") if isinstance(raw_metadata.get("counts"), dict) else {}
+                raw_files = raw_metadata.get("files") if isinstance(raw_metadata.get("files"), list) else []
+                symbol_count = 0
+                languages: dict[str, int] = {}
+                for item in raw_files[:500]:
+                    if not isinstance(item, dict):
+                        continue
+                    symbols = item.get("symbols")
+                    if isinstance(symbols, list):
+                        symbol_count = min(10_000, symbol_count + len(symbols))
+                    language = item.get("language")
+                    if isinstance(language, str) and language:
+                        languages[language] = languages.get(language, 0) + 1
                 # Do not send the complete index entry list through the
                 # interactive envelope. Health is metadata, not a second
                 # source browser; keep it bounded for large repositories.
@@ -2644,6 +2656,8 @@ def main(argv: list[str] | None = None) -> int:
                     "schema_version": raw_metadata.get("schema_version"),
                     "fingerprint": str(raw_metadata.get("fingerprint") or "")[:128],
                     "counts": {key: counts.get(key, 0) for key in ("files", "readable", "binary")},
+                    "symbols": symbol_count,
+                    "languages": dict(sorted(languages.items())[:32]),
                 }
                 diagnostics = index.diagnostics()
                 return {

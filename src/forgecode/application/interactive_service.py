@@ -93,7 +93,10 @@ def _human_result(value: object) -> str | None:
         stale = value.get("stale") or []
         errors = value.get("errors") or []
         counts = metadata.get("counts") if isinstance(metadata.get("counts"), dict) else {}
-        lines = ["Context index", "─────────────", f"files: {counts.get('files', len(metadata.get('files', [])))}", f"stale: {len(stale)}", f"errors: {len(errors)}"]
+        lines = ["Context index", "─────────────", f"files: {counts.get('files', len(metadata.get('files', [])))}", f"symbols: {metadata.get('symbols', 0)}", f"stale: {len(stale)}", f"errors: {len(errors)}"]
+        languages = metadata.get("languages") if isinstance(metadata.get("languages"), dict) else {}
+        if languages:
+            lines.append("languages: " + ", ".join(f"{key}={value}" for key, value in list(languages.items())[:8]))
         if stale:
             lines.append("Stale entries:")
             lines.extend(f"  ⚠ {item.get('path', '<unknown>')} — {item.get('reason', 'changed')}" for item in stale[:10] if isinstance(item, dict))

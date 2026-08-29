@@ -101,8 +101,8 @@ def test_human_diff_result_renders_clean_state_and_content():
 
 
 def test_human_context_status_renders_index_health():
-    rendered = _human_result({"context_status": True, "metadata": {"counts": {"files": 12}}, "stale": [], "errors": []})
-    assert "files: 12" in rendered and "Index is healthy" in rendered
+    rendered = _human_result({"context_status": True, "metadata": {"counts": {"files": 12}, "symbols": 7, "languages": {"Python": 5}}, "stale": [], "errors": []})
+    assert "files: 12" in rendered and "symbols: 7" in rendered and "languages: Python=5" in rendered and "Index is healthy" in rendered
 
 
 def test_human_events_status_renders_bounded_tail():
