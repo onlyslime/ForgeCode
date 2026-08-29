@@ -1899,10 +1899,14 @@ def main(argv: list[str] | None = None) -> int:
                     def progress_event(kind: str, payload: dict[str, Any]) -> None:
                         if machine_json:
                             return
-                        labels = {"tool_call": "▸", "tool_result": "✓" if payload.get("ok") else "✗", "verification_result": "✓" if payload.get("ok") else "✗", "mode": "•"}
+                        labels = {"tool_call": "▸", "tool_result": "✓" if payload.get("ok") else "✗", "verification_result": "✓" if payload.get("ok") else "✗", "command_result": "✓" if payload.get("ok") else "✗", "command_timeout": "✗", "mode": "•"}
                         if kind not in labels:
                             return
-                        text = str(payload.get("tool") or payload.get("command") or payload.get("mode") or kind)
+                        tool = str(payload.get("tool") or "")
+                        arguments = payload.get("arguments") if isinstance(payload.get("arguments"), dict) else {}
+                        detail = str(arguments.get("path") or arguments.get("command") or payload.get("command") or payload.get("mode") or "")
+                        verbs = {"read_file": "Read", "write_file": "Write", "apply_patch": "Apply patch", "run_command": "Run"}
+                        text = f"{verbs.get(tool, tool or kind)} {detail}".strip()
                         color = "\x1b[32m" if labels[kind] == "✓" else ("\x1b[31m" if labels[kind] == "✗" else "\x1b[36m")
                         with output_lock:
                             print(f"\x1b[2K\r{color}{labels[kind]} {text}\x1b[0m")

@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.2.2 — 2026-08-29
+
+- Improved live progress labels with file paths and command text, including
+  distinct success and failure markers for tool and verification events.
+
 ## v0.2.1 — 2026-08-29
 
 - Added live human-readable progress events for interactive runs, including
