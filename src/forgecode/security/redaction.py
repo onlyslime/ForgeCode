@@ -20,10 +20,13 @@ _SENSITIVE_KEY_PARTS = ("api_key", "api-key", "apikey", "authorization", "token"
 def redact_text(value: object, secrets: Iterable[str] = ()) -> str:
     """Redact configured values and common credential-shaped text."""
     rendered = str(value)
-    for secret in sorted((secret for secret in secrets if secret), key=len, reverse=True):
-        rendered = rendered.replace(secret, "[REDACTED]")
+    # Apply shape-based redaction first.  Doing configured-value replacement
+    # first can turn a value into ``[REDACTED]``; the closing bracket would
+    # then be misread as trailing untrusted text by ``_NAMED_SECRET_RE``.
     rendered = _BEARER_RE.sub("Bearer [REDACTED]", rendered)
     rendered = _NAMED_SECRET_RE.sub(lambda match: f"{match.group(1)}{match.group(2)}[REDACTED]", rendered)
+    for secret in sorted((secret for secret in secrets if secret), key=len, reverse=True):
+        rendered = rendered.replace(secret, "[REDACTED]")
     return rendered
 
 

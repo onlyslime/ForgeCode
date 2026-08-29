@@ -66,6 +66,12 @@ updating a row.
   `transaction --execute --auto-approve` restored the original SHA-256 and
   marked the parent `undone` with no transaction issues. This is direct
   evidence for the transaction/undo claim.
+- Direct tool probes confirmed a valid patch changes only its target file;
+  ShellTool truncates million-character output to its configured bound and
+  marks it truncated, while a one-second sleeping command returns a typed
+  timeout in about two seconds and does not report success. The redaction
+  probe exposed and fixed a double-redaction trailing-bracket bug; current
+  `api_key=SECRET` output is exactly `api_key=[REDACTED]`.
 - RPC fuzz smoke sent empty, malformed, unknown-method, control-character,
   wrong-id-type, null-params, and run-without-trust requests. Every response
   was JSON, no traceback appeared, and invalid requests were typed errors;
