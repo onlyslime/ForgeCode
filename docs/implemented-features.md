@@ -268,3 +268,9 @@ updating a row.
   files with zero findings and exit `0`. `doctor --json`, `compileall`, and
   `git diff --check` also passed. This cleanup is runtime-state maintenance,
   not a change to the tracked source implementation.
+
+- Review recheck note (2026-08-29): an earlier review failure was reproduced
+  as a stale transaction hash conflict after deleting demo fixtures; once the
+  generated manifest/blob were removed, the same repository review passed.
+  This demonstrates that review fails closed on stale transaction state and
+  does not silently treat a missing/changed file as clean.
