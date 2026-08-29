@@ -198,6 +198,8 @@ def config_policy(*, workspace: str | None = None, profile: str | None = None, m
     if not isinstance(no_tools, bool):
         raise ValueError("no_tools must be boolean")
     if mode is not None and mode not in {"plan", "act"}: raise ValueError("mode must be plan or act")
+    if workspace is not None and (not isinstance(workspace, str) or not workspace or len(workspace) > 1_000 or any(ch in workspace for ch in "\r\n")):
+        raise ValueError("workspace must be bounded newline-safe text")
     for name, value in (("profile", profile), ("tools", tools), ("exclude_tools", exclude_tools)):
         if value is not None and (not isinstance(value, str) or not value or len(value) > 4_000 or any(ch in value for ch in "\r\n")):
             raise ValueError(f"{name} must be bounded newline-safe text")

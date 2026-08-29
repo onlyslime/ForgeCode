@@ -93,6 +93,8 @@ def test_embed_session_result_validates_handle():
     with pytest.raises(ValueError):
         config_policy(no_tools="yes")
     with pytest.raises(ValueError):
+        config_policy(workspace="bad\npath")
+    with pytest.raises(ValueError):
         session_cancel("x", workspace="bad\npath")
     with pytest.raises(ValueError):
         session_approval("x", "yes")

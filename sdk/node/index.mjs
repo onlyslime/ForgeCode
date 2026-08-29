@@ -174,11 +174,11 @@ export const sessionApproval = (session, approved, { workspace, ...options } = {
   validateWorkspace(workspace);
   return method("session.approval", { ...options, params: { ...(options.params ?? {}), session, approved, ...(workspace === undefined ? {} : { workspace }) } });
 };
-export const configProfiles = (options = {}) => method("config.profiles", options);
-export const configPolicy = ({ workspace, profile, mode, tools, excludeTools, noTools, ...options } = {}) => method("config.policy", {
+export const configProfiles = ({ workspace, ...options } = {}) => { validateWorkspace(workspace); return method("config.profiles", { ...options, params: { ...(options.params ?? {}), ...(workspace === undefined ? {} : { workspace }) } }); };
+export const configPolicy = ({ workspace, profile, mode, tools, excludeTools, noTools, ...options } = {}) => (validateWorkspace(workspace), method("config.policy", {
   ...options,
   params: { ...(options.params ?? {}), ...(workspace === undefined ? {} : { workspace }), ...(profile === undefined ? {} : { profile }), ...(mode === undefined ? {} : { mode }), ...(tools === undefined ? {} : { tools }), ...(excludeTools === undefined ? {} : { exclude_tools: excludeTools }), ...(noTools === undefined ? {} : { no_tools: noTools }) },
-});
+}));
 
 export function interactive(workspace, { mode = "plan", executable = "forgecode", maxEvents = 2048 } = {}) {
   if (!Number.isInteger(maxEvents) || maxEvents < 1 || maxEvents > 100_000) throw new TypeError("maxEvents must be an integer between 1 and 100000");
