@@ -5,8 +5,8 @@
 - Consolidated the historical root changelog into `docs/CHANGELOG.md`.
 - Removed the duplicate root changelog and updated documentation references to
   the single canonical history location.
-- Reworked the public README and assessment handoff into concise, bilingual,
-  user-focused documentation with direct navigation and runnable examples.
+- Reworked public documentation into a concise English README with a linked
+  standalone Chinese README, plus a compact assessment handoff.
 
 ## v0.6.1 — 2026-08-29
 
