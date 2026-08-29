@@ -1937,7 +1937,7 @@ def main(argv: list[str] | None = None) -> int:
             with AgentLoop tool calls.
             """
             command_fingerprint = hashlib_lib.sha256(shortcut.command.encode("utf-8", errors="replace")).hexdigest()
-            if state["mode"] != AgentMode.ACT.value:
+            if state["mode"] not in {AgentMode.ACT.value, AgentMode.BYPASS.value}:
                 session.append(
                     "command_shortcut",
                     {"shortcut": shortcut.prefix, "kind": shortcut.kind, "command_fingerprint": command_fingerprint, "ok": False, "risk": "unknown", "approval": "not_requested", "cancelled": False, "timed_out": False, "truncated": False},
@@ -1945,7 +1945,7 @@ def main(argv: list[str] | None = None) -> int:
                     outcome="rejected",
                     error_code="mode_denied",
                 )
-                return {"accepted": False, "shortcut": shortcut.prefix, "command_fingerprint": command_fingerprint, "error": "command shortcuts require act mode", "code": "mode_denied"}
+                return {"accepted": False, "shortcut": shortcut.prefix, "command_fingerprint": command_fingerprint, "error": "command shortcuts require act or bypass mode", "code": "mode_denied"}
             token = CancellationToken()
             pause_event = threading.Event()
             shortcut_control.update({"token": token, "pause": pause_event, "fingerprint": command_fingerprint})
