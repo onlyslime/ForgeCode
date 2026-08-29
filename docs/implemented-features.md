@@ -38,3 +38,19 @@ The audit is intentionally manual and does not use `pytest`. “Partial” items
 must be repaired or narrowed before being advertised as fully implemented.
 Record date, command, inputs, exit code, and observed bounded output when
 updating a row.
+
+### 2026-08-29 pre-acceptance pass
+
+- `uv run forgecode doctor`, provider health/list, config show/validate/profiles,
+  trust status, telemetry status, context search, and RPC two-request JSONL
+  smoke all returned bounded machine-readable responses with exit code 0.
+- Boundary probes rejected `context complete ../` and an invalid zero result
+  limit with exit code 2. Python compilation via `uv run python -m compileall`
+  and Node syntax validation passed.
+- `forgecode review --json --no-verify-files` failed as designed when scanning
+  the repository: its secret heuristic reported 23 token-shaped assignments,
+  mostly deliberately fake credentials in source/tests. This is a release
+  blocker for a clean review report, not evidence that those values are real
+  secrets; the detector and fixture allowlist need follow-up.
+- Direct `python` was unusable because the configured interpreter path was
+  missing; all Python checks therefore used the `uv` environment.
