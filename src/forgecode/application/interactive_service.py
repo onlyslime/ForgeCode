@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 import json
+import difflib
 import re
 import shlex
 import threading
@@ -587,7 +588,12 @@ class InteractiveSession:
         command = parts[0][1:].lower()
         args = parts[1:]
         if command not in self.COMMANDS:
-            raise SlashCommandError(f"unknown command /{command}; use /help")
+            # Keep malformed slash commands inside the chat loop, while making
+            # typos recoverable and discoverable instead of forcing users to
+            # remember the complete command vocabulary.
+            matches = difflib.get_close_matches(command, self.COMMANDS, n=1, cutoff=0.55)
+            hint = f"; did you mean /{matches[0]}?" if matches else "; use /help"
+            raise SlashCommandError(f"unknown command /{command}{hint}")
         if command == "help":
             if args: raise SlashCommandError("usage: /help")
             return self.help_text()

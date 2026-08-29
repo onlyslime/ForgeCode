@@ -27,6 +27,8 @@
   high-priority system message when fitting the next provider request.
 - Added read-only interactive `/diff`, reusing the bounded Git diff path so
   users can inspect changes without asking the model or invoking side effects.
+- Slash-command completion now includes `/diff`, and unknown commands provide
+  a close-match suggestion when a typo is detected.
 - Provider request identities retain zero-based per-turn suffixes for
   compatibility with existing audit consumers while the UI remains 1-based.
 - Interactive Act/Bypass sessions now ask once whether the current workspace
