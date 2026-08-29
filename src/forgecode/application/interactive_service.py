@@ -36,6 +36,16 @@ def _human_result(value: object) -> str | None:
         return f"Connected: {value.get('model') or 'model'} @ {value.get('base_url') or 'endpoint'}"
     if value.get("model_status") is True:
         return f"Model: {value.get('model') or 'not configured'}\nProvider: {value.get('provider') or 'unknown'}\nEndpoint: {value.get('base_url') or 'not configured'}\nProfile: {value.get('profile') or 'default'}"
+    if value.get("tools_status") is True:
+        rows = value.get("tools") or []
+        lines = ["Available tools", "───────────────"]
+        for row in rows:
+            if isinstance(row, dict):
+                state = "✓" if row.get("available", True) else "—"
+                lines.append(f"{state} {row.get('name', 'unknown')}: {row.get('description', '')}")
+            else:
+                lines.append(f"✓ {row}")
+        return "\n".join(lines)
     if value.get("message") and value.get("state") == "completed":
         duration = value.get("duration_seconds")
         suffix = f"\n\nWorked for {_format_duration(duration)}" if isinstance(duration, (int, float)) else ""
@@ -360,6 +370,7 @@ class InteractiveSession:
     compact: Callable[[], object] = lambda: {}
     undo: Callable[[list[str]], object] = lambda _args: {}
     rules: Callable[[], object] = lambda: {}
+    tools: Callable[[], object] = lambda: {"tools_status": True, "tools": []}
     files: Callable[..., object] = lambda *_args: {}
     skills: Callable[[list[str]], object] = lambda _args: {}
     model: Callable[[list[str]], object] = lambda _args: {}
@@ -388,13 +399,13 @@ class InteractiveSession:
     stopped: bool = False
     controller: InteractiveRunController | None = None
 
-    COMMANDS = ("help", "status", "plan", "mode", "model", "connect", "login", "rules", "files", "skills", "skill", "tree", "review", "test", "compact", "undo", "cancel", "pause", "resume", "clear", "quit")
+    COMMANDS = ("help", "status", "tools", "plan", "mode", "model", "connect", "login", "rules", "files", "skills", "skill", "tree", "review", "test", "compact", "undo", "cancel", "pause", "resume", "clear", "quit")
 
     def header(self, *, run_id: str = "", mode: str = "plan", profile: str = "default", rules_count: int = 0, budget: int = 60_000) -> str:
         return f"ForgeCode session run={run_id or '<new>'} workspace=. mode={mode} profile={profile} rules={rules_count} budget={budget}"
 
     def help_text(self) -> str:
-        return "/help /status /model /plan [show|refresh] /mode plan|act|bypass /connect /login /rules /files [prefix] /skills [id] /tree /review /test [command] /compact /undo [id|latest] /pause /resume /cancel /clear /quit; !<command> sends a bounded result to the model; !!<command> stays local"
+        return "/help /status /tools /model /plan [show|refresh] /mode plan|act|bypass /connect /login /rules /files [prefix] /skills [id] /tree /review /test [command] /compact /undo [id|latest] /pause /resume /cancel /clear /quit; !<command> sends a bounded result to the model; !!<command> stays local"
 
     def dispatch(self, line: str) -> object | None:
         line = line.rstrip("\r\n")
@@ -424,6 +435,9 @@ class InteractiveSession:
         if command == "status":
             if args: raise SlashCommandError("usage: /status")
             return self.status()
+        if command == "tools":
+            if args: raise SlashCommandError("usage: /tools")
+            return self.tools()
         if command == "plan":
             if len(args) > 1 or (args and args[0] not in {"show", "refresh"}): raise SlashCommandError("usage: /plan [show|refresh]")
             return self.plan(args)

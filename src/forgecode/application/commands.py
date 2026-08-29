@@ -2367,6 +2367,12 @@ def main(argv: list[str] | None = None) -> int:
             controller = controller_holder["value"]
             return {"mode": state["mode"], "run_id": session.run_id, "transactions": len(manifests), "last_state": getattr(state["last"], "state", None), "latest_verification": state["last_verification"], "worker": controller.snapshot() if controller is not None else {"active": False}}
 
+        def tools_command() -> Any:
+            rows = []
+            for definition in registry.definitions(state["mode"]):
+                rows.append({"name": definition.name, "description": definition.description, "available": True, "side_effecting": definition.side_effecting})
+            return {"tools_status": True, "tools": rows, "mode": state["mode"]}
+
         def login_command() -> Any:
             effective = settings.effective
             provider = effective.provider if effective else "openai-compatible"
@@ -2553,6 +2559,7 @@ def main(argv: list[str] | None = None) -> int:
         interactive = InteractiveSession(
             run_message,
             status=status,
+            tools=tools_command,
             plan=plan_command,
             set_mode=set_mode,
             model=model_command,

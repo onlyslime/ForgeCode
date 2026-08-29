@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.3.7 — 2026-08-29
+
+- Added the interactive `/tools` command with descriptions and mode-aware
+  availability, plus slash completion support.
+
 ## v0.3.6 — 2026-08-29
 
 - Added a compact startup status card with mode, model, tool count, and
