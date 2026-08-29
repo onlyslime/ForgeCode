@@ -126,7 +126,7 @@ export const login = ({ profile, provider, apiKeyEnv, ...options } = {}) => invo
 });
 export const method = (name, options = {}) => invoke([], { ...options, method: name });
 export const run = (prompt, options = {}) => method("run", { ...options, params: { ...(options.params ?? {}), prompt } });
-export const sessionInspect = (session, { workspace, ...options } = {}) => method("session.inspect", { ...options, params: { ...(options.params ?? {}), session, ...(workspace === undefined ? {} : { workspace }) } });
+export const sessionInspect = (session, { workspace, ...options } = {}) => { validateSession(session); validateWorkspace(workspace); return method("session.inspect", { ...options, params: { ...(options.params ?? {}), session, ...(workspace === undefined ? {} : { workspace }) } }); };
 export const sessionTree = ({ workspace, limit, ...options } = {}) => method("session.tree", {
   ...options,
   params: {
@@ -153,11 +153,11 @@ export const sessionOpen = ({ workspace, mode, session, ...options } = {}) => me
     ...(session === undefined ? {} : { session }),
   },
 });
-export const sessionStatus = (session, { workspace, ...options } = {}) => method("session.status", { ...options, params: { ...(options.params ?? {}), session, ...(workspace === undefined ? {} : { workspace }) } });
-export const sessionResult = (session, { workspace, ...options } = {}) => method("session.result", { ...options, params: { ...(options.params ?? {}), session, ...(workspace === undefined ? {} : { workspace }) } });
-export const sessionWait = (session, { workspace, timeout, ...options } = {}) => method("session.wait", { ...options, params: { ...(options.params ?? {}), session, ...(workspace === undefined ? {} : { workspace }), ...(timeout === undefined ? {} : { timeout }) } });
-export const sessionEvents = (session, { workspace, after, limit, ...options } = {}) => method("session.events", { ...options, params: { ...(options.params ?? {}), session, ...(workspace === undefined ? {} : { workspace }), ...(after === undefined ? {} : { after }), ...(limit === undefined ? {} : { limit }) } });
-export const sessionRun = (session, prompt, { workspace, ...options } = {}) => method("session.run", { ...options, params: { ...(options.params ?? {}), session, prompt, ...(workspace === undefined ? {} : { workspace }) } });
+export const sessionStatus = (session, { workspace, ...options } = {}) => { validateSession(session); validateWorkspace(workspace); return method("session.status", { ...options, params: { ...(options.params ?? {}), session, ...(workspace === undefined ? {} : { workspace }) } }); };
+export const sessionResult = (session, { workspace, ...options } = {}) => { validateSession(session); validateWorkspace(workspace); return method("session.result", { ...options, params: { ...(options.params ?? {}), session, ...(workspace === undefined ? {} : { workspace }) } }); };
+export const sessionWait = (session, { workspace, timeout, ...options } = {}) => { validateSession(session); validateWorkspace(workspace); return method("session.wait", { ...options, params: { ...(options.params ?? {}), session, ...(workspace === undefined ? {} : { workspace }), ...(timeout === undefined ? {} : { timeout }) } }); };
+export const sessionEvents = (session, { workspace, after, limit, ...options } = {}) => { validateSession(session); validateWorkspace(workspace); return method("session.events", { ...options, params: { ...(options.params ?? {}), session, ...(workspace === undefined ? {} : { workspace }), ...(after === undefined ? {} : { after }), ...(limit === undefined ? {} : { limit }) } }); };
+export const sessionRun = (session, prompt, { workspace, ...options } = {}) => { validateSession(session); validateWorkspace(workspace); return method("session.run", { ...options, params: { ...(options.params ?? {}), session, prompt, ...(workspace === undefined ? {} : { workspace }) } }); };
 export const sessionControl = (session, action, { workspace, ...options } = {}) => {
   validateSession(session);
   if (!["cancel", "pause", "resume", "close"].includes(action)) throw new TypeError("session action is invalid");

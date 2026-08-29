@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { ForgeCodeError, invoke, invokeStream, interactive, sessionApproval, sessionControl, sessionList, sessionOpen, sessionTree, trust } from "../sdk/node/index.mjs";
+import { ForgeCodeError, invoke, invokeStream, interactive, sessionApproval, sessionControl, sessionList, sessionOpen, sessionResult, sessionTree, trust } from "../sdk/node/index.mjs";
 
 assert.equal(typeof ForgeCodeError, "function");
 assert.equal(typeof sessionList, "function");
@@ -16,6 +16,7 @@ assert.throws(() => trust("delete"), TypeError);
 assert.throws(() => sessionApproval("session", "yes"), TypeError);
 assert.throws(() => sessionApproval("bad\nsession", true), TypeError);
 assert.throws(() => sessionControl("session", "explode"), TypeError);
+assert.throws(() => sessionResult("bad\nsession"), TypeError);
 {
   const controller = new AbortController(); controller.abort();
   await assert.rejects(invoke([], { executable: process.execPath, signal: controller.signal }), (error) => error.code === "cancelled");
