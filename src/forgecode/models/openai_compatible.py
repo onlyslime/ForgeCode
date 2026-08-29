@@ -341,7 +341,7 @@ def parse_chat_completion(payload: dict[str, Any]) -> ModelResponse:
     return ModelResponse(Message(role="assistant", content=content, tool_calls=calls), finish_reason, safe_usage)
 
 
-def _sse_json_events(chunks: Iterable[bytes], *, max_bytes: int = 4_000_000, max_events: int = 2_000, cancellation: CancellationToken | Callable[[], bool] | None = None) -> tuple[list[dict[str, Any]], bool]:
+def _sse_json_events(chunks: Iterable[bytes], *, max_bytes: int = 4_000_000, max_events: int = 2_000, cancellation: CancellationToken | Callable[[], bool] | None = None, allow_duplicate_frames: bool = False) -> tuple[list[dict[str, Any]], bool]:
     """Parse a bounded OpenAI-compatible SSE byte stream.
 
     We decode only complete UTF-8 lines and complete JSON data frames.  A
@@ -402,6 +402,8 @@ def _sse_json_events(chunks: Iterable[bytes], *, max_bytes: int = 4_000_000, max
             except (TypeError, ValueError, OverflowError) as exc:
                 raise ProviderError("SSE frame is not JSON-safe", category="stream_protocol_error") from exc
             if canonical in seen_data_frames:
+                if allow_duplicate_frames:
+                    continue
                 raise ProviderError("SSE stream repeated a data frame", category="stream_protocol_error")
             seen_data_frames.add(canonical)
             events.append(payload)
@@ -731,6 +733,7 @@ class OpenAICompatibleProvider:
                             events, _done = await _run_sync_bounded(
                                 _sse_json_events, chunks,
                                 max_bytes=self.max_response_bytes,
+                                allow_duplicate_frames="deepseek.com" in self.base_url.lower(),
                                 timeout=timeout,
                                 cancellation=request_context.cancellation_token or request_context.cancellation_requested,
                             )
