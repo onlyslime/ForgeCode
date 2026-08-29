@@ -23,4 +23,4 @@ apply_patch、命令风险/审批/超时/取消、真实测试与有限修复、
 上下文压缩、checkpoint/session/review/eval、JSONL RPC、Node/Python SDK。
 离线 demo 会真实展示读取、失败、修改、测试和验证闭环。
 
-当前版本：v0.6.3。
+当前版本：v0.7.0。
