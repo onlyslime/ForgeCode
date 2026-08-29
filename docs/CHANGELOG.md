@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.6.1 — 2026-08-29
+
+- Completed repository cleanup rules for local source audits and vendor clones.
+- Confirmed runtime state, caches, environments, temporary files, and private
+  goal/strategy data remain ignored and are not release artifacts.
+
 ## v0.6.0 — 2026-08-29
 
 - Started the整理-focused release line. This version entry only establishes

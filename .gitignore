@@ -54,5 +54,9 @@ temp/
 *.tmp
 *.swp
 
+# Local source audits and vendor clones (never part of the ForgeCode package)
+.opencode-src/
+opencode-audit/
+
 # Historical release notes are kept locally, not tracked
 docs/releases/
