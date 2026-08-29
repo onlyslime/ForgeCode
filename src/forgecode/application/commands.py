@@ -2633,7 +2633,17 @@ def main(argv: list[str] | None = None) -> int:
             """Expose bounded, content-free context-index health in chat."""
             try:
                 index = ContextIndex(guard)
-                metadata = index.show()
+                raw_metadata = index.show()
+                counts = raw_metadata.get("counts") if isinstance(raw_metadata.get("counts"), dict) else {}
+                # Do not send the complete index entry list through the
+                # interactive envelope. Health is metadata, not a second
+                # source browser; keep it bounded for large repositories.
+                metadata = {
+                    "path": raw_metadata.get("path"),
+                    "schema_version": raw_metadata.get("schema_version"),
+                    "fingerprint": str(raw_metadata.get("fingerprint") or "")[:128],
+                    "counts": {key: counts.get(key, 0) for key in ("files", "readable", "binary")},
+                }
                 diagnostics = index.diagnostics()
                 return {
                     "context_status": True,
