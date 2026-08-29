@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.4.1 — 2026-08-29
+
+- Added `find_files` for bounded glob discovery.
+- Added `test` for approved, bounded project test execution.
+- Added `diagnostics` for approved compile/lint-style checks with structured
+  exit results.
+
 ## v0.4.0 — 2026-08-29
 
 - Started the tools-focused release line with dedicated read-only `git_status`
