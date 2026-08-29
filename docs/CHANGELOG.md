@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.4.4 — 2026-08-29
+
+- Added controlled background process tools: `run_background`,
+  `process_status`, `poll_process`, and `kill_process`.
+- Background tasks have ForgeCode-owned IDs, bounded incremental output, status
+  and exit metadata, cancellation, approval, and command risk checks.
+
 ## v0.4.3 — 2026-08-29
 
 - Added read-only `git_log` for recent commit history.
