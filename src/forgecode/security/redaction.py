@@ -12,7 +12,10 @@ _BEARER_RE = re.compile(r"(?i)\bbearer\s+[a-z0-9._~+/=-]+")
 _NAMED_SECRET_RE = re.compile(
     r"(?i)\b(api[_-]?key|apikey|access[_-]?token|refresh[_-]?token|token|password|secret|cookie|authorization)\b"
     r"(\s*[:=]\s*)"
-    r"(?:\"[^\"]*\"|'[^']*'|\[[^\]]*\]|[^\s,;}\]]+)"
+    # The unquoted branch consumes a trailing bracket as part of the value.
+    # Without it, inputs such as ``token=abc]`` leaked an extra delimiter
+    # after replacement (``token=[REDACTED]]``).
+    r"(?:\"[^\"]*\"|'[^']*'|\[[^\]]*\]|[^\s,;}]+)"
 )
 _SENSITIVE_KEY_PARTS = ("api_key", "api-key", "apikey", "authorization", "token", "password", "secret", "cookie", "credential")
 

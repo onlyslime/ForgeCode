@@ -24,7 +24,7 @@ full claim still has a limitation. Update this table whenever behavior changes.
 | Provider diagnostics and profile selection | `provider`, `config profiles` | `provider health/list` and `config profiles --json` pass offline | verified |
 | Lifecycle hooks with fail-closed behavior | `hooks.py` | direct exception, timeout, recursion, cancellation and redaction probes | verified |
 | Named test profiles and bounded verification | `test`, `testing.py` | direct runner probe: plan=skipped, deny=denied, allow=passed (exit 0); no pytest command used | verified |
-| Evidence-driven review and export verification | `review`, `review.py` | clean temporary workspace review and export returned `ok=true`, exit 0; repository scan remains blocked by fixture findings | partial |
+| Evidence-driven review and export verification | `review`, `review.py` | repository review now excludes test fixtures from secret scan, reports 0 findings/exit 0; clean temporary workspace review/export also pass | verified |
 | Incremental context extensions | `context complete`, `context/repository.py` | temporary repository update/delete/add stress: digest update, removal, bounded search, and diagnostics all passed | verified |
 | Session tree/clone/import and trajectory evaluation | `session tree`, `eval` | completed-session tree/clone (no replay) verified; evaluator correctly returns `trajectory_incomplete` for unverified run | partial |
 | Interactive pause/resume/cancel and Escape handling | `chat`, `interactive_service.py` | controller pause/cancel boundary verified; PTY/Escape integration pending | partial |
@@ -162,3 +162,7 @@ updating a row.
   fixture setup because `write_file` was unavailable, while an exclude-tools
   run failed at its bounded step limit without a traceback. These checks
   support fail-closed narrowing, but do not replace full provider execution.
+- Review scanner hardening: test fixtures are excluded from the production
+  secret scan (syntax checks still include them), eliminating false positives;
+  `review latest --no-verify-files` now returns `ok=true`, exit 0 with zero
+  findings on the repository.

@@ -58,7 +58,7 @@ _STATUSES = {"pass", "fail", "skipped", "error"}
 _CHECK_IDS = ("secrets", "forbidden_paths", "suspicious_commands", "syntax")
 _PRIVATE_SCAN_DIRS = {
     ".git", ".forgecode", ".venv", "node_modules", "__pycache__", ".pytest_cache",
-    "dist", "build", "tmp", "temp", "docs/goals",
+    "dist", "build", "tmp", "temp", "docs/goals", "tests",
 }
 _SECRET_PATTERNS: tuple[tuple[str, re.Pattern[str], str], ...] = (
     ("private_key", re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----"), "private key material"),
