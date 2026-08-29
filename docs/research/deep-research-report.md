@@ -726,5 +726,23 @@ provider 回归测试均已通过。
 条件 skip、2 warnings）及 `uv run forgecode doctor` 输出为证据，不把未能访问的
 Codex 官方页面或未实现的竞品特性当作本项目已完成能力。
 
+### 下一阶段 P1 设计契约：只读工具并行
+
+该能力仍未实现，以下契约先作为实现前置条件：
+
+- **范围**：仅允许 `read_file`、`search`、`list_files`、`workspace_summary` 和
+  `repository_map`；每个调用必须通过现有 WorkspaceGuard、输出上限和取消令牌。
+- **非目标**：不并行 `write_file`、`apply_patch`、`run_command`、测试、事务、hooks
+  或任何 side-effecting tool；不改变 Plan/Act/Bypass 权限模型；不引入线程池以外的
+  agent SDK 或外部调度服务。
+- **完成条件**：同一模型响应中的只读调用可受控并行；结果按原始 tool-call 顺序
+  回填；每个调用仍有独立错误、超时和取消结果；总调用数、总输出和线程数有硬上限；
+  session audit 事件保持单调序列。
+- **失败语义**：单个只读调用失败不丢弃其它结果；聚合结果必须保留每个 call id；
+  取消会阻止尚未开始的调用，并在事件中记录 `cancelled_before_start`；任何检测到
+  side effect 的调用都回退为串行安全路径。
+- **验证**：至少覆盖顺序稳定性、取消传播、配额、错误聚合、混合只读/副作用调用、
+  checkpoint 一致性和 JSON/JSONL tool-call 配对；在此之前不标记 P1 并行为完成。
+
 每项实现都需要源码入口、定向测试、CLI 可观察证据和 changelog 条目；不以
 “功能数量”替代可靠性、安全边界或可解释的失败结果。
