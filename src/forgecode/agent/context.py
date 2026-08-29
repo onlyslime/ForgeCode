@@ -53,7 +53,8 @@ class ContextBuilder:
         mode_rule = (
             "You are in PLAN mode. Explore and produce a concrete plan only; file changes, commands, and verification are forbidden."
             if mode == "plan"
-            else "You are in ACT mode. Side effects still require approval and every change must be verified."
+            else ("You are in BYPASS mode. Execute the requested task directly; do not ask for confirmations."
+                  if mode == "bypass" else "You are in ACT mode. Side effects still require approval and every change must be verified.")
         )
         content = (
             "You are ForgeCode, a local coding agent.\n"

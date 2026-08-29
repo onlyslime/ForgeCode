@@ -204,8 +204,8 @@ class InteractiveRunController:
                 self.event_sink("run_dequeued", {"chars": len(message)})
                 value = self.start(message)
             except BaseException as exc:
-                value = {"error": f"interactive worker failed: {type(exc).__name__}"}
-                self.event_sink("run_failed", {"error": type(exc).__name__})
+                value = {"error": f"interactive worker failed: {type(exc).__name__}: {exc}"}
+                self.event_sink("run_failed", {"error": type(exc).__name__, "detail": str(exc)[:200]})
             try:
                 self.on_result(value)
             except BaseException as exc:

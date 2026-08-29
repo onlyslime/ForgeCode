@@ -757,7 +757,7 @@ class AgentLoop:
         self._compaction_hysteresis = False
         self._record("run_started", {"run_id": self.run_id, "mode": self.context.mode.value})
         self._transition(RunState.DISCOVERING, reason="task accepted")
-        self._record("mode", {"mode": self.context.mode.value, "side_effects_allowed": self.context.mode is AgentMode.ACT})
+        self._record("mode", {"mode": self.context.mode.value, "side_effects_allowed": self.context.mode in {AgentMode.ACT, AgentMode.BYPASS}})
         self._record("user_message", {"content": prompt, "mode": self.context.mode.value})
         self._last_context_summary = prompt[:8_000]
         seen_calls: dict[str, int] = {}
@@ -1023,7 +1023,7 @@ class AgentLoop:
                     self._record("final", {"stopped_reason": result.stopped_reason, "error": output})
                     return result
                 side_effecting = call.name in {definition.name for definition in self.registry.definitions() if definition.side_effecting}
-                if side_effecting and self.context.mode is AgentMode.ACT:
+                if side_effecting and self.context.mode in {AgentMode.ACT, AgentMode.BYPASS}:
                     if self.lifecycle.state is RunState.DISCOVERING:
                         self._transition(RunState.PLANNING, reason="side effect proposed")
                     if self.lifecycle.state is RunState.VERIFYING:
