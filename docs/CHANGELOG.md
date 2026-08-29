@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.4.3 — 2026-08-29
+
+- Added read-only `git_log` for recent commit history.
+- Added approval-gated `git_commit`; it refuses plan mode, cancellation, and
+  empty unstaged commits.
+
 ## v0.4.2 — 2026-08-29
 
 - Added `read_range` for precise bounded line-range inspection.
