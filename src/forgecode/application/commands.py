@@ -1910,6 +1910,19 @@ def main(argv: list[str] | None = None) -> int:
                         color = "\x1b[32m" if labels[kind] == "✓" else ("\x1b[31m" if labels[kind] == "✗" else "\x1b[36m")
                         with output_lock:
                             print(f"\x1b[2K\r{color}{labels[kind]} {text}\x1b[0m")
+                            if kind == "tool_call" and tool in {"write_file", "apply_patch"}:
+                                preview = arguments.get("content") or arguments.get("patch")
+                                if isinstance(preview, str):
+                                    for line in preview[:4_000].splitlines()[:40]:
+                                        prefix = "+ " if tool == "write_file" else ("- " if line.startswith("-") else ("+ " if line.startswith("+") else "  "))
+                                        line_color = "\x1b[32m" if prefix == "+ " else ("\x1b[31m" if prefix == "- " else "\x1b[90m")
+                                        print(f"  {line_color}{prefix}{line.lstrip('+- ')}\x1b[0m")
+                            if kind == "tool_result" and isinstance(payload.get("metadata"), dict):
+                                diff = payload["metadata"].get("diff")
+                                if isinstance(diff, str):
+                                    for line in diff[:4_000].splitlines()[:40]:
+                                        line_color = "\x1b[32m" if line.startswith("+") else ("\x1b[31m" if line.startswith("-") else "\x1b[90m")
+                                        print(f"  {line_color}{line}\x1b[0m")
                             redraw_input_bar()
                     result = asyncio.run(service.execute(enriched, mode=state["mode"], secrets=(api_key,) if api_key else (), on_event=progress_event))
                 finally:

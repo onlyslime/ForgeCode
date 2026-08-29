@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.2.3 — 2026-08-29
+
+- Added inline previews for write and patch operations in interactive progress,
+  with green additions and red deletions.
+
 ## v0.2.2 — 2026-08-29
 
 - Improved live progress labels with file paths and command text, including
