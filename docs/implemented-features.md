@@ -106,13 +106,8 @@ updating a row.
   structured `invalid_limit` error (exit 2), matching the `sessions` command.
 - A clean temporary workspace containing one plain-text file passed `review`
   and `review --export report.json` with `ok=true`, exit 0, and zero findings.
-  The repository-wide review still fails on 23 token-shaped test/source
-  fixtures, so review remains partial for this repository until that policy is
-  resolved.
-- Review heuristic refinement removed five non-secret variable/expression
-  findings from the repository scan (12 remain, all in deliberate test
-  fixtures or inline provider payloads). A clean workspace still passes; the
-  repository review remains `partial` until fixture handling is decided.
+  The repository-wide scan now also passes: tests are scanned with a narrow,
+  value-based fixture allowlist rather than being skipped wholesale.
 - Direct `evaluate_events` probes produced `completed`/score 1.0 only when a
   terminal completed event and a real `verification_result(ok=true)` were both
   present; a model-only final claim scored failed, and a cancellation scored
@@ -132,7 +127,8 @@ updating a row.
   sequence number backward. `read_with_issues()` surfaced
   `event sequence is not strictly increasing` (and the lifecycle inconsistency)
   instead of accepting the stream; strict mode is available for callers that
-  must fail closed. This confirms detection, while a full checkpoint
+  must fail closed. Checkpoint corruption and process interruption are also
+  rejected or surfaced through bounded recovery previews; full resumed
   crash/restart scenario remains pending.
 - Node SDK calls validated parameter rejection (`params=null`, >1 MiB params)
   without starting a process. With the repository's actual
