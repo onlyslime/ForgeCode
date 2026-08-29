@@ -2606,6 +2606,12 @@ def main(argv: list[str] | None = None) -> int:
         command_name = f"session {args.session_action}"
         try:
             if args.session_action == "tree":
+                if isinstance(args.limit, bool) or args.limit < 1 or args.limit > 200:
+                    if machine_json:
+                        _emit_machine(_machine_error(command_name, "invalid_limit", "limit must be between 1 and 200", exit_code=2))
+                    else:
+                        print("limit must be between 1 and 200", file=sys.stderr)
+                    return 2
                 from .session_service import SessionService
                 payload = SessionService(guard).tree(limit=max(1, min(200, args.limit)))
                 if machine_json:

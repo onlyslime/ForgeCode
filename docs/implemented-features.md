@@ -101,6 +101,9 @@ updating a row.
   malformed SSE JSON, repeated `[DONE]`, and `NaN` frames with typed
   `ProviderError(stream_protocol_error)`; no tool call was emitted for the
   invalid streams.
+- Session tree boundary fuzzing initially exposed that `--limit 0` was silently
+  clamped to one node. The CLI now rejects zero and values above 200 with a
+  structured `invalid_limit` error (exit 2), matching the `sessions` command.
 - InteractiveSession probes confirmed `/help`, `/mode`, unknown-command errors,
   `/quit`, and prefix-only `!`/`!!` parsing. InteractiveRunController accepted
   two bounded follow-ups, rejected a full queue, reported pending pause and
