@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "forgecode"
-version = "0.2.6"
+version = "0.2.7"
 description = "A self-built, auditable coding agent framework."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -12,6 +12,7 @@ dependencies = ["prompt_toolkit>=3.0.43,<4"]
 
 [project.scripts]
 forgecode = "forgecode.cli:main"
+fc = "forgecode.cli:fc_main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/forgecode"]

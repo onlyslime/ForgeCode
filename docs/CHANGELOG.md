@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.2.7 — 2026-08-29
+
+- Added the `fc` executable shortcut, which opens chat directly without
+  arguments.
+- Fixed runtime duration tracking by importing the monotonic clock module.
+
 ## v0.2.6 — 2026-08-29
 
 - Added elapsed runtime markers to interactive progress events and a final

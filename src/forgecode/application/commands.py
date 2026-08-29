@@ -12,6 +12,7 @@ import subprocess
 import sys
 import re
 import difflib
+import time
 import threading
 import queue
 import uuid
@@ -449,9 +450,9 @@ def _parser() -> argparse.ArgumentParser:
     review_parser.add_argument("--no-verify-files", action="store_true", help="verify artifact integrity but skip current-file digest checks")
     review_parser.add_argument("--json", action="store_true", default=argparse.SUPPRESS, dest="json")
     review_parser.add_argument("--jsonl", action="store_true", default=argparse.SUPPRESS, dest="jsonl", help="emit one bounded machine-readable envelope")
-    chat_parser = subparsers.add_parser("chat", aliases=["start"], help="scriptable interactive coding session")
+    chat_parser = subparsers.add_parser("chat", aliases=["start", "fc"], help="scriptable interactive coding session")
     chat_parser.add_argument("prompt", nargs="*", help="optional initial task")
-    chat_parser.add_argument("--mode", choices=[mode.value for mode in AgentMode], default=AgentMode.PLAN.value)
+    chat_parser.add_argument("--mode", choices=[mode.value for mode in AgentMode], default=AgentMode.ACT.value)
     chat_parser.add_argument("--auto-approve", "--yes", action="store_true")
     chat_parser.add_argument("--demo", action="store_true")
     chat_parser.add_argument("--demo-task", choices=("calculator", "json"), default="calculator")
