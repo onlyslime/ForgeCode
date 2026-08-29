@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from forgecode.embed import ForgeCodeError, config_profiles, provider_list, provider_health, config_policy, invoke, session_open, session_run, session_inspect, session_events, session_result, session_wait, session_tree, session_cancel, session_pause, session_resume, session_approval, stream
+from forgecode.embed import ForgeCodeError, config_profiles, provider_list, provider_health, config_policy, invoke, login, session_open, session_run, session_inspect, session_events, session_result, session_wait, session_tree, session_cancel, session_pause, session_resume, session_approval, stream
 import forgecode
 
 
@@ -91,6 +91,7 @@ def test_embed_session_result_validates_handle():
     assert forgecode.config_profiles_embedded is config_profiles
     assert forgecode.provider_list_embedded is provider_list
     assert forgecode.provider_health_embedded is provider_health
+    assert forgecode.login_embedded is login
     with pytest.raises(ValueError):
         session_wait("x", timeout=61)
     with pytest.raises(ValueError):
@@ -103,6 +104,8 @@ def test_embed_session_result_validates_handle():
         config_policy(workspace="bad\npath")
     with pytest.raises(ValueError):
         config_profiles(workspace="bad\npath")
+    with pytest.raises(ValueError):
+        login(api_key_env="bad\nenv")
     with pytest.raises(ValueError):
         session_cancel("x", workspace="bad\npath")
     with pytest.raises(ValueError):

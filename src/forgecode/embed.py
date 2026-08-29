@@ -238,6 +238,18 @@ def provider_health(**kwargs: Any) -> list[dict[str, Any]]:
     return _provider_query("provider.health", **kwargs)
 
 
+def login(*, profile: str | None = None, provider: str | None = None, api_key_env: str | None = None, request_id: str | int | None = None, raise_for_status: bool = False) -> list[dict[str, Any]]:
+    params: dict[str, Any] = {}
+    for name, value in (("profile", profile), ("provider", provider), ("api_key_env", api_key_env)):
+        if value is not None:
+            if not isinstance(value, str) or not value or len(value) > 256 or any(ch in value for ch in "\r\n"):
+                raise ValueError(f"{name} must be bounded newline-safe text")
+            params[name] = value
+    request = {"method": "login", "params": params}
+    if request_id is not None: request["id"] = request_id
+    return list(stream([request], raise_for_status=raise_for_status))
+
+
 def stream(requests: Iterable[dict[str, Any]], *, raise_for_status: bool = False, max_items: int = 1024, max_response_bytes: int = 2_000_000) -> Iterable[dict[str, Any]]:
     """Process JSON-compatible RPC requests in order."""
     if isinstance(max_items, bool) or not isinstance(max_items, int) or max_items < 1 or max_items > 100_000:
@@ -278,7 +290,7 @@ def stream(requests: Iterable[dict[str, Any]], *, raise_for_status: bool = False
         yield envelope
 
 
-__all__ = ["ForgeCodeError", "invoke", "session_open", "session_run", "session_inspect", "session_events", "session_result", "session_wait", "session_list", "session_tree", "session_cancel", "session_pause", "session_resume", "session_approval", "config_profiles", "provider_list", "provider_health", "config_policy", "stream"]
+__all__ = ["ForgeCodeError", "invoke", "login", "session_open", "session_run", "session_inspect", "session_events", "session_result", "session_wait", "session_list", "session_tree", "session_cancel", "session_pause", "session_resume", "session_approval", "config_profiles", "provider_list", "provider_health", "config_policy", "stream"]
 
 
 class EmbeddedSession:

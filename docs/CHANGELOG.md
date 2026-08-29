@@ -14,6 +14,12 @@ slice.
   deadlines and side-effect conflicts.
 - Verification: cancellation hardening regression and recovery tests.
 
+## v0.0.44 — 2026-08-29
+
+- Added Python embedding `login` for provider/profile credential references;
+  only environment-variable names cross the RPC boundary.
+- Verification: embedding contract, compile, doctor, and full regression tests.
+
 ## v0.0.43 — 2026-08-29
 
 - Added provider discovery and health helpers to Node/Python SDKs, exposing

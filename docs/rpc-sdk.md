@@ -177,6 +177,8 @@ incremental audit events.
 workspace-bound RPC request semantics.
 Node and Python clients also expose `providerList`/`provider_list` and
 `providerHealth`/`provider_health` for provider capability and health discovery.
+Python `login` mirrors Node `login`, forwarding only bounded profile/provider
+and API-key environment-variable names.
 It also exposes `session_cancel`, `session_pause`, `session_resume`, and
 `session_approval`; each forwards the same workspace-bound RPC control and
 returns the standard JSON envelope.
