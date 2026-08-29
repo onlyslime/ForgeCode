@@ -62,6 +62,8 @@
 - Event query callbacks retain compatibility with older embedded integrations:
   zero-argument callbacks continue to work while the built-in session handler
   receives bounded limit and kind parameters.
+- Event timeline rows now include validated per-event duration when available,
+  alongside relative position in the run.
 - Provider request identities retain zero-based per-turn suffixes for
   compatibility with existing audit consumers while the UI remains 1-based.
 - Interactive Act/Bypass sessions now ask once whether the current workspace

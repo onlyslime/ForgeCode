@@ -2673,7 +2673,9 @@ def main(argv: list[str] | None = None) -> int:
                         elapsed = max(0.0, (timestamp - origin).total_seconds())
                     except (TypeError, ValueError):
                         elapsed = None
-                    rows.append({"sequence": event.sequence, "kind": event.kind, "mode": event.mode, "outcome": event.outcome, "error_code": event.error_code, "elapsed_seconds": round(elapsed, 3) if elapsed is not None else None})
+                    raw_duration = event.payload.get("duration_seconds") if isinstance(event.payload, dict) else None
+                    duration = round(float(raw_duration), 3) if isinstance(raw_duration, (int, float)) and not isinstance(raw_duration, bool) and 0 <= float(raw_duration) <= 86_400 else None
+                    rows.append({"sequence": event.sequence, "kind": event.kind, "mode": event.mode, "outcome": event.outcome, "error_code": event.error_code, "elapsed_seconds": round(elapsed, 3) if elapsed is not None else None, "duration_seconds": duration})
                 return {"events_status": True, "filter": kind, "events": rows}
             except (OSError, ValueError) as exc:
                 return {"events_status": False, "error": _redact_display(str(exc), [api_key])}
