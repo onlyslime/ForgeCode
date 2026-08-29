@@ -2327,18 +2327,13 @@ def main(argv: list[str] | None = None) -> int:
             """Configure a provider for this chat process without persisting secrets."""
             nonlocal settings, api_key
             effective = settings.effective
-            if connect_args:
-                provider = connect_args[0]
-            else:
-                provider = input("Provider ID: ").strip()
-                if not provider:
-                    return {"error": "provider selection cancelled", "code": "connect_cancelled"}
-            if provider not in SUPPORTED_PROVIDERS:
-                return {"error": f"unsupported provider: {provider}", "code": "unsupported_provider", "available": list(SUPPORTED_PROVIDERS)}
-            defaults = PROVIDER_CATALOG[provider]
-            print(f"Connect ({provider}) — enter values manually", flush=True)
+            # Provider is an internal adapter detail; users only need the
+            # endpoint, model ID, and credential. Infer a known adapter from
+            # the endpoint hostname after the URL is entered.
             base_url = input("API endpoint: ").strip()
             model = input("Model ID: ").strip()
+            provider = next((name for name, data in PROVIDER_CATALOG.items() if base_url.startswith(data["base_url"])), "openai-compatible")
+            defaults = PROVIDER_CATALOG[provider]
             if provider not in SUPPORTED_PROVIDERS:
                 return {"error": f"unsupported provider: {provider}", "code": "unsupported_provider"}
             if not base_url or not model:

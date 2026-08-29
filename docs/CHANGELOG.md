@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.5.10 — 2026-08-29
+
+- Simplified interactive login to exactly three prompts: endpoint URL, model
+  ID, and API key; provider adapter is inferred internally from the URL.
+
 ## v0.5.9 — 2026-08-29
 
 - Simplified interactive connection to explicit manual Provider ID, endpoint,
