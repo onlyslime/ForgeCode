@@ -709,5 +709,22 @@ provider 回归测试均已通过。
 5. **P2 生态能力**：worktree、多代理、MCP、浏览器/视觉、远程分享和一键安装
    后置，不挤占需求→修改→验证闭环。
 
+### 0.7.0 实施审计（2026-08-30）
+
+- **P0 可见闭环：已验证**。普通 `fcc` 已具备阶段、文本增量、工具时间线、
+  真实改动文件、验证结果、耗时、会话指标、`/context` 和可筛选 `/events`。
+- **P0 安全叙事：已验证**。workspace trust、Plan/Act/Bypass、审批、风险分类、
+  拒绝结果、取消和 unresolved recovery 均有源码入口及回归测试；边界仍不是 OS
+  sandbox，README 和交互说明已明确这一点。
+- **P1 长任务可靠性：部分完成**。checkpoint、事件 JSONL、上下文压缩和流式协议
+  重试已验证；同轮只读工具并行、worktree 隔离和后台多任务仍未实现，不能在路线图
+  中标记为完成。
+- **P1 工程上下文：部分完成**。仓库 map、增量索引、符号列表和 bounded 诊断可用；
+  LSP 级 definition/reference/hover 仍是后续工作。
+
+本审计以 `uv run pytest -rs` 的完整门禁（484 passed、8 个 Windows symlink
+条件 skip、2 warnings）及 `uv run forgecode doctor` 输出为证据，不把未能访问的
+Codex 官方页面或未实现的竞品特性当作本项目已完成能力。
+
 每项实现都需要源码入口、定向测试、CLI 可观察证据和 changelog 条目；不以
 “功能数量”替代可靠性、安全边界或可解释的失败结果。
