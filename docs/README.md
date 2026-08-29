@@ -2,6 +2,24 @@
 
 This directory contains the project's reviewed, reproducible documentation.
 
+## Reader guide
+
+Most readers only need the root [`README.md`](../README.md), then
+[`demo-script.md`](demo-script.md) for a short walkthrough. Use the following
+documents when you need more detail:
+
+- `architecture.md`, `durability-design.md`, `rpc-sdk.md`, and `privacy.md`:
+  implementation and safety design (maintainer/technical review).
+- `implemented-features.md` and `capability-trace.md`: capability inventory
+  and the evidence behind each claim (assessment/review).
+- `research/`: the research plan and report (project background).
+- `assignment/`: the supplied assessment prompt; it is tracked for context.
+- `VERSIONING.md` and the root `CHANGELOG.md`: release and history policy.
+
+The material in `goals/`, `strategy/`, and `releases/` is intentionally local
+working history. It may be useful to maintainers, but is not part of the
+public reading path and must not be committed or packaged.
+
 ## Committed reference material
 
 - `architecture.md`, `durability-design.md`, `rpc-sdk.md`, and `privacy.md`
