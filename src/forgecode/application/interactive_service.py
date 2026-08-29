@@ -36,6 +36,18 @@ def _human_result(value: object) -> str | None:
         return f"Connected: {value.get('model') or 'model'} @ {value.get('base_url') or 'endpoint'}"
     if value.get("model_status") is True:
         return f"Model: {value.get('model') or 'not configured'}\nProvider: {value.get('provider') or 'unknown'}\nEndpoint: {value.get('base_url') or 'not configured'}\nProfile: {value.get('profile') or 'default'}"
+    if "run_id" in value and "mode" in value and "worker" in value:
+        worker = value.get("worker") if isinstance(value.get("worker"), dict) else {}
+        verification = value.get("latest_verification")
+        verification_text = "passed" if isinstance(verification, dict) and verification.get("ok") is True else ("failed" if isinstance(verification, dict) and verification.get("ok") is False else "not run")
+        return "Status\n──────\n" + "\n".join((
+            f"mode: {value.get('mode')}",
+            f"run: {value.get('run_id') or '<new>'}",
+            f"last state: {value.get('last_state') or 'idle'}",
+            f"transactions: {value.get('transactions', 0)}",
+            f"verification: {verification_text}",
+            f"worker: {'running' if worker.get('active') else 'idle'} (queued: {worker.get('queue_items', 0)})",
+        ))
     if value.get("tools_status") is True:
         rows = value.get("tools") or []
         lines = ["Available tools", "───────────────"]

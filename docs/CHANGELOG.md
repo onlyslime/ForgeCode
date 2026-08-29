@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.5.2 — 2026-08-29
+
+- Fixed human-readable `/status` output; it now shows mode, run ID, last state,
+  transaction count, verification state, and worker queue status.
+
 ## v0.5.1 — 2026-08-29
 
 - Fixed the interactive TTY prompt to catch invalid slash commands and render
