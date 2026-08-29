@@ -177,7 +177,7 @@ export const sessionApproval = (session, approved, { workspace, ...options } = {
 export const configProfiles = ({ workspace, ...options } = {}) => { validateWorkspace(workspace); return method("config.profiles", { ...options, params: { ...(options.params ?? {}), ...(workspace === undefined ? {} : { workspace }) } }); };
 export const configPolicy = ({ workspace, profile, mode, tools, excludeTools, noTools, ...options } = {}) => (validateWorkspace(workspace), method("config.policy", {
   ...options,
-  params: { ...(options.params ?? {}), ...(workspace === undefined ? {} : { workspace }), ...(profile === undefined ? {} : { profile }), ...(mode === undefined ? {} : { mode }), ...(tools === undefined ? {} : { tools }), ...(excludeTools === undefined ? {} : { exclude_tools: excludeTools }), ...(noTools === undefined ? {} : { no_tools: noTools }) },
+  params: { ...(options.params ?? {}), ...(workspace === undefined ? {} : { workspace }), ...(profile === undefined ? {} : { profile: (typeof profile === "string" && profile.length <= 4000 && !/[\r\n]/.test(profile) && profile ? profile : (() => { throw new TypeError("profile must be bounded newline-safe text"); })()) }), ...(mode === undefined ? {} : (["plan", "act"].includes(mode) ? { mode } : (() => { throw new TypeError("mode must be plan or act"); })())), ...(tools === undefined ? {} : { tools }), ...(excludeTools === undefined ? {} : { exclude_tools: excludeTools }), ...(noTools === undefined ? {} : (typeof noTools === "boolean" ? { no_tools: noTools } : (() => { throw new TypeError("noTools must be boolean"); })())) },
 }));
 
 export function interactive(workspace, { mode = "plan", executable = "forgecode", maxEvents = 2048 } = {}) {
