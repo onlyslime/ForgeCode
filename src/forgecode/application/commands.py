@@ -44,6 +44,7 @@ from ..storage import Checkpoint, CheckpointStore, RecoveryConflict, SessionForm
 from ..tools import AgentMode, AllowAllApproval, DenyAllApproval, InteractiveApproval, ToolContext, build_default_registry
 from ..hooks import Hook, HookRegistry
 from .review_service import ReviewService
+from .prompt_ui import run_prompt_ui
 
 
 def _load_saved_credential(workspace: Path) -> None:
@@ -2515,7 +2516,10 @@ def main(argv: list[str] | None = None) -> int:
         shutdown_unresolved = False
         try:
             stream = sys.stdin
-            interactive.run_stream(stream)
+            if bool(getattr(stream, "isatty", lambda: False)()) and not machine_json:
+                run_prompt_ui(interactive, mode=lambda: state["mode"])
+            else:
+                interactive.run_stream(stream)
         except KeyboardInterrupt:
             controller.stop(cancel=True, timeout=2.0)
             session.append("state_transition", {"to": "cancelled", "reason": "user interruption"}, mode=state["mode"], error_code="cancelled")

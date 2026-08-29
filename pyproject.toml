@@ -4,11 +4,11 @@ build-backend = "hatchling.build"
 
 [project]
 name = "forgecode"
-version = "0.1.1"
+version = "0.1.2"
 description = "A self-built, auditable coding agent framework."
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = []
+dependencies = ["prompt_toolkit>=3.0.43,<4"]
 
 [project.scripts]
 forgecode = "forgecode.cli:main"
