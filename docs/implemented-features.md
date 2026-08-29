@@ -28,7 +28,7 @@ full claim still has a limitation. Update this table whenever behavior changes.
 | Incremental context extensions | `context complete`, `context/repository.py` | temporary repository update/delete/add stress: digest update, removal, bounded search, and diagnostics all passed | verified |
 | Session tree/clone/import and trajectory evaluation | `session tree`, `eval` | completed-session tree/clone (no replay) verified; evaluator correctly returns `trajectory_incomplete` for unverified run | partial |
 | Interactive pause/resume/cancel and Escape handling | `chat`, `interactive_service.py` | controller pause/cancel boundary verified; PTY/Escape integration pending | partial |
-| RPC server plus Python/Node embedding | `rpc`, `rpc.py`, `sdk/node/index.mjs` | Python RPC JSONL smoke verified; Node SDK validation passed, executable discovery unavailable in current shell | partial |
+| RPC server plus Python/Node embedding | `rpc`, `rpc.py`, `sdk/node/index.mjs` | Python and Node SDK doctor/provider-health calls plus stream event-list smoke | verified |
 | Runtime tool narrowing (`--tools`, `--exclude-tools`, `--no-tools`) | CLI/config policy | policy help/source identified; deny-path matrix pending | partial |
 | Offline mode and telemetry policy | `config`, `telemetry` | config validate and telemetry status pass without network | verified |
 
@@ -135,8 +135,10 @@ updating a row.
   must fail closed. This confirms detection, while a full checkpoint
   crash/restart scenario remains pending.
 - Node SDK calls validated parameter rejection (`params=null`, >1 MiB params)
-  without starting a process. A valid call could not be completed because the
-  shell has no `forgecode` executable on PATH; Python RPC remains verified.
+  without starting a process. With the repository's actual
+  `.venv/Scripts/forgecode.exe`, SDK `invoke` successfully called `doctor` and
+  `provider health`, preserving the request id; `invokeStream` returned a
+  bounded event list. Invalid oversize params remained rejected before spawn.
 - InteractiveSession probes confirmed `/help`, `/mode`, unknown-command errors,
   `/quit`, and prefix-only `!`/`!!` parsing. InteractiveRunController accepted
   two bounded follow-ups, rejected a full queue, reported pending pause and
