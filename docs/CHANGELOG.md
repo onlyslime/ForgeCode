@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.3.1 — 2026-08-29
+
+- Bound standalone `Esc` in the prompt UI to cancel the active task while
+  keeping the chat session and input buffer available.
+
 ## v0.3.0 — 2026-08-29
 
 - Started the 0.3 release line with the current interactive launcher modes,

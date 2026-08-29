@@ -37,6 +37,16 @@ def run_prompt_ui(session, *, mode: Callable[[], str]) -> None:
         # Most terminals encode Shift+Enter as the Escape+Enter sequence.
         event.current_buffer.insert_text("\n")
 
+    @bindings.add("escape")
+    def _(event) -> None:
+        # A standalone Esc cancels the active agent run without closing chat.
+        # Keep the buffer intact so the user can edit or submit a follow-up.
+        result = session.cancel()
+        rendered = _human_result(result)
+        if rendered:
+            session.output(rendered)
+        event.app.invalidate()
+
     style = Style.from_dict({
         "prompt": "bg:#202123 #f5f5f5 bold",
         "continuation": "bg:#202123 #f5f5f5",
