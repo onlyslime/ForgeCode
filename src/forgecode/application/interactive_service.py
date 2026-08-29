@@ -87,6 +87,21 @@ def _human_result(value: object) -> str | None:
                 else:
                     lines.append(f"  ✓ {row}")
         return "\n".join(lines)
+    if value.get("context_status") is True:
+        metadata = value.get("metadata") if isinstance(value.get("metadata"), dict) else {}
+        stale = value.get("stale") or []
+        errors = value.get("errors") or []
+        counts = metadata.get("counts") if isinstance(metadata.get("counts"), dict) else {}
+        lines = ["Context index", "─────────────", f"files: {counts.get('files', len(metadata.get('files', [])))}", f"stale: {len(stale)}", f"errors: {len(errors)}"]
+        if stale:
+            lines.append("Stale entries:")
+            lines.extend(f"  ⚠ {item.get('path', '<unknown>')} — {item.get('reason', 'changed')}" for item in stale[:10] if isinstance(item, dict))
+        if errors:
+            lines.append("Errors:")
+            lines.extend(f"  ✗ {item}" for item in errors[:10])
+        if not stale and not errors:
+            lines.append("Index is healthy")
+        return "\n".join(lines)
     if "nodes" in value and "roots" in value and "edges" in value:
         nodes = value.get("nodes") or []
         lines = ["Session tree", "────────────", f"sessions: {len(nodes)}", f"roots: {len(value.get('roots') or [])}"]
@@ -547,6 +562,7 @@ class InteractiveSession:
     login: Callable[[], object] = lambda: {"provider": "openai-compatible", "storage": "environment-only"}
     tree: Callable[[list[str]], object] = lambda _args: {}
     diff: Callable[[], object] = lambda: {}
+    context_info: Callable[[], object] = lambda: {}
     cancel: Callable[[], object] = lambda: {"cancelled": True}
     pause: Callable[[], object] = lambda: {"paused": True}
     resume: Callable[[], object] = lambda: {"resumed": True}
@@ -569,7 +585,7 @@ class InteractiveSession:
     stopped: bool = False
     controller: InteractiveRunController | None = None
 
-    COMMANDS = ("help", "status", "tools", "plan", "mode", "model", "connect", "login", "rules", "files", "skills", "skill", "tree", "diff", "review", "test", "compact", "undo", "cancel", "pause", "resume", "clear", "quit", "exit")
+    COMMANDS = ("help", "status", "tools", "plan", "mode", "model", "connect", "login", "rules", "files", "skills", "skill", "tree", "diff", "context", "review", "test", "compact", "undo", "cancel", "pause", "resume", "clear", "quit", "exit")
 
     def header(self, *, run_id: str = "", mode: str = "plan", profile: str = "default", rules_count: int = 0, budget: int = 60_000) -> str:
         return f"ForgeCode session run={run_id or '<new>'} workspace=. mode={mode} profile={profile} rules={rules_count} budget={budget}"
@@ -586,6 +602,7 @@ class InteractiveSession:
             "/connect              configure URL, model, and API key\n"
             "/rules /files /skills inspect project guidance and context sources\n"
             "/tree /diff            inspect repository structure and Git changes\n"
+            "/context              inspect the local context index health\n"
             "/review /test          run review or verification checks\n"
             "/compact /undo         manage context and recoverable edits\n"
             "/pause /resume /cancel control an active worker\n"
@@ -668,6 +685,9 @@ class InteractiveSession:
         if command == "diff":
             if args: raise SlashCommandError("usage: /diff")
             return self.diff()
+        if command == "context":
+            if args: raise SlashCommandError("usage: /context")
+            return self.context_info()
         if command == "test": return self.test(args)
         if command == "compact":
             if args: raise SlashCommandError("usage: /compact")

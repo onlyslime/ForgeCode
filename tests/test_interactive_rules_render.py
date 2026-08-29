@@ -98,3 +98,8 @@ def test_human_status_renders_completed_run_metrics():
 def test_human_diff_result_renders_clean_state_and_content():
     assert "Working tree is clean" in _human_result({"diff_status": True, "diff": ""})
     assert "Git diff" in _human_result({"diff_status": True, "diff": "+ added line"})
+
+
+def test_human_context_status_renders_index_health():
+    rendered = _human_result({"context_status": True, "metadata": {"counts": {"files": 12}}, "stale": [], "errors": []})
+    assert "files: 12" in rendered and "Index is healthy" in rendered

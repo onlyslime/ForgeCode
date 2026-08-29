@@ -2629,6 +2629,22 @@ def main(argv: list[str] | None = None) -> int:
             except OSError as exc:
                 return {"diff_status": False, "error": _redact_display(str(exc), [api_key])}
 
+        def context_info_command() -> Any:
+            """Expose bounded, content-free context-index health in chat."""
+            try:
+                index = ContextIndex(guard)
+                metadata = index.show()
+                diagnostics = index.diagnostics()
+                return {
+                    "context_status": True,
+                    "metadata": metadata,
+                    "stale": diagnostics.get("stale", [])[:100],
+                    "errors": diagnostics.get("errors", [])[:100],
+                    "exclusions": diagnostics.get("exclusions", [])[:100],
+                }
+            except (ContextIndexError, OSError, ValueError) as exc:
+                return {"context_status": False, "error": _redact_display(str(exc), [api_key])}
+
         controller = InteractiveRunController(
             start=run_message,
             on_result=emit_interactive_result,
@@ -2656,6 +2672,7 @@ def main(argv: list[str] | None = None) -> int:
             skills=skills_command,
             tree=tree_command,
             diff=diff_command,
+            context_info=context_info_command,
             cancel=controller.cancel,
             pause=controller.pause,
             resume=controller.resume,
