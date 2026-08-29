@@ -32,6 +32,17 @@ full claim still has a limitation. Update this table whenever behavior changes.
 | Runtime tool narrowing (`--tools`, `--exclude-tools`, `--no-tools`) | CLI/config policy | `--no-tools` and allowlist lacking `write_file` fail closed during demo setup; exclude path reaches bounded run failure without traceback | verified |
 | Offline mode and telemetry policy | `config`, `telemetry` | config validate and telemetry status pass without network | verified |
 
+### Execution safety boundary
+
+Interactive and headless runs terminate through cooperative cancellation,
+provider and command deadlines, the configured total run deadline, process/EOF
+shutdown, provider/tool errors, repeated-call detection, and explicit tool-call
+budgets. There is no default agent-step cap. Side effects checkpoint before
+execution and persist transaction manifests containing before/after hashes,
+operation metadata, command exit codes, and unresolved outcomes. Interrupted
+or conflicting work is reported as `cancelled`, `recovery_required`, or
+`recovery_conflict`; it is never treated as a successful completion.
+
 ## Audit notes
 
 The audit is intentionally manual and does not use `pytest`. “Partial” items
