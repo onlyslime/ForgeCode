@@ -148,7 +148,7 @@ export const sessionEvents = (session, { workspace, after, limit, ...options } =
 export const sessionRun = (session, prompt, { workspace, ...options } = {}) => method("session.run", { ...options, params: { ...(options.params ?? {}), session, prompt, ...(workspace === undefined ? {} : { workspace }) } });
 export const sessionControl = (session, action, { workspace, ...options } = {}) => method(`session.${action}`, { ...options, params: { ...(options.params ?? {}), session, ...(workspace === undefined ? {} : { workspace }) } });
 export const sessionClose = (session, options = {}) => sessionControl(session, "close", options);
-export const sessionApproval = (session, approved, options = {}) => method("session.approval", { ...options, params: { ...(options.params ?? {}), session, approved } });
+export const sessionApproval = (session, approved, { workspace, ...options } = {}) => method("session.approval", { ...options, params: { ...(options.params ?? {}), session, approved, ...(workspace === undefined ? {} : { workspace }) } });
 export const configProfiles = (options = {}) => method("config.profiles", options);
 export const configPolicy = ({ workspace, profile, mode, tools, excludeTools, noTools, ...options } = {}) => method("config.policy", {
   ...options,
