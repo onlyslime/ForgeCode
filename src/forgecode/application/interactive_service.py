@@ -58,6 +58,32 @@ def _human_result(value: object) -> str | None:
             else:
                 lines.append(f"✓ {row}")
         return "\n".join(lines)
+    if "nodes" in value and "roots" in value and "edges" in value:
+        nodes = value.get("nodes") or []
+        lines = ["Session tree", "────────────", f"sessions: {len(nodes)}", f"roots: {len(value.get('roots') or [])}"]
+        if not nodes:
+            lines.append("No session branches yet")
+        else:
+            lines.append("")
+            for node in nodes:
+                if isinstance(node, dict):
+                    lines.append(f"  • {node.get('run_id', '?')}  {node.get('state', 'unknown')}  ({node.get('events', 0)} events)")
+        return "\n".join(lines)
+    if "rollback_available" in value and "transaction_id" in value:
+        lines = ["Review", "──────", f"transaction: {value.get('transaction_id')}", f"state: {value.get('state', 'unknown')}", f"rollback: {'available' if value.get('rollback_available') else 'unavailable'}"]
+        issues = value.get("rollback_conflicts") or value.get("store_issues") or []
+        if issues:
+            lines.append("Issues:")
+            lines.extend(f"  ⚠ {item}" for item in issues)
+        return "\n".join(lines)
+    if "summary" in value and ("before_chars" in value or "after_chars" in value):
+        return "Context compacted\n─────────────────\n" + "\n".join((
+            f"before: {value.get('before_chars', 0)} chars",
+            f"after: {value.get('after_chars', 0)} chars",
+            f"omitted messages: {value.get('omitted_messages', 0)}",
+            "",
+            str(value.get("summary") or "completed"),
+        ))
     if "results" in value and "prefix" in value and value.get("advisory") is True:
         results = value.get("results") or []
         lines = ["Files", "─────", f"prefix: {value.get('prefix') or '<all>'}", f"matches: {len(results)}"]
@@ -474,13 +500,13 @@ class InteractiveSession:
     stopped: bool = False
     controller: InteractiveRunController | None = None
 
-    COMMANDS = ("help", "status", "tools", "plan", "mode", "model", "connect", "login", "rules", "files", "skills", "skill", "tree", "review", "test", "compact", "undo", "cancel", "pause", "resume", "clear", "quit")
+    COMMANDS = ("help", "status", "tools", "plan", "mode", "model", "connect", "login", "rules", "files", "skills", "skill", "tree", "review", "test", "compact", "undo", "cancel", "pause", "resume", "clear", "quit", "exit")
 
     def header(self, *, run_id: str = "", mode: str = "plan", profile: str = "default", rules_count: int = 0, budget: int = 60_000) -> str:
         return f"ForgeCode session run={run_id or '<new>'} workspace=. mode={mode} profile={profile} rules={rules_count} budget={budget}"
 
     def help_text(self) -> str:
-        return "/help /status /tools /model /plan [show|refresh] /mode plan|act|bypass /connect [provider] /login (alias) /rules /files [prefix] /skills [id] /tree /review /test [command] /compact /undo [id|latest] /pause /resume /cancel /clear /quit; !<command> sends a bounded result to the model; !!<command> stays local"
+        return "/help /status /tools /model /plan [show|refresh] /mode plan|act|bypass /connect [provider] /login (alias) /rules /files [prefix] /skills [id] /tree /review /test [command] /compact /undo [id|latest] /pause /resume /cancel /clear /quit (/exit); !<command> sends a bounded result to the model; !!<command> stays local"
 
     def dispatch(self, line: str) -> object | None:
         line = line.rstrip("\r\n")
@@ -566,8 +592,8 @@ class InteractiveSession:
         if command == "clear":
             if args: raise SlashCommandError("usage: /clear")
             return self.clear_screen()
-        if command == "quit":
-            if args: raise SlashCommandError("usage: /quit")
+        if command in {"quit", "exit"}:
+            if args: raise SlashCommandError(f"usage: /{command}")
             result = self.quit()
             self.stopped = True
             return result
