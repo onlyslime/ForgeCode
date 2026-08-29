@@ -61,3 +61,8 @@ updating a row.
   `verification_ok=true`, but its built-in verification command invokes
   pytest. Per this audit's rule, that run is recorded as a smoke observation
   only and is not counted as no-pytest verification.
+- A second calculator run used `--no-verify` and no test runner: the CLI
+  created a committed transaction, `status --json` exposed it, and
+  `transaction --execute --auto-approve` restored the original SHA-256 and
+  marked the parent `undone` with no transaction issues. This is direct
+  evidence for the transaction/undo claim.
