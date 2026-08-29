@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.2.8 — 2026-08-29
+
+- Replaced the `fc` launcher with `fcc` to avoid PowerShell's built-in alias.
+
 ## v0.2.7 — 2026-08-29
 
 - Added the `fc` executable shortcut, which opens chat directly without
