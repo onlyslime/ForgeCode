@@ -146,3 +146,7 @@ updating a row.
 - Node SDK stress checks with the real executable confirmed typed timeout,
   pre-aborted `AbortSignal` cancellation, and output-limit errors; normal
   `invoke` and `invokeStream` calls remained JSON/event-list successes.
+- Interactive CLI was run with an injected Escape byte followed by EOF. The
+  process exited cleanly with JSONL header/result and no traceback, reporting
+  `no active worker`; cancellation of an actively running provider still
+  requires a live provider/PTY scenario and remains partial.
