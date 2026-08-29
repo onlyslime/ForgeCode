@@ -2616,14 +2616,16 @@ def main(argv: list[str] | None = None) -> int:
             print("│   local coding harness       │")
             print("╰──────────────────────────────╯\n")
             effective_model = settings.effective.model if settings.effective else settings.model
-            print(f"\x1b[90mstatus  ready   mode: {state['mode']}   model: {effective_model or 'not configured'}\x1b[0m")
-            print(f"\x1b[90mtools   {len(registry.names())} enabled   workspace: trusted\x1b[0m\n")
-            if state["mode"] in {"act", "bypass"} and bool(getattr(sys.stdin, "isatty", lambda: False)()):
+            trust_status = {"trusted": True}
+            if state["mode"] in {"act", "bypass"}:
                 try:
                     trust_status = TrustStore(workspace).status()
-                except TrustError as exc:
+                except TrustError:
                     trust_status = {"trusted": False}
-                    print(f"Workspace trust unavailable: {exc}")
+            trust_label = "trusted" if trust_status.get("trusted") else "untrusted"
+            print(f"\x1b[90mstatus  ready   mode: {state['mode']}   model: {effective_model or 'not configured'}\x1b[0m")
+            print(f"\x1b[90mtools   {len(registry.names())} enabled   workspace: {trust_label}\x1b[0m\n")
+            if state["mode"] in {"act", "bypass"} and bool(getattr(sys.stdin, "isatty", lambda: False)()):
                 if not trust_status.get("trusted"):
                     print("This workspace is not trusted for file changes or commands.")
                     try:
