@@ -14,6 +14,13 @@ uv run forgecode doctor
 uv run forgecode chat
 ```
 
+没有 Python 或 uv 时，可安装带独立运行文件的 npm 包（当前先提供 Windows x64）：
+
+```powershell
+npm install -g @onlyslime/forgecode
+fcc
+```
+
 配置模型时，在 `fcc` 中输入 `/login`，填写服务商提供的 URL、ID 和 KEY：
 
 ```powershell
@@ -45,4 +52,4 @@ fcc --act
 - [能力清单](docs/implemented-features.md)
 - [更新日志](docs/CHANGELOG.md)
 
-当前版本：`v0.6.2`。许可证：MIT。
+当前版本：`v0.6.3`。许可证：MIT。

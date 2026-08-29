@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.6.3 — 2026-08-29
+
+- Added an npm distribution wrapper that launches a bundled native ForgeCode
+  binary, so installed users can run `fcc` without Python or uv.
+- Added the Windows x64 build pipeline and package layout for future platform
+  binaries; the initial package is published as `@onlyslime/forgecode` because
+  the unscoped `forgecode` name is already owned by another project.
+
 ## v0.6.2 — 2026-08-29
 
 - Consolidated the historical root changelog into `docs/CHANGELOG.md`.

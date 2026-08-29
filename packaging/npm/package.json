@@ -1,0 +1,11 @@
+{
+  "name": "@onlyslime/forgecode",
+  "version": "0.6.3",
+  "description": "ForgeCode local coding agent",
+  "license": "MIT",
+  "bin": { "fcc": "bin/fcc.js", "forgecode": "bin/fcc.js" },
+  "files": ["bin", "dist", "README.md"],
+  "engines": { "node": ">=18" },
+  "publishConfig": { "access": "public" },
+  "scripts": { "pack:check": "npm pack --dry-run" }
+}

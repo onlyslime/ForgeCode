@@ -19,6 +19,14 @@ uv run forgecode doctor
 uv run forgecode chat
 ```
 
+For a machine without Python or uv, the npm distribution provides a bundled
+launcher and native binary (Windows x64 is available first):
+
+```sh
+npm install -g @onlyslime/forgecode
+fcc
+```
+
 For an online provider, run ForgeCode and enter the three values it gives you:
 
 ```sh
@@ -65,7 +73,7 @@ cloud runner, or operating-system sandbox. Read the [architecture](docs/architec
 [examples](docs/demo-script.md), [capability audit](docs/implemented-features.md),
 and [changelog](docs/CHANGELOG.md) for details.
 
-Current release: `v0.6.2`.
+Current release: `v0.6.3`.
 
 ## License
 
