@@ -78,6 +78,13 @@ def test_recovery_prompt_stays_within_plan_task_bound_and_keeps_follow_up():
 def test_context_jsonl_contains_results_in_one_envelope(capsys, tmp_path: Path):
     (tmp_path / "main.py").write_text("def hello():\n    return 'hello'\n", encoding="utf-8")
     assert main(["--workspace", str(tmp_path), "context", "search", "hello", "--jsonl"]) == 0
+    output = capsys.readouterr()
+    assert output.err == ""
+    records = _json_lines(output.out)
+    assert len(records) == 1
+    _assert_envelope(records[0], command="context search", ok=True)
+    assert records[0]["type"] == "context_summary"  # additive legacy label
+    assert records[0]["data"]["results"]
 
 
 def test_tools_json_exposes_stable_capability_categories(capsys, tmp_path: Path):
@@ -86,13 +93,6 @@ def test_tools_json_exposes_stable_capability_categories(capsys, tmp_path: Path)
     _assert_envelope(record, command="tools", ok=True)
     categories = {row["category"] for row in record["data"]["tools"]}
     assert {"read_only", "changes", "execution", "evidence"} <= categories
-    output = capsys.readouterr()
-    assert output.err == ""
-    records = _json_lines(output.out)
-    assert len(records) == 1
-    _assert_envelope(records[0], command="context search", ok=True)
-    assert records[0]["type"] == "context_summary"  # additive legacy label
-    assert records[0]["data"]["results"]
 
 
 def test_sessions_state_filter_is_bounded_and_machine_readable(capsys, tmp_path: Path):
