@@ -146,7 +146,7 @@ class OllamaProvider(OpenAICompatibleProvider):
 def create_provider(*, provider: str, api_key: str, base_url: str, model: str, streaming: bool = False, stream_required: bool = False, timeout: float = 60.0):
     if provider not in SUPPORTED_PROVIDERS:
         raise ValueError(f"unsupported provider: {provider}")
-    cls = {"openai-compatible": OpenAICompatibleProvider, "anthropic": AnthropicProvider, "google": GoogleProvider, "ollama": OllamaProvider}[provider]
+    cls = {"openai-compatible": OpenAICompatibleProvider, "anthropic": AnthropicProvider, "google": GoogleProvider, "ollama": OllamaProvider}.get(provider, OpenAICompatibleProvider)
     # Ollama is normally local and does not require a credential; the
     # provider-neutral adapter still needs a non-empty auth marker internally.
     return cls(api_key=(api_key or "local") if provider == "ollama" else api_key, base_url=base_url, model=model, streaming=streaming, stream_required=stream_required, timeout=timeout)

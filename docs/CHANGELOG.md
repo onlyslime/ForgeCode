@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.5.3 — 2026-08-29
+
+- Consolidated provider setup around `/connect`; `/login` is now a compatibility
+  alias with guidance to use `/connect`.
+- Added built-in provider defaults for OpenAI, Anthropic, Google, DeepSeek,
+  OpenRouter, Groq, Mistral, xAI, and Ollama, including endpoint, credential
+  environment variable, and recommended model hints.
+- OpenAI-compatible adapters can now target the expanded provider catalog.
+
 ## v0.5.2 — 2026-08-29
 
 - Fixed human-readable `/status` output; it now shows mode, run ID, last state,

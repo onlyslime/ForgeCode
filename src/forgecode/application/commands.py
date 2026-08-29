@@ -28,7 +28,7 @@ from .run_service import RunService
 from .session_service import aggregate_events
 from ..context import ContextIndex, ContextIndexError, RepositoryMapBuilder
 from ..skills import MAX_SKILL_INPUT_CHARS, SkillError, SkillExecutor, SkillInvocation, SkillLoader, SkillRegistry
-from ..config import ConfigError, ConfigLoader, Settings, parse_tool_policy_options, SUPPORTED_PROVIDERS, provider_metadata, provider_requires_credential
+from ..config import ConfigError, ConfigLoader, Settings, parse_tool_policy_options, SUPPORTED_PROVIDERS, PROVIDER_CATALOG, provider_metadata, provider_requires_credential
 from ..references import ReferenceResolver, parse_references
 from ..rules import RuleEngine
 from ..plan import PlanItem, TaskPlan
@@ -2327,27 +2327,30 @@ def main(argv: list[str] | None = None) -> int:
             """Configure a provider for this chat process without persisting secrets."""
             nonlocal settings, api_key
             effective = settings.effective
-            provider = effective.provider if effective else "openai-compatible"
-            print("Connect model")
-            base_url = input("API endpoint: ").strip()
-            model = input("Model: ").strip()
+            provider = connect_args[0] if connect_args else (effective.provider if effective else "openai-compatible")
+            if provider not in SUPPORTED_PROVIDERS:
+                return {"error": f"unsupported provider: {provider}", "code": "unsupported_provider", "available": list(SUPPORTED_PROVIDERS)}
+            defaults = PROVIDER_CATALOG[provider]
+            print(f"Connect model ({provider})")
+            base_url = input(f"API endpoint [{defaults['base_url']}]: ").strip() or defaults["base_url"]
+            model = input(f"Model [{defaults['model']}]: ").strip() or defaults["model"]
             if provider not in SUPPORTED_PROVIDERS:
                 return {"error": f"unsupported provider: {provider}", "code": "unsupported_provider"}
             if not base_url or not model:
                 return {"error": "API endpoint URL and model name are required", "code": "connect_incomplete"}
             requires_key = provider_requires_credential(provider)
             if requires_key:
-                entered = input("API key: ").strip()
+                entered = input(f"API key ({defaults['api_key_env']}): ").strip() or os.getenv(defaults["api_key_env"], "")
                 if not entered:
                     return {"error": "API key must not be empty", "code": "credential_missing"}
                 # Keep the credential process-local and never write it to config/session.
                 api_key = entered
-                os.environ["FORGECODE_API_KEY"] = entered
+                os.environ[defaults["api_key_env"]] = entered
                 try:
                     _save_connection(workspace, endpoint=base_url, model=model, api_key=entered)
                 except OSError as exc:
                     return {"error": f"could not save connection: {exc}", "code": "connect_persist_failed"}
-                api_key_env = "FORGECODE_API_KEY"
+                api_key_env = defaults["api_key_env"]
             else:
                 api_key_env = effective.api_key_env if effective else "FORGECODE_API_KEY"
             if effective is not None:
@@ -2355,7 +2358,7 @@ def main(argv: list[str] | None = None) -> int:
             else:
                 updated = None
             settings = Settings(workspace=workspace, model=model or None, api_key_env=api_key_env, base_url=base_url, profile=settings.profile, effective=updated)
-            return {"connected": True, "provider": provider, "model": model or None, "base_url": base_url, "api_key_configured": (not requires_key) or bool(api_key), "storage": "workspace-local-ignored" if requires_key else "process-environment-only"}
+            return {"connected": True, "provider": provider, "model": model or None, "base_url": base_url, "api_key_env": api_key_env, "api_key_configured": (not requires_key) or bool(api_key), "storage": "workspace-local-ignored" if requires_key else "process-environment-only"}
 
         def clear_screen_command() -> Any:
             if not machine_json:

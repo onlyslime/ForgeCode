@@ -417,7 +417,7 @@ class InteractiveSession:
         return f"ForgeCode session run={run_id or '<new>'} workspace=. mode={mode} profile={profile} rules={rules_count} budget={budget}"
 
     def help_text(self) -> str:
-        return "/help /status /tools /model /plan [show|refresh] /mode plan|act|bypass /connect /login /rules /files [prefix] /skills [id] /tree /review /test [command] /compact /undo [id|latest] /pause /resume /cancel /clear /quit; !<command> sends a bounded result to the model; !!<command> stays local"
+        return "/help /status /tools /model /plan [show|refresh] /mode plan|act|bypass /connect [provider] /login (alias) /rules /files [prefix] /skills [id] /tree /review /test [command] /compact /undo [id|latest] /pause /resume /cancel /clear /quit; !<command> sends a bounded result to the model; !!<command> stays local"
 
     def dispatch(self, line: str) -> object | None:
         line = line.rstrip("\r\n")
@@ -462,13 +462,13 @@ class InteractiveSession:
                 raise SlashCommandError("usage: /model [show|list|select <name>]")
             return self.model(args)
         if command == "connect":
-            if args:
-                raise SlashCommandError("usage: /connect (then enter API endpoint, API key, and model)")
+            if len(args) > 1:
+                raise SlashCommandError("usage: /connect [provider]")
             return self.connect(args)
         if command == "login":
             if args:
-                raise SlashCommandError("usage: /login")
-            return self.login()
+                raise SlashCommandError("usage: /login (alias for /connect)")
+            return {"message": "Use /connect to choose a provider and configure credentials; /login is kept as a compatibility alias."}
         if command == "rules":
             if args: raise SlashCommandError("usage: /rules")
             return self.rules()
