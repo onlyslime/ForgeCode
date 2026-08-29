@@ -143,3 +143,6 @@ updating a row.
   `/quit`, and prefix-only `!`/`!!` parsing. InteractiveRunController accepted
   two bounded follow-ups, rejected a full queue, reported pending pause and
   cancel, and drained without running queued work after cancellation.
+- Node SDK stress checks with the real executable confirmed typed timeout,
+  pre-aborted `AbortSignal` cancellation, and output-limit errors; normal
+  `invoke` and `invokeStream` calls remained JSON/event-list successes.
