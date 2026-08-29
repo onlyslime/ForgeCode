@@ -19,7 +19,7 @@ full claim still has a limitation. Update this table whenever behavior changes.
 | Strict JSON/JSONL machine contract and exit codes | global `--json/--jsonl` | doctor/config/RPC responses parsed as JSON; full exit matrix pending | partial |
 | Rules and scoped `AGENTS.md` precedence | `rules`, `rules.py` | nested-rule smoke | verified |
 | Explicit context references and bounded context index | `context`, `context/index.py` | index/search/path-boundary smoke | verified |
-| Structured plans and interactive controls | `plan`, `chat` | help available; interactive FIFO/pause/cancel stress pending | partial |
+| Structured plans and interactive controls | `plan`, `chat` | direct dispatcher and controller probes; bounded FIFO/pause/cancel verified | verified |
 | Skills manifest validation and bounded execution | `skills`, `skills.py` | list/check malformed manifest | verified |
 | Provider diagnostics and profile selection | `provider`, `config profiles` | `provider health/list` and `config profiles --json` pass offline | verified |
 | Lifecycle hooks with fail-closed behavior | `hooks.py` | direct exception, timeout, recursion, cancellation and redaction probes | verified |
@@ -27,7 +27,7 @@ full claim still has a limitation. Update this table whenever behavior changes.
 | Evidence-driven review and export verification | `review`, `review.py` | fresh workspace review smoke | partial |
 | Incremental context extensions | `context complete`, `context/repository.py` | source inspection; large-tree stress pending | partial |
 | Session tree/clone/import and trajectory evaluation | `session tree`, `eval` | help and empty-session boundary probes | partial |
-| Interactive pause/resume/cancel and Escape handling | `chat`, `interactive_service.py` | source inspection; PTY stress pending | partial |
+| Interactive pause/resume/cancel and Escape handling | `chat`, `interactive_service.py` | controller pause/cancel boundary verified; PTY/Escape integration pending | partial |
 | RPC server plus Python/Node embedding | `rpc`, `rpc.py`, `sdk/node/index.mjs` | JSONL request/response smoke | partial |
 | Runtime tool narrowing (`--tools`, `--exclude-tools`, `--no-tools`) | CLI/config policy | policy help/source identified; deny-path matrix pending | partial |
 | Offline mode and telemetry policy | `config`, `telemetry` | config validate and telemetry status pass without network | verified |
@@ -101,3 +101,7 @@ updating a row.
   malformed SSE JSON, repeated `[DONE]`, and `NaN` frames with typed
   `ProviderError(stream_protocol_error)`; no tool call was emitted for the
   invalid streams.
+- InteractiveSession probes confirmed `/help`, `/mode`, unknown-command errors,
+  `/quit`, and prefix-only `!`/`!!` parsing. InteractiveRunController accepted
+  two bounded follow-ups, rejected a full queue, reported pending pause and
+  cancel, and drained without running queued work after cancellation.
