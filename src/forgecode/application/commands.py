@@ -2404,7 +2404,7 @@ def main(argv: list[str] | None = None) -> int:
             return {"mode": state["mode"], "run_id": session.run_id, "transactions": len(manifests), "last_state": getattr(state["last"], "state", None), "latest_verification": state["last_verification"], "worker": controller.snapshot() if controller is not None else {"active": False}}
 
         def tools_command() -> Any:
-            evidence_names = {"review", "test", "git_status", "git_diff", "transaction", "rollback", "eval"}
+            evidence_names = {"review", "test", "diagnostics", "git_status", "git_diff", "transaction", "rollback", "eval"}
             execution_names = {"run_command", "run_background", "process_status", "poll_process", "kill_process"}
             change_names = {"write_file", "apply_patch", "git_commit"}
             rows = []
@@ -2750,7 +2750,7 @@ def main(argv: list[str] | None = None) -> int:
     if command == "tools":
         machine_json = bool(getattr(args, "json", False) or getattr(args, "jsonl", False))
         command_name = "tools"
-        evidence_names = {"review", "test", "git_status", "git_diff", "transaction", "rollback", "eval"}
+        evidence_names = {"review", "test", "diagnostics", "git_status", "git_diff", "transaction", "rollback", "eval"}
         execution_names = {"run_command", "run_background", "process_status", "poll_process", "kill_process"}
         change_names = {"write_file", "apply_patch", "git_commit"}
         tool_data = []

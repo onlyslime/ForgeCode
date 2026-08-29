@@ -52,7 +52,7 @@ def _human_result(value: object) -> str | None:
         rows = value.get("tools") or []
         lines = ["Available tools", "───────────────"]
         groups: dict[str, list[object]] = {"Read-only": [], "Changes": [], "Execution": [], "Evidence": [], "Other": []}
-        evidence_names = {"review", "test", "git_status", "git_diff", "transaction", "rollback", "eval"}
+        evidence_names = {"review", "test", "diagnostics", "git_status", "git_diff", "transaction", "rollback", "eval"}
         execution_names = {"run_command", "run_background", "process_status", "poll_process", "kill_process"}
         change_names = {"write_file", "apply_patch", "git_commit"}
         for row in rows:
