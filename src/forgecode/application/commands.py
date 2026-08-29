@@ -2193,7 +2193,7 @@ def main(argv: list[str] | None = None) -> int:
             """Draw the persistent human input area at the current bottom."""
             if machine_json:
                 return
-            print("\x1b[40;97m╭─ forgecode │ message\n╰─❯ \x1b[0m", end="", flush=True)
+            print(f"\x1b[40;97m╭─ forgecode │ {state['mode']}\n╰─❯ \x1b[0m", end="", flush=True)
 
         def model_command(model_args: list[str]) -> Any:
             nonlocal settings
