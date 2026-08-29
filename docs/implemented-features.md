@@ -8,9 +8,9 @@ full claim still has a limitation. Update this table whenever behavior changes.
 | Capability | Entry point / source | Manual audit evidence | Status |
 |---|---|---|---|
 | Plan/Act mode and fail-closed tool policy | `plan`, `src/forgecode/agent/loop.py` | filtered registry returns typed `tool_unavailable` for side-effect calls, `unknown_tool` for forged names, and `mode_denied` in plan mode | verified |
-| Workspace path and symlink guard | `src/forgecode/security/workspace.py` | CLI parent traversal and direct `WorkspaceGuard` traversal rejection; symlink stress pending | partial |
+| Workspace path and symlink guard | `src/forgecode/security/workspace.py` | CLI parent traversal and direct guard rejection; existing symlink/junction entries are rejected lexically, metadata errors now fail closed; OS link creation unavailable here | partial |
 | Read/list/search UTF-8 tools | `tools`, `src/forgecode/tools/filesystem.py` | 150 UTF-8 files indexed/searched; list limit 100 truncates with omitted count; >2 MB, invalid UTF-8, traversal, and read/write race inputs fail closed; broader platform race stress pending | partial |
-| Structured multi-file patch with atomic write | `apply_patch`, `tools/patch.py` | malformed second hunk is rejected during pre-parse and both target files remain byte-identical; write-failure injection still pending | partial |
+| Structured multi-file patch with atomic write | `apply_patch`, `tools/patch.py` | malformed second hunk is rejected pre-write; injected second-file I/O failure returns `write_failed`, rolls back first file, and preserves both originals | verified |
 | Command risk classes, approval, timeout and output limits | `run_command`, `tools/shell.py` | dangerous classification, deny approval, 1 MiB output truncation, and typed timeout observed | verified |
 | Secret redaction and privacy boundary | `security/redaction.py`, `privacy.md` | review found test fixtures are flagged as token-shaped; runtime redaction stress pending | partial |
 | Session JSONL persistence, checkpoints and recovery | `storage/`, `session`, `sessions` | synthetic checkpoint resume returns typed recovery conflict; changed file is detected by SHA-256; 8-thread/200-event append stress had zero issues; real process crash/restart stress remains pending | partial |
@@ -210,3 +210,10 @@ updating a row.
   expected exit code (0 for success, 2 for client/input errors), and no
   traceback. Provider/network and every subcommand combination remain outside
   this bounded matrix.
+- Fault-injection patch probe replaced the atomic writer to fail on the second
+  file. The tool returned `write_failed` with `rolled_back=true`; both files
+  matched their original bytes, confirming multi-file rollback on I/O error.
+- Workspace alias handling was tightened so metadata/permission failures while
+  checking a path are treated as unsafe (missing components remain valid for
+  creation). Symlink creation was attempted but denied by this Windows
+  environment, so the OS-specific positive rejection path remains noted.
