@@ -59,6 +59,9 @@
   renderer displays the active filter explicitly.
 - `/events <kind>` is now a shorthand for filtering the latest 40 events,
   matching the completion menu and keeping the full bounded form available.
+- Event query callbacks retain compatibility with older embedded integrations:
+  zero-argument callbacks continue to work while the built-in session handler
+  receives bounded limit and kind parameters.
 - Provider request identities retain zero-based per-turn suffixes for
   compatibility with existing audit consumers while the UI remains 1-based.
 - Interactive Act/Bypass sessions now ask once whether the current workspace

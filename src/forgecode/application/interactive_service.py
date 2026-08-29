@@ -11,6 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 import json
 import difflib
+import inspect
 import re
 import shlex
 import threading
@@ -720,7 +721,16 @@ class InteractiveSession:
                 raise SlashCommandError("events limit must be between 1 and 100")
             if kind and (len(kind) > 64 or any(ch.isspace() for ch in kind)):
                 raise SlashCommandError("event kind must be bounded text")
-            return self.events_info(limit, kind)
+            # Preserve the original zero-argument callback contract for
+            # embedders while allowing the production callback to receive
+            # bounded query parameters.
+            try:
+                parameters = inspect.signature(self.events_info).parameters
+                accepts_query = any(item.kind == inspect.Parameter.VAR_POSITIONAL for item in parameters.values()) or len(parameters) >= 2
+                accepts_limit = accepts_query or len(parameters) == 1
+            except (TypeError, ValueError):
+                accepts_query = True
+            return self.events_info(limit, kind) if accepts_query else (self.events_info(limit) if accepts_limit else self.events_info())
         if command == "test": return self.test(args)
         if command == "compact":
             if args: raise SlashCommandError("usage: /compact")

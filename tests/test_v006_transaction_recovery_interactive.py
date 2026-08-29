@@ -277,6 +277,11 @@ def test_interactive_context_and_events_commands_stay_local():
     assert calls == []
 
 
+def test_events_command_keeps_zero_argument_callback_compatibility():
+    service = InteractiveSession(lambda _message: None, events_info=lambda: {"events_status": True, "events": []}, output=lambda _text: None)
+    assert service.dispatch("/events")["events_status"] is True
+
+
 def test_interactive_unknown_plan_denial_and_quit_are_recoverable():
     service = InteractiveSession(lambda message: message, set_mode=lambda mode: {"error": "approval denied"} if mode == "act" else {"mode": mode}, output=lambda _text: None)
     results = service.run_stream(["/unknown\n", "/mode act\n", "/quit\n", "ignored\n"])
