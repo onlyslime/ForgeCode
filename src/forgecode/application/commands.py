@@ -1902,8 +1902,10 @@ def main(argv: list[str] | None = None) -> int:
                     controller.flush_pending_controls()
                 try:
                     started_at = time.monotonic()
+                    tool_steps = 0
                     file_snapshots: dict[str, str] = {}
                     def progress_event(kind: str, payload: dict[str, Any]) -> None:
+                        nonlocal tool_steps
                         if machine_json:
                             return
                         labels = {"tool_call": "▸", "tool_result": "✓" if payload.get("ok") else "✗", "verification_result": "✓" if payload.get("ok") else "✗", "command_result": "✓" if payload.get("ok") else "✗", "command_timeout": "✗", "mode": "•", "model_message": "◆", "model_progress": "…"}
@@ -1918,17 +1920,21 @@ def main(argv: list[str] | None = None) -> int:
                         with output_lock:
                             elapsed = time.monotonic() - started_at
                             if kind == "model_progress":
-                                print(f"\x1b[2K\r\x1b[35m… assistant  ({elapsed:.1f}s)\x1b[0m {payload.get('message', '')}")
+                                turn = int(payload.get("step", 0)) + 1
+                                print(f"\x1b[2K\r\x1b[35m… assistant turn {turn}  ({elapsed:.1f}s)\x1b[0m {payload.get('message', '')}  \x1b[90m[{tool_steps} tool steps]\x1b[0m")
                                 redraw_input_bar()
                                 return
                             if kind == "model_message":
                                 content = str(payload.get("content") or "").strip()
                                 if content:
-                                    print(f"\x1b[2K\r\x1b[35m◆ assistant  ({elapsed:.1f}s)\x1b[0m")
+                                    turn = int(payload.get("step", 0)) + 1
+                                    print(f"\x1b[2K\r\x1b[35m◆ assistant turn {turn}  ({elapsed:.1f}s)\x1b[0m")
                                     print(content)
                                 redraw_input_bar()
                                 return
                             print(f"\x1b[2K\r{color}{labels[kind]} {text}  ({elapsed:.1f}s)\x1b[0m")
+                            if kind == "tool_call":
+                                tool_steps += 1
                             if kind == "tool_result" and tool == "read_file" and payload.get("ok"):
                                 path = str(payload.get("metadata", {}).get("path") or arguments.get("path") or "")
                                 file_snapshots[path] = str(payload.get("output") or "")

@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.3.3 — 2026-08-29
+
+- Improved human-readable task timelines with numbered assistant turns,
+  elapsed time, and cumulative tool-step counts.
+
 ## v0.3.2 — 2026-08-29
 
 - Added immediate assistant progress events before each model turn, so
