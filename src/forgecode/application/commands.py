@@ -46,6 +46,27 @@ from ..hooks import Hook, HookRegistry
 from .review_service import ReviewService
 
 
+def _load_saved_credential(workspace: Path) -> None:
+    """Load a workspace-local ignored credential when no environment value exists."""
+    path = workspace / ".forgecode" / "credentials.json"
+    try:
+        if path.is_file() and not os.getenv("FORGECODE_API_KEY"):
+            data = json.loads(path.read_text(encoding="utf-8"))
+            value = data.get("FORGECODE_API_KEY") if isinstance(data, dict) else None
+            if isinstance(value, str) and value:
+                os.environ["FORGECODE_API_KEY"] = value
+    except (OSError, ValueError):
+        pass
+
+
+def _save_connection(workspace: Path, *, endpoint: str, model: str, api_key: str) -> None:
+    """Persist connection metadata and credential in ignored workspace state."""
+    folder = workspace / ".forgecode"
+    folder.mkdir(parents=True, exist_ok=True)
+    (folder / "credentials.json").write_text(json.dumps({"FORGECODE_API_KEY": api_key}, ensure_ascii=False), encoding="utf-8")
+    (folder / "config.toml").write_text("provider = \"openai-compatible\"\n" + f"base_url = {json.dumps(endpoint)}\nmodel = {json.dumps(model)}\n", encoding="utf-8")
+
+
 def _build_provider(effective):
     """Construct the selected provider while preserving legacy injection."""
     provider_name = effective.provider if effective else "openai-compatible"
@@ -703,6 +724,7 @@ def main(argv: list[str] | None = None) -> int:
         else:
             print(message, file=sys.stderr)
         return 2
+    _load_saved_credential(workspace)
 
     try:
         selected_profile = getattr(args, "profile", None)
@@ -2222,6 +2244,10 @@ def main(argv: list[str] | None = None) -> int:
                 # Keep the credential process-local and never write it to config/session.
                 api_key = entered
                 os.environ["FORGECODE_API_KEY"] = entered
+                try:
+                    _save_connection(workspace, endpoint=base_url, model=model, api_key=entered)
+                except OSError as exc:
+                    return {"error": f"could not save connection: {exc}", "code": "connect_persist_failed"}
                 api_key_env = "FORGECODE_API_KEY"
             else:
                 api_key_env = effective.api_key_env if effective else "FORGECODE_API_KEY"
@@ -2230,7 +2256,7 @@ def main(argv: list[str] | None = None) -> int:
             else:
                 updated = None
             settings = Settings(workspace=workspace, model=model or None, api_key_env=api_key_env, base_url=base_url, profile=settings.profile, effective=updated)
-            return {"connected": True, "provider": provider, "model": model or None, "base_url": base_url, "api_key_configured": (not requires_key) or bool(api_key), "storage": "process-environment-only"}
+            return {"connected": True, "provider": provider, "model": model or None, "base_url": base_url, "api_key_configured": (not requires_key) or bool(api_key), "storage": "workspace-local-ignored" if requires_key else "process-environment-only"}
 
         def clear_screen_command() -> Any:
             if not machine_json:
