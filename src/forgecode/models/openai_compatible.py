@@ -753,6 +753,16 @@ class OpenAICompatibleProvider:
                         except ProviderError as exc:
                             annotate_error(exc, attempt)
                             attempt_finished(attempt_info, outcome="error", error_category=exc.category, unresolved=exc.unresolved)
+                            # A malformed or truncated SSE response is a
+                            # provider/proxy protocol failure, not a tool
+                            # execution failure: no model tool call has been
+                            # handed to AgentLoop yet. Retry it within the
+                            # existing bounded request budget.
+                            if (exc.category in {"stream_protocol_error", "stream_incomplete"}
+                                    and attempt <= self.max_retries
+                                    and not exc.unresolved):
+                                await self._retry(attempt, exc.category, str(exc), context=request_context, request_id=request_id)
+                                continue
                             raise
                         except (TimeoutError, error.URLError, OSError) as exc:
                             unresolved = bool(getattr(exc, "unresolved", False))

@@ -31,6 +31,9 @@
   a close-match suggestion when a typo is detected.
 - Completion now also suggests valid arguments for `/mode`, `/plan`, `/model`,
   and `/undo`, reducing command syntax friction during live use.
+- Optional streaming requests now retry truncated or malformed SSE frames
+  before surfacing an error; incomplete tool calls stay inside the provider and
+  cannot reach the executor as partial side effects.
 - Provider request identities retain zero-based per-turn suffixes for
   compatibility with existing audit consumers while the UI remains 1-based.
 - Interactive Act/Bypass sessions now ask once whether the current workspace

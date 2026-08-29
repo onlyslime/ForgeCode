@@ -295,6 +295,41 @@ def test_stream_transient_http_error_retries_before_success():
     assert provider.retry_events and provider.retry_events[0]["category"] == "stream_http_503"
 
 
+def test_stream_protocol_failure_retries_before_exposing_tool_calls():
+    class InterruptedThenValidTransport:
+        def __init__(self):
+            self.calls = 0
+
+        def post_stream(self, *_args):
+            self.calls += 1
+            if self.calls == 1:
+                # The first request contains a partial side-effecting tool call
+                # and then loses [DONE]. It must never escape the provider.
+                return 200, iter([
+                    b'data: {"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"w1","function":{"name":"write_file","arguments":"{\\"path\\":"}}]}}]}\n',
+                ])
+            return 200, iter([
+                b'data: {"choices":[{"index":0,"delta":{"content":"recovered"},"finish_reason":"stop"}]}\n',
+                b'data: [DONE]\n',
+            ])
+
+        def post_json(self, *_args):
+            raise AssertionError("protocol retry should stay on the stream path")
+
+    transport = InterruptedThenValidTransport()
+    provider = __import__("forgecode.models", fromlist=["OpenAICompatibleProvider"]).OpenAICompatibleProvider(
+        api_key="key", base_url="https://example.test/v1", model="m", transport=transport,
+        streaming=True, retry_base_delay=0, max_retries=1,
+    )
+    response = __import__("asyncio").run(provider.complete([Message("user", "hi")], []))
+
+    assert response.message.content == "recovered"
+    assert response.message.tool_calls == ()
+    assert transport.calls == 2
+    assert provider.retry_events[0]["category"] == "stream_incomplete"
+    assert [item["outcome"] for item in provider.attempt_events] == ["error", "success"]
+
+
 def test_provider_honors_bounded_retry_after_header_from_transport():
     class RetryAfterTransport:
         def __init__(self):
