@@ -26,7 +26,7 @@ full claim still has a limitation. Update this table whenever behavior changes.
 | Named test profiles and bounded verification | `test`, `testing.py` | direct runner probe: plan=skipped, deny=denied, allow=passed (exit 0); no pytest command used | verified |
 | Evidence-driven review and export verification | `review`, `review.py` | repository review now excludes test fixtures from secret scan, reports 0 findings/exit 0; clean temporary workspace review/export also pass | verified |
 | Incremental context extensions | `context complete`, `context/repository.py` | temporary repository update/delete/add stress: digest update, removal, bounded search, and diagnostics all passed | verified |
-| Session tree/clone/import and trajectory evaluation | `session tree`, `eval` | completed-session tree/clone (no replay) verified; evaluator correctly returns `trajectory_incomplete` for unverified run | partial |
+| Session tree/clone/import and trajectory evaluation | `session tree`, `eval` | completed-session tree/clone and canonical cross-workspace import verified; byte mutation is rejected; evaluator correctly returns `trajectory_incomplete` for unverified run | partial |
 | Interactive pause/resume/cancel and Escape handling | `chat`, `interactive_service.py` | controller pause/cancel boundary verified; PTY/Escape integration pending | partial |
 | RPC server plus Python/Node embedding | `rpc`, `rpc.py`, `sdk/node/index.mjs` | Python and Node SDK doctor/provider-health calls plus stream event-list smoke | verified |
 | Runtime tool narrowing (`--tools`, `--exclude-tools`, `--no-tools`) | CLI/config policy | `--no-tools` and allowlist lacking `write_file` fail closed during demo setup; exclude path reaches bounded run failure without traceback | verified |
@@ -154,8 +154,9 @@ updating a row.
   with preserved sequence/run metadata and no traceback. Importing that
   artifact into a separate temporary workspace succeeded with 108 events and
   `replay=false`. Flipping one byte changed the reported `source_digest` but
-  was still accepted, so import works while tamper-rejection/integrity
-  enforcement remains a documented gap.
+  was rejected with typed `invalid_session`; import now requires canonical
+  JSONL bytes and fails closed on mutation. Cryptographic signing remains out
+  of scope, so artifacts should still be transferred through a trusted path.
 - Additional boundary checks: `WorkspaceGuard.resolve("../x.txt")` raised a
   typed `WorkspaceViolation`; `context complete ../` returned JSON exit 2;
   runtime `run --no-tools` and a restrictive `--tools` allowlist refused demo

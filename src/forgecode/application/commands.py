@@ -2,6 +2,7 @@
 
 import argparse
 import asyncio
+from dataclasses import asdict
 import json
 import json as jsonlib
 import os
@@ -2636,6 +2637,17 @@ def main(argv: list[str] | None = None) -> int:
                 read_result = source_store.read_with_issues()
                 if read_result.issues or not read_result.events:
                     raise SessionFormatError("session artifact is invalid or empty")
+                # Session exports are canonical JSONL.  Re-serializing the
+                # validated events and requiring byte-for-byte equality makes
+                # import integrity fail closed: a changed byte (including
+                # whitespace, line endings, or an extra field) cannot be
+                # silently accepted as a new artifact with a new digest.
+                canonical = "".join(
+                    jsonlib.dumps(asdict(event), ensure_ascii=False, allow_nan=False, separators=(",", ":")) + "\n"
+                    for event in read_result.events
+                ).encode("utf-8")
+                if source.read_bytes() != canonical:
+                    raise SessionFormatError("session artifact is not canonical or has been tampered with")
                 run_ids = {event.run_id for event in read_result.events if event.run_id}
                 sequences = [event.sequence for event in read_result.events]
                 if len(run_ids) != 1 or sequences != sorted(set(sequences)):
