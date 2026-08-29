@@ -2188,7 +2188,10 @@ def main(argv: list[str] | None = None) -> int:
 
         def interactive_output(text: str) -> None:
             with output_lock:
+                # Keep asynchronous model output above the persistent prompt.
+                print("\x1b[2K\r", end="")
                 print(text)
+                redraw_input_bar()
 
         def redraw_input_bar() -> None:
             """Draw the persistent human input area at the current bottom."""
