@@ -185,8 +185,10 @@ class RunService:
         def observed_event(name: str, data: dict[str, Any]) -> None:
             if telemetry is not None:
                 try:
-                    telemetry.record(str(name), **{key: value for key, value in data.items() if isinstance(value, (str, int, float, bool)) or value is None})
-                except (OSError, ValueError):
+                    # ``event`` is the positional record name; never pass a
+                    # provider/session payload field with the same key.
+                    telemetry.record(str(name), **{key: value for key, value in data.items() if key != "event" and (isinstance(value, (str, int, float, bool)) or value is None)})
+                except (OSError, ValueError, TypeError):
                     pass
             if on_event is not None:
                 on_event(name, data)
