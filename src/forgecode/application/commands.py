@@ -1940,7 +1940,19 @@ def main(argv: list[str] | None = None) -> int:
                                 tool_steps += 1
                             if kind == "tool_result" and tool == "read_file" and payload.get("ok"):
                                 path = str(payload.get("metadata", {}).get("path") or arguments.get("path") or "")
-                                file_snapshots[path] = str(payload.get("output") or "")
+                                output = str(payload.get("output") or "")
+                                file_snapshots[path] = output
+                                print("  \x1b[100;97m file content \x1b[0m")
+                                for line_number, line in enumerate(output.splitlines()[:24], 1):
+                                    print(f"  \x1b[100;37m{line_number:>3} │ {line[:240]}\x1b[0m")
+                                if len(output.splitlines()) > 24:
+                                    print(f"  \x1b[100;90m… {len(output.splitlines()) - 24} more lines\x1b[0m")
+                            if kind == "tool_result" and tool in {"run_command", "search"} and payload.get("ok"):
+                                output = str(payload.get("output") or "").strip()
+                                if output:
+                                    print("  \x1b[100;97m output \x1b[0m")
+                                    for line in output.splitlines()[:12]:
+                                        print(f"  \x1b[100;37m{line[:240]}\x1b[0m")
                             if kind == "tool_call" and tool in {"write_file", "apply_patch"}:
                                 preview = arguments.get("content") or arguments.get("patch")
                                 if isinstance(preview, str):
@@ -1978,7 +1990,7 @@ def main(argv: list[str] | None = None) -> int:
                         session.append("plan_updated", {"plan": current.to_dict()}, mode=state["mode"])
                     except ValueError:
                         pass
-                payload = {"stopped_reason": result.stopped_reason, "state": result.state, "succeeded": result.succeeded, "verification_ok": result.verification_ok, "run_id": result.run_id, "duration_seconds": round(time.monotonic() - started_at, 3)}
+                payload = {"stopped_reason": result.stopped_reason, "state": result.state, "succeeded": result.succeeded, "verification_ok": result.verification_ok, "run_id": result.run_id, "duration_seconds": round(time.monotonic() - started_at, 3), "tool_steps": tool_steps}
                 if result.error:
                     payload["error"] = _redact_display(result.error, [api_key])
                 # Interactive callers need to see the assistant's actual

@@ -39,6 +39,8 @@ def _human_result(value: object) -> str | None:
     if value.get("message") and value.get("state") == "completed":
         duration = value.get("duration_seconds")
         suffix = f"\n\nWorked for {_format_duration(duration)}" if isinstance(duration, (int, float)) else ""
+        if isinstance(value.get("tool_steps"), int):
+            suffix += f" · {value['tool_steps']} tool steps"
         return _pretty_text(value["message"]) + suffix
     if value.get("error"):
         return f"Error: {_pretty_text(value.get('error'))}"

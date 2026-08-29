@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.3.5 — 2026-08-29
+
+- Improved the human timeline with bounded file-content previews (line
+  numbers), command/search output panels, truncation hints, and cumulative tool
+  step counts in the final `Worked for …` summary.
+
 ## v0.3.4 — 2026-08-29
 
 - Enabled SSE streaming by default for profiles using `streaming = "auto"`;
