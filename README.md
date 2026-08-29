@@ -18,9 +18,9 @@ Chat Completions 返回结构化 tool calls，ForgeCode 在用户指定工作区
 - **Plan/Act 权限边界**：plan 只暴露摘要、列文件、读文件和搜索；工具执行层
   即使收到伪造调用也会返回 `mode_denied`。act 允许副作用，但每次写入、patch
   和命令仍经过审批。
-- **连接与交互外观**：交互会话支持 `/connect`（进程内配置 provider、model
-  和兼容 API 地址）、`/model` profile 管理、`/clear`，并在真实终端显示
-  `forgecode>` 输入提示和 WELCOME 横幅；凭据只保存在当前进程环境。
+- **连接与交互外观**：交互会话支持 `/connect`（交互式配置 API endpoint、
+  API key 和 model）以及 `/clear`，并在真实终端显示黑底输入栏和就绪横幅；
+  凭据只保存在当前进程环境。
 - **结构化 `apply_patch`**：支持 unified diff 和 `*** Begin Patch`，多文件/多
   hunk、行偏移、新建和显式删除；执行前检查路径、UTF-8、大小、上下文和符号
   链接边界，内存预验证后才原子写入，并展示有上限的 diff preview。
@@ -57,12 +57,13 @@ Chat Completions 返回结构化 tool calls，ForgeCode 在用户指定工作区
 - **滚动有界上下文**：AgentLoop 按序列化消息/工具参数大小自动触发有界压缩；摘要保留目标、安全规则、计划、验证和最近完整 tool pairing，并追加带 source sequence/fingerprint 的 `context_compacted` 证据。达到硬上限时明确报告退化，不假设无限上下文。
 - **整条轨迹评估**：`forgecode eval`（别名 `benchmark`）只读取持久化事件，计算完成、真实验证、失败/修复、审批拒绝、重复调用、压缩、冲突、取消、未决和审计指标；模型自评不能制造成功。
 - **会话树与路径建议**：`session tree|clone|import` 提供不重放副作用的父子证据；`context complete` 和交互 `/files <prefix>` 返回稳定相对路径及排除原因，结果仅供建议。
-- **模型 profile**：`config profiles` 和交互 `/model list|show|select` 展示/切换经过严格校验的 provider 配置，只显示 API key 环境变量名和是否配置，并记录切换事件。
+- **模型 profile**：`config profiles` 展示/切换经过严格校验的 provider 配置；
+  交互连接使用 `/connect`，只显示 API key 环境变量名和是否配置。
 
 ### v0.0.10 交互运行时控制
 
 - **单一可控 worker**：`chat`/`start` 在同一个 AgentLoop 上支持有界 FIFO follow-up；`/pause`、`/resume`、`/cancel` 在 provider、工具、审批和验证安全边界生效。恢复会校验 session/checkpoint 与规则、计划、配置指纹；无法停止的 worker 进入 recovery-required。
-- **机器契约与模型竞态**：`chat --jsonl` 保证 stdout 每行是可解析 envelope，进度/审批只写 stderr；运行期间 `/model select` 安全拒绝且不改变 provider。旧 `InteractiveSession` 和 `--json` 入口保持兼容。
+- **机器契约与模型竞态**：`chat --jsonl` 保证 stdout 每行是可解析 envelope，进度/审批只写 stderr；运行期间 provider 配置不会绕过安全边界。旧 `InteractiveSession` 和 `--json` 入口保持兼容。
 
 ### v0.0.11 Pi-inspired 终端快捷方式
 

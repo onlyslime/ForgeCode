@@ -292,9 +292,10 @@ updating a row.
 
 ## 2026-08-29 interactive UX additions
 
-- Added `/connect [provider model base_url]` for process-local provider setup;
-  API keys are entered with hidden input and are never persisted. `/model`
-  continues to list/show/select validated profiles.
-- Added `/clear`, a startup `WELCOME to ForgeCode` banner, and a visible
-  `forgecode> ` prompt when running on an interactive terminal. JSON/JSONL
-  transports remain prompt-free and machine-readable.
+- Added interactive `/connect`, which explicitly prompts for API endpoint URL,
+  model name, and hidden API key; values remain process-local and are never
+  persisted. Profile inspection remains available through CLI config commands,
+  while the interactive `/model` command is intentionally not exposed.
+- Added `/clear` (screen reset only), a compact text ready banner, and a
+  black-background input bar on interactive terminals. JSON/JSONL transports
+  remain prompt-free and machine-readable.

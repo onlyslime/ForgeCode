@@ -338,13 +338,13 @@ class InteractiveSession:
     stopped: bool = False
     controller: InteractiveRunController | None = None
 
-    COMMANDS = ("help", "status", "plan", "mode", "model", "connect", "login", "rules", "files", "skills", "skill", "tree", "review", "test", "compact", "undo", "cancel", "pause", "resume", "clear", "quit")
+    COMMANDS = ("help", "status", "plan", "mode", "connect", "login", "rules", "files", "skills", "skill", "tree", "review", "test", "compact", "undo", "cancel", "pause", "resume", "clear", "quit")
 
     def header(self, *, run_id: str = "", mode: str = "plan", profile: str = "default", rules_count: int = 0, budget: int = 60_000) -> str:
         return f"ForgeCode session run={run_id or '<new>'} workspace=. mode={mode} profile={profile} rules={rules_count} budget={budget}"
 
     def help_text(self) -> str:
-        return "/help /status /plan [show|refresh] /mode plan|act /connect [provider model base_url] /model [list|show|select <name>] /login /rules /files [prefix] /skills [id] /tree /review /test [command] /compact /undo [id|latest] /pause /resume /cancel /clear /quit; !<command> sends a bounded result to the model; !!<command> stays local"
+        return "/help /status /plan [show|refresh] /mode plan|act /connect /login /rules /files [prefix] /skills [id] /tree /review /test [command] /compact /undo [id|latest] /pause /resume /cancel /clear /quit; !<command> sends a bounded result to the model; !!<command> stays local"
 
     def dispatch(self, line: str) -> object | None:
         line = line.rstrip("\r\n")
@@ -381,15 +381,9 @@ class InteractiveSession:
             if len(args) != 1 or args[0] not in {"plan", "act"}:
                 raise SlashCommandError("usage: /mode plan|act")
             return self.set_mode(args[0])
-        if command == "model":
-            if len(args) > 2 or (args and args[0] not in {"list", "show", "select"}):
-                raise SlashCommandError("usage: /model [list|show|select <name>]")
-            if args and args[0] == "select" and len(args) != 2:
-                raise SlashCommandError("usage: /model select <name>")
-            return self.model(args)
         if command == "connect":
-            if len(args) > 3:
-                raise SlashCommandError("usage: /connect [provider model base_url]")
+            if args:
+                raise SlashCommandError("usage: /connect (then enter API endpoint, API key, and model)")
             return self.connect(args)
         if command == "login":
             if args:
@@ -456,7 +450,10 @@ class InteractiveSession:
         is_tty = bool(getattr(stream, "isatty", lambda: False)()) and not (self.json_mode or self.jsonl_mode)
         while True:
             if is_tty:
-                self.raw_output("forgecode> ")
+                # A compact inverse/black input bar makes the active CLI
+                # unmistakable while remaining plain text on non-colour
+                # terminals.
+                self.raw_output("\x1b[40;97m╭─ forgecode │ message\n╰─❯ \x1b[0m")
             try:
                 line = next(iterator)
             except StopIteration:

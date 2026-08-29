@@ -2169,18 +2169,17 @@ def main(argv: list[str] | None = None) -> int:
             """Configure a provider for this chat process without persisting secrets."""
             nonlocal settings, api_key
             effective = settings.effective
-            provider = connect_args[0] if connect_args else (effective.provider if effective else "openai-compatible")
-            model = connect_args[1] if len(connect_args) > 1 else (settings.model or os.getenv("FORGECODE_MODEL", ""))
-            base_url = connect_args[2] if len(connect_args) > 2 else (effective.base_url if effective else os.getenv("FORGECODE_BASE_URL", "https://api.openai.com/v1"))
+            provider = effective.provider if effective else "openai-compatible"
+            print("Connect a model provider (values are kept only for this process).")
+            base_url = input("API endpoint URL (e.g. https://api.openai.com/v1): ").strip()
+            model = input("Model name (e.g. gpt-4o-mini): ").strip()
             if provider not in SUPPORTED_PROVIDERS:
                 return {"error": f"unsupported provider: {provider}", "code": "unsupported_provider"}
-            if not model:
-                model = input("Model name: ").strip()
-            if not base_url:
-                base_url = input("Base URL: ").strip()
+            if not base_url or not model:
+                return {"error": "API endpoint URL and model name are required", "code": "connect_incomplete"}
             requires_key = provider_requires_credential(provider)
             if requires_key:
-                entered = getpass.getpass("API key (input hidden): ").strip()
+                entered = getpass.getpass("API key (input hidden; never saved): ").strip()
                 if not entered:
                     return {"error": "API key must not be empty", "code": "credential_missing"}
                 # Keep the credential process-local and never write it to config/session.
@@ -2199,11 +2198,7 @@ def main(argv: list[str] | None = None) -> int:
         def clear_screen_command() -> Any:
             if not machine_json:
                 print("\x1b[2J\x1b[H", end="")
-                print(" _ _  _  _  _  _  _  _  _  _  _")
-                print("|  _|| || || || || || || || || |")
-                print("|_|  |_|/__/|_|/__/|_|/__/|_|/__/\n")
-                print("WELCOME to ForgeCode\n")
-            return {"cleared": True, "welcome": "WELCOME"}
+            return None
 
         def status() -> Any:
             manifests = transaction_store.list(limit=20)
@@ -2418,10 +2413,10 @@ def main(argv: list[str] | None = None) -> int:
             _emit_machine(_machine_envelope("chat", "interactive_header", True, data=header_data, exit_code=0, type="interactive_header", **_compat_aliases(header_data)))
         else:
             print(interactive.header(run_id=session.run_id, mode=state["mode"], rules_count=rules_count))
-            print(" _ _  _  _  _  _  _  _  _  _  _")
-            print("|  _|| || || || || || || || || |")
-            print("|_|  |_|/__/|_|/__/|_|/__/|_|/__/\n")
-            print("WELCOME to ForgeCode\n")
+            print("╭──────────────────────────────╮")
+            print("│   ◆ FORGECODE // READY ◆     │")
+            print("│   local coding harness       │")
+            print("╰──────────────────────────────╯\n")
         if initial_prompt:
             initial_result = interactive.dispatch(initial_prompt)
             if initial_result is not None:
