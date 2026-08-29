@@ -58,6 +58,37 @@ def _human_result(value: object) -> str | None:
             else:
                 lines.append(f"✓ {row}")
         return "\n".join(lines)
+    # ``/rules`` returns the RuleSet payload directly.  Keep this separate
+    # from the generic dictionary fallback so the interactive TTY makes the
+    # discovered sources and diagnostics visible (machine JSON is unchanged).
+    if "sources" in value and "diagnostics" in value and "fingerprint" in value:
+        sources = value.get("sources") or []
+        diagnostics = value.get("diagnostics") or []
+        lines = ["Rules", "─────", f"status: {'error' if any(isinstance(item, dict) and item.get('severity') == 'error' for item in diagnostics) else ('active' if sources else 'none')}", f"sources: {len(sources)}", f"characters: {value.get('chars', 0)}"]
+        fingerprint = str(value.get("fingerprint") or "")
+        if fingerprint:
+            lines.append(f"fingerprint: {fingerprint[:16]}")
+        if sources:
+            lines.append("")
+            lines.append("Sources:")
+            for source in sources:
+                if isinstance(source, dict):
+                    path = source.get("path", "<unknown>")
+                    scope = source.get("scope", ".")
+                    suffix = " (truncated)" if source.get("truncated") else ""
+                    lines.append(f"  • {path} [scope: {scope}]{suffix}")
+        lines.append("")
+        if diagnostics:
+            lines.append("Diagnostics:")
+            for item in diagnostics:
+                if isinstance(item, dict):
+                    severity = item.get("severity", "warning")
+                    message = item.get("message", item.get("code", "unknown"))
+                    path = f" ({item['path']})" if item.get("path") else ""
+                    lines.append(f"  {'✗' if severity == 'error' else '⚠'} {message}{path}")
+        else:
+            lines.append("Diagnostics: none")
+        return "\n".join(lines)
     if value.get("message") and value.get("state") == "completed":
         duration = value.get("duration_seconds")
         suffix = f"\n\nWorked for {_format_duration(duration)}" if isinstance(duration, (int, float)) else ""
