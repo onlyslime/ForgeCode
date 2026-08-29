@@ -11,21 +11,54 @@ there is no wrapped agent SDK hiding the important parts.
 
 ## Quick start
 
-Requires Python 3.11+ and [uv](https://docs.astral.sh/uv/).
+The recommended command is `fcc`. The following two paths cover a new machine
+and a repository downloaded as a ZIP.
 
-```sh
-uv sync
-uv run forgecode doctor
-uv run forgecode chat
+### New Windows machine
+
+Install [uv](https://docs.astral.sh/uv/) in PowerShell:
+
+```powershell
+irm https://astral.sh/uv/install.ps1 | iex
 ```
 
-For a machine without Python or uv, the npm distribution provides a bundled
-launcher and native binary (Windows x64 is available first):
+Open a new PowerShell window, then install ForgeCode directly from GitHub:
 
-```sh
-npm install -g @onlyslime/forgecode
+```powershell
+uv tool install "git+https://github.com/onlyslime/ForgeCode.git"
+uv tool update-shell
+```
+
+Open a new PowerShell window once more. `fcc` is now available from any
+directory:
+
+```powershell
+fcc --version
 fcc
 ```
+
+### GitHub ZIP download
+
+Extract the ZIP, open PowerShell in the extracted project directory, and let
+uv create the project environment:
+
+```powershell
+uv sync
+uv run forgecode doctor
+uv run fcc
+```
+
+`uv sync` is the project/development path; it does not install a global
+command. To make this checkout's `fcc` available from every directory, run
+the following once from the project directory:
+
+```powershell
+uv tool install --editable .
+uv tool update-shell
+```
+
+After opening a new PowerShell window, use `fcc` anywhere. The editable
+installation follows the extracted directory, so keep it in place.
 
 For an online provider, run ForgeCode and enter the three values it gives you:
 
