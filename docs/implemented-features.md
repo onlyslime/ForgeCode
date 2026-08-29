@@ -283,3 +283,9 @@ updating a row.
   distinguishes narrowly allowlisted known fixtures from arbitrary token-like
   test content and stale transaction hashes; this matches the reverse-probe
   and clean-repository review results.
+
+- Symlink capability probe (2026-08-29): creating a temporary file symlink
+  raised `OSError` under the current Windows account before the guard could
+  receive it. Existing lexical/metadata checks remain covered by direct
+  rejection probes; a positive OS-link rejection test must be repeated under
+  an account with symlink privilege.
