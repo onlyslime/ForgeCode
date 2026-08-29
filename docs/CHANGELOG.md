@@ -5,6 +5,12 @@ and metadata-only commits remain under the current version and are not listed as
 new releases. Verification notes identify the evidence used for each feature
 slice.
 
+## v0.0.35 — 2026-08-29
+
+- Added `--mode plan|act` to `config policy` and matching RPC/Node/Python
+  parameters, so policy explanations reflect runtime mode overrides.
+- Verification: policy, RPC, embed, compile, and diff contract checks.
+
 ## v0.0.34 — 2026-08-29
 
 - Added read-only `config policy` / `config.policy` permission explanations,

@@ -91,6 +91,12 @@ def test_config_policy_explains_trust_and_runtime_narrowing(capsys, tmp_path: Pa
     assert "runtime_not_allowlisted" in rows["write_file"]["reasons"]
     assert payload["data"]["rules"]["sources"][0]["path"] == "AGENTS.md"
     assert "text" not in payload["data"]["rules"]["sources"][0]
+    assert main(["--workspace", str(tmp_path), "config", "policy", "--mode", "plan", "--jsonl"]) == 0
+    plan_payload = json.loads(capsys.readouterr().out)
+    plan_rows = {item["tool"]: item for item in plan_payload["data"]["tools"]}
+    assert plan_payload["data"]["configured_mode"] == "act"
+    assert plan_rows["run_command"]["enabled"] is False
+    assert "plan_mode_read_only" in plan_rows["run_command"]["reasons"]
 
 
 def test_session_tree_clone_and_import_are_non_replaying(capsys, tmp_path: Path):

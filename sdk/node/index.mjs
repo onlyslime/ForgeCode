@@ -150,9 +150,9 @@ export const sessionControl = (session, action, { workspace, ...options } = {}) 
 export const sessionClose = (session, options = {}) => sessionControl(session, "close", options);
 export const sessionApproval = (session, approved, options = {}) => method("session.approval", { ...options, params: { ...(options.params ?? {}), session, approved } });
 export const configProfiles = (options = {}) => method("config.profiles", options);
-export const configPolicy = ({ workspace, profile, tools, excludeTools, noTools, ...options } = {}) => method("config.policy", {
+export const configPolicy = ({ workspace, profile, mode, tools, excludeTools, noTools, ...options } = {}) => method("config.policy", {
   ...options,
-  params: { ...(options.params ?? {}), ...(workspace === undefined ? {} : { workspace }), ...(profile === undefined ? {} : { profile }), ...(tools === undefined ? {} : { tools }), ...(excludeTools === undefined ? {} : { exclude_tools: excludeTools }), ...(noTools === undefined ? {} : { no_tools: noTools }) },
+  params: { ...(options.params ?? {}), ...(workspace === undefined ? {} : { workspace }), ...(profile === undefined ? {} : { profile }), ...(mode === undefined ? {} : { mode }), ...(tools === undefined ? {} : { tools }), ...(excludeTools === undefined ? {} : { exclude_tools: excludeTools }), ...(noTools === undefined ? {} : { no_tools: noTools }) },
 });
 
 export function interactive(workspace, { mode = "plan", executable = "forgecode", maxEvents = 2048 } = {}) {

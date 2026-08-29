@@ -282,11 +282,13 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                         raise ValueError("workspace must be an existing directory")
                     argv_value = ["--workspace", workspace, *argv_value]
                 if method == "config.policy":
-                    for key, flag in (("profile", "--profile"), ("tools", "--tools"), ("exclude_tools", "--exclude-tools")):
+                    for key, flag in (("profile", "--profile"), ("mode", "--mode"), ("tools", "--tools"), ("exclude_tools", "--exclude-tools")):
                         value = params.get(key)
                         if value is not None:
                             if not isinstance(value, str) or len(value) > 4_000 or any(ch in value for ch in "\r\n"):
                                 raise ValueError(f"config.policy.{key} is invalid")
+                            if key == "mode" and value not in {"plan", "act"}:
+                                raise ValueError("config.policy.mode is invalid")
                             argv_value.extend([flag, value])
                     if params.get("no_tools"):
                         if not isinstance(params["no_tools"], bool): raise ValueError("config.policy.no_tools must be boolean")
