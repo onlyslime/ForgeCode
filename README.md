@@ -80,7 +80,7 @@ Node/Python SDKs.
 - file listing, reading, search, writing, and unified `apply_patch`
 - Plan, Act, and Bypass modes with explicit side-effect boundaries
 - command and test execution with timeout, cancellation, output, and process limits
-- rules, references, repository context, compaction, and model/tool progress
+- rules, references, repository context, compaction, context health, event timelines, and model/tool progress
 - durable sessions, checkpoints, transaction undo, review, evaluation, and audit JSONL
 - skills, hooks, provider diagnostics, path completion, and machine-readable envelopes
 
@@ -88,7 +88,8 @@ Node/Python SDKs.
 
 Type `/help` in `fcc` for the complete list. Useful starting points are
 `/mode`, `/tools`, `/files`, `/skills`, `/rules`, `/tree`, `/review`,
-`/compact`, `/cancel`, `/quit`, and `/exit`. `!command` sends a bounded command
+`/compact`, `/context`, `/events`, `/cancel`, `/quit`, and `/exit`. `/events` can
+filter recent audit entries, for example `/events 20 error`. `!command` sends a bounded command
 result to the model; `!!command` keeps it local.
 
 ## Architecture
@@ -147,7 +148,7 @@ The project is intentionally local. It is not an IDE, browser controller,
 cloud runner, or operating-system sandbox. Read the [examples](docs/demo-script.md)
 and [changelog](docs/CHANGELOG.md) for details.
 
-Current release: `v0.6.3`.
+Current release: `v0.7.0`.
 
 ## License
 

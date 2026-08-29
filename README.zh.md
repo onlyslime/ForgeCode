@@ -65,14 +65,14 @@ fcc --act
 - 列文件、读取、搜索、写入和 unified `apply_patch`
 - Plan、Act、Bypass 三种工作模式
 - 带超时、取消和输出限制的命令与测试执行
-- 规则、引用、仓库上下文和上下文压缩
+- 规则、引用、仓库上下文、上下文健康度、事件时间线和上下文压缩
 - session、checkpoint、事务撤销、review、eval 和 JSONL 审计
 - skills、hooks、Node/Python SDK 和 JSONL RPC
-- 固定输入栏、多行粘贴、实时进度和 Esc 取消
+- 固定输入栏、多行粘贴、实时进度、事件筛选和 Esc 取消
 
 ## 交互命令
 
-在 `fcc` 中输入 `/help` 查看全部命令。常用命令包括 `/mode`、`/tools`、`/files`、`/skills`、`/rules`、`/tree`、`/review`、`/compact`、`/cancel`、`/quit` 和 `/exit`。
+在 `fcc` 中输入 `/help` 查看全部命令。常用命令包括 `/mode`、`/tools`、`/files`、`/skills`、`/rules`、`/tree`、`/diff`、`/context`、`/events`、`/review`、`/compact`、`/cancel`、`/quit` 和 `/exit`。`/events 20 error` 可筛选最近的错误事件。
 
 ## 架构
 
@@ -119,4 +119,4 @@ Act 的副作用需要审批；Bypass 是明确的可信工作区选择。所有
 - [示例](docs/demo-script.md)
 - [更新日志](docs/CHANGELOG.md)
 
-当前版本：`v0.6.3`。许可证：MIT。
+当前版本：`v0.7.0`。许可证：MIT。
