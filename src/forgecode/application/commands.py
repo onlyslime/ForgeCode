@@ -2004,7 +2004,23 @@ def main(argv: list[str] | None = None) -> int:
                                         line_color = "\x1b[32m" if line.startswith("+") else ("\x1b[31m" if line.startswith("-") else "\x1b[90m")
                                         print(f"  {line_color}{line}\x1b[0m")
                             redraw_input_bar()
-                    result = asyncio.run(service.execute(enriched, mode=state["mode"], secrets=(api_key,) if api_key else (), on_event=progress_event))
+                    heartbeat_stop = threading.Event()
+                    heartbeat_thread: threading.Thread | None = None
+                    if bool(getattr(sys.stdin, "isatty", lambda: False)()) and not machine_json:
+                        def heartbeat() -> None:
+                            while not heartbeat_stop.wait(5.0):
+                                with output_lock:
+                                    elapsed = time.monotonic() - started_at
+                                    print(f"\x1b[2K\r\x1b[90m… working ({elapsed:.1f}s) · {tool_steps} tool steps\x1b[0m")
+                                    redraw_input_bar()
+                        heartbeat_thread = threading.Thread(target=heartbeat, name="forgecode-heartbeat", daemon=True)
+                        heartbeat_thread.start()
+                    try:
+                        result = asyncio.run(service.execute(enriched, mode=state["mode"], secrets=(api_key,) if api_key else (), on_event=progress_event))
+                    finally:
+                        heartbeat_stop.set()
+                        if heartbeat_thread is not None:
+                            heartbeat_thread.join(timeout=1.0)
                 finally:
                     with active_service_lock:
                         if active_service is service:
