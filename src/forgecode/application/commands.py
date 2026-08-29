@@ -1939,6 +1939,7 @@ def main(argv: list[str] | None = None) -> int:
                                 phase = "Verify"
                             if phase and phase != current_phase:
                                 current_phase = phase
+                                controller.update_metrics(tool_steps=tool_steps, phase=phase)
                                 print(f"\n\x1b[1;36m─── {phase} ───\x1b[0m")
                             if kind == "model_progress":
                                 streamed_content = False
@@ -1964,6 +1965,7 @@ def main(argv: list[str] | None = None) -> int:
                             print(f"\x1b[2K\r{color}{labels[kind]} [{tool_steps + (1 if kind == 'tool_call' else 0)}] {text}  ({elapsed:.1f}s)\x1b[0m")
                             if kind == "tool_call":
                                 tool_steps += 1
+                                controller.update_metrics(tool_steps=tool_steps, phase=current_phase)
                             if kind == "tool_result" and tool == "read_file" and payload.get("ok"):
                                 path = str(payload.get("metadata", {}).get("path") or arguments.get("path") or "")
                                 output = str(payload.get("output") or "")

@@ -77,6 +77,7 @@ def test_human_status_renders_active_elapsed_time():
     rendered = _human_result({
         "run_id": "run-1", "mode": "act", "transactions": 0,
         "last_state": "acting", "latest_verification": None,
-        "worker": {"active": True, "queue_items": 1, "elapsed_seconds": 12.3},
+        "worker": {"active": True, "queue_items": 1, "elapsed_seconds": 12.3, "phase": "Inspect", "tool_steps": 4},
     })
     assert "elapsed: 12.3s" in rendered
+    assert "phase: Inspect · tools: 4" in rendered

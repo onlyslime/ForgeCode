@@ -49,6 +49,7 @@ def _human_result(value: object) -> str | None:
             f"verification: {verification_text}",
             f"worker: {'running' if worker.get('active') else 'idle'} (queued: {worker.get('queue_items', 0)})",
             *( [f"elapsed: {_format_duration(worker['elapsed_seconds'])}"] if isinstance(worker.get('elapsed_seconds'), (int, float)) else [] ),
+            *( [f"phase: {worker['phase']} · tools: {worker.get('tool_steps', 0)}"] if worker.get('phase') else [] ),
         ))
     if value.get("tools_status") is True:
         rows = value.get("tools") or []
@@ -310,6 +311,8 @@ class InteractiveRunController:
     _pending_pause: bool = field(default=False, init=False, repr=False)
     _pending_cancel: bool = field(default=False, init=False, repr=False)
     _started_monotonic: float | None = field(default=None, init=False, repr=False)
+    _tool_steps: int = field(default=0, init=False, repr=False)
+    _phase: str = field(default="", init=False, repr=False)
     _thread: threading.Thread | None = field(default=None, init=False, repr=False)
     _condition: threading.Condition = field(default_factory=threading.Condition, init=False, repr=False)
 
@@ -324,6 +327,8 @@ class InteractiveRunController:
             return {
                 "active": self._active,
                 "elapsed_seconds": round(elapsed, 3) if elapsed is not None else None,
+                "tool_steps": self._tool_steps,
+                "phase": self._phase or None,
                 "queue_items": len(self._queue),
                 "queue_chars": self._queue_chars,
                 "stopped": self._stopped,
@@ -358,6 +363,8 @@ class InteractiveRunController:
             self._pending_pause = False
             self._pending_cancel = False
             self._started_monotonic = time.monotonic()
+            self._tool_steps = 0
+            self._phase = ""
             self.event_sink("run_enqueued", {"chars": len(text), "queue_items": 0})
             self._thread = threading.Thread(target=self._worker, args=(text,), name="forgecode-interactive", daemon=True)
             self._thread.start()
@@ -397,6 +404,8 @@ class InteractiveRunController:
                     self._queue_chars = 0
                     self._active = False
                     self._started_monotonic = None
+                    self._tool_steps = 0
+                    self._phase = ""
                     if not self._stopped:
                         self._cancel_requested = False
                     self._condition.notify_all()
@@ -495,6 +504,14 @@ class InteractiveRunController:
         if thread is not None and thread is not threading.current_thread():
             thread.join(timeout)
         return not self.active
+
+    def update_metrics(self, *, tool_steps: int | None = None, phase: str | None = None) -> None:
+        """Publish bounded live metrics from the injected production worker."""
+        with self._condition:
+            if tool_steps is not None:
+                self._tool_steps = max(0, min(int(tool_steps), 100_000))
+            if phase is not None:
+                self._phase = str(phase)[:32]
 
 
 @dataclass
