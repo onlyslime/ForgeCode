@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.1.5 — 2026-08-29
+
+- Styled multiline continuation rows so the entire input buffer keeps the
+  dark input background.
+- Enter submits; the terminal's Shift+Enter escape sequence inserts a newline.
+
 ## v0.1.4 — 2026-08-29
 
 - Fixed chat startup failure caused by an unsupported prompt-toolkit

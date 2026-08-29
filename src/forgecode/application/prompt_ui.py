@@ -20,14 +20,14 @@ def run_prompt_ui(session, *, mode: Callable[[], str]) -> None:
         # Enter submits, matching Codex-style chat.
         event.current_buffer.validate_and_handle()
 
-    @bindings.add("c-j")
+    @bindings.add("escape", "enter")
     def _(event) -> None:
-        # Ctrl-J is supported consistently across prompt_toolkit terminals
-        # and provides an explicit multiline insertion gesture.
+        # Most terminals encode Shift+Enter as the Escape+Enter sequence.
         event.current_buffer.insert_text("\n")
 
     style = Style.from_dict({
         "prompt": "bg:#202123 #f5f5f5 bold",
+        "continuation": "bg:#202123 #f5f5f5",
         "bottom-toolbar": "bg:#202123 #f5f5f5",
     })
     prompt_session = PromptSession(multiline=True, key_bindings=bindings, style=style)
@@ -38,7 +38,7 @@ def run_prompt_ui(session, *, mode: Callable[[], str]) -> None:
     with patch_stdout(raw=True):
         while not session.stopped:
             try:
-                text = prompt_session.prompt(prompt)
+                text = prompt_session.prompt(prompt, prompt_continuation=lambda width, line: HTML("<continuation>│ </continuation>"))
             except (EOFError, KeyboardInterrupt):
                 session.cancel()
                 break
