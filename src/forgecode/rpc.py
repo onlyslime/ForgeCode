@@ -383,6 +383,13 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                         raise ValueError("session handle is unknown")
                     with _SESSION_LOCK:
                         info = _RPC_SESSIONS.get(handle, {})
+                        requested_workspace = params.get("workspace")
+                        if requested_workspace is not None:
+                            if not isinstance(requested_workspace, str) or not requested_workspace or len(requested_workspace) > 1_000 or any(ch in requested_workspace for ch in "\r\n"):
+                                raise ValueError("session workspace is invalid")
+                            resolved_workspace = str(Path(requested_workspace).expanduser().resolve())
+                            if resolved_workspace != str(info.get("workspace")):
+                                raise ValueError("session workspace does not match its bound workspace")
                         if info.get("state") == "recovery_required" and method in {"session.pause", "session.resume", "session.cancel", "session.approval", "session.close"}:
                             raise ValueError("session requires explicit recovery run")
                         if info.get("mode") == "act":

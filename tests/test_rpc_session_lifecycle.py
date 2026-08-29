@@ -29,6 +29,16 @@ def test_rpc_session_open_status_close_lifecycle(tmp_path):
     assert missing["error"]["code"] == "invalid_request"
 
 
+def test_rpc_session_control_rejects_workspace_mismatch(tmp_path):
+    other = tmp_path / "other"
+    other.mkdir()
+    opened = _call({"method": "session.open", "params": {"workspace": str(tmp_path), "mode": "plan"}})
+    handle = opened["data"]["session"]
+    payload = _call({"method": "session.status", "params": {"session": handle, "workspace": str(other)}})
+    assert payload["ok"] is False
+    assert "workspace" in payload["error"]["message"]
+
+
 def test_rpc_request_id_is_bounded_and_newline_safe():
     oversized = {"id": "x" * 257, "argv": ["doctor"]}
     response = json.loads(next(iter(serve_lines([json.dumps(oversized)]))))

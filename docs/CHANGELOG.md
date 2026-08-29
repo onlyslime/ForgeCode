@@ -14,6 +14,13 @@ slice.
   deadlines and side-effect conflicts.
 - Verification: cancellation hardening regression and recovery tests.
 
+## v0.0.37 — 2026-08-29
+
+- Enforced canonical workspace binding on RPC session controls. A caller
+  supplying a workspace must match the workspace captured at `session.open`;
+  mismatches are rejected before session control is applied.
+- Verification: RPC session lifecycle and workspace mismatch regression tests.
+
 ## v0.0.35 — 2026-08-29
 
 - Added `--mode plan|act` to `config policy` and matching RPC/Node/Python
