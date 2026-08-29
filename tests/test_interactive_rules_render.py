@@ -83,6 +83,18 @@ def test_human_status_renders_active_elapsed_time():
     assert "phase: Inspect · tools: 4" in rendered
 
 
+def test_human_status_renders_completed_run_metrics():
+    rendered = _human_result({
+        "run_id": "run-1", "mode": "act", "transactions": 1,
+        "last_state": "completed", "latest_verification": {"ok": True},
+        "metrics": {"provider_attempts": 3, "provider_retries": 1, "tool_calls": 4, "context_chars": 1200},
+        "worker": {"active": False, "queue_items": 0, "last_elapsed_seconds": 4.2, "last_tool_steps": 4},
+    })
+    assert "provider attempts: 3 · retries: 1" in rendered
+    assert "tool calls: 4 · context: 1200 chars" in rendered
+    assert "last run: 4.2s · 4 tool steps" in rendered
+
+
 def test_human_diff_result_renders_clean_state_and_content():
     assert "Working tree is clean" in _human_result({"diff_status": True, "diff": ""})
     assert "Git diff" in _human_result({"diff_status": True, "diff": "+ added line"})

@@ -2412,7 +2412,23 @@ def main(argv: list[str] | None = None) -> int:
         def status() -> Any:
             manifests = transaction_store.list(limit=20)
             controller = controller_holder["value"]
-            return {"mode": state["mode"], "run_id": session.run_id, "transactions": len(manifests), "last_state": getattr(state["last"], "state", None), "latest_verification": state["last_verification"], "worker": controller.snapshot() if controller is not None else {"active": False}}
+            metrics = {"provider_attempts": 0, "provider_retries": 0, "tool_calls": 0, "context_chars": 0}
+            try:
+                for event in session.read(strict=False):
+                    if event.kind == "model_request":
+                        metrics["provider_attempts"] += 1
+                        value = event.payload.get("context_chars", 0)
+                        if isinstance(value, int) and not isinstance(value, bool):
+                            metrics["context_chars"] += value
+                    elif event.kind == "provider_retry":
+                        metrics["provider_retries"] += 1
+                    elif event.kind == "tool_call":
+                        metrics["tool_calls"] += 1
+            except (OSError, ValueError):
+                # Status is diagnostic and must remain usable even when an
+                # older or partially written session stream has issues.
+                metrics["audit_read_error"] = True
+            return {"mode": state["mode"], "run_id": session.run_id, "transactions": len(manifests), "last_state": getattr(state["last"], "state", None), "latest_verification": state["last_verification"], "metrics": metrics, "worker": controller.snapshot() if controller is not None else {"active": False}}
 
         def tools_command() -> Any:
             evidence_names = {"review", "test", "diagnostics", "git_status", "git_diff", "transaction", "rollback", "eval"}

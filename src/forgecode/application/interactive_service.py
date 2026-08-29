@@ -48,6 +48,8 @@ def _human_result(value: object) -> str | None:
             f"last state: {value.get('last_state') or 'idle'}",
             f"transactions: {value.get('transactions', 0)}",
             f"verification: {verification_text}",
+            *( [f"provider attempts: {value['metrics'].get('provider_attempts', 0)} · retries: {value['metrics'].get('provider_retries', 0)}"] if isinstance(value.get('metrics'), dict) else [] ),
+            *( [f"tool calls: {value['metrics'].get('tool_calls', 0)} · context: {value['metrics'].get('context_chars', 0)} chars"] if isinstance(value.get('metrics'), dict) else [] ),
             f"worker: {'running' if worker.get('active') else 'idle'} (queued: {worker.get('queue_items', 0)})",
             *( [f"elapsed: {_format_duration(worker['elapsed_seconds'])}"] if isinstance(worker.get('elapsed_seconds'), (int, float)) else [] ),
             *( [f"phase: {worker['phase']} · tools: {worker.get('tool_steps', 0)}"] if worker.get('phase') else [] ),
