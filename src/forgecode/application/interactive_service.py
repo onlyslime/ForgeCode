@@ -108,8 +108,9 @@ def _human_result(value: object) -> str | None:
         for item in events:
             if isinstance(item, dict):
                 outcome = f" · {item['outcome']}" if item.get("outcome") else ""
+                error_code = f" [{item['error_code']}]" if item.get("error_code") else ""
                 elapsed = f" +{_format_duration(item['elapsed_seconds'])}" if isinstance(item.get("elapsed_seconds"), (int, float)) else ""
-                lines.append(f"  {item.get('sequence', '?'):>4}  {item.get('kind', 'event')}{outcome}{elapsed}")
+                lines.append(f"  {item.get('sequence', '?'):>4}  {item.get('kind', 'event')}{outcome}{error_code}{elapsed}")
         return "\n".join(lines)
     if "nodes" in value and "roots" in value and "edges" in value:
         nodes = value.get("nodes") or []
