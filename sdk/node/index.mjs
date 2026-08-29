@@ -158,7 +158,12 @@ export const sessionResult = (session, { workspace, ...options } = {}) => method
 export const sessionWait = (session, { workspace, timeout, ...options } = {}) => method("session.wait", { ...options, params: { ...(options.params ?? {}), session, ...(workspace === undefined ? {} : { workspace }), ...(timeout === undefined ? {} : { timeout }) } });
 export const sessionEvents = (session, { workspace, after, limit, ...options } = {}) => method("session.events", { ...options, params: { ...(options.params ?? {}), session, ...(workspace === undefined ? {} : { workspace }), ...(after === undefined ? {} : { after }), ...(limit === undefined ? {} : { limit }) } });
 export const sessionRun = (session, prompt, { workspace, ...options } = {}) => method("session.run", { ...options, params: { ...(options.params ?? {}), session, prompt, ...(workspace === undefined ? {} : { workspace }) } });
-export const sessionControl = (session, action, { workspace, ...options } = {}) => method(`session.${action}`, { ...options, params: { ...(options.params ?? {}), session, ...(workspace === undefined ? {} : { workspace }) } });
+export const sessionControl = (session, action, { workspace, ...options } = {}) => {
+  validateSession(session);
+  if (!["cancel", "pause", "resume", "close"].includes(action)) throw new TypeError("session action is invalid");
+  validateWorkspace(workspace);
+  return method(`session.${action}`, { ...options, params: { ...(options.params ?? {}), session, ...(workspace === undefined ? {} : { workspace }) } });
+};
 export const sessionClose = (session, options = {}) => sessionControl(session, "close", options);
 export const sessionApproval = (session, approved, { workspace, ...options } = {}) => {
   validateSession(session);
