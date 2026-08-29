@@ -786,6 +786,7 @@ class AgentLoop:
             request_messages = self._maybe_auto_compact(messages, step=step)
             request_messages = self.context_builder.fit(request_messages)
             self._last_context_summary = "\n".join(message.content for message in request_messages[-8:])[:8_000]
+            self._record("model_progress", {"step": step, "message": "Analyzing the task and deciding the next safe action…" if step == 0 else "Reviewing the latest tool result and continuing…"})
             self._record("model_request", {"step": step, "message_count": len(request_messages), "context_chars": sum(len(message.content) for message in request_messages), "tool_count": len(self.registry.schemas(self.context.mode))})
             provider_started = time.monotonic()
             try:

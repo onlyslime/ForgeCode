@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.3.2 — 2026-08-29
+
+- Added immediate assistant progress events before each model turn, so
+  multi-step tasks visibly show analysis and continuation instead of appearing
+  silent between tool calls.
+
 ## v0.3.1 — 2026-08-29
 
 - Bound standalone `Esc` in the prompt UI to cancel the active task while

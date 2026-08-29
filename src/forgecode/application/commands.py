@@ -1906,7 +1906,7 @@ def main(argv: list[str] | None = None) -> int:
                     def progress_event(kind: str, payload: dict[str, Any]) -> None:
                         if machine_json:
                             return
-                        labels = {"tool_call": "▸", "tool_result": "✓" if payload.get("ok") else "✗", "verification_result": "✓" if payload.get("ok") else "✗", "command_result": "✓" if payload.get("ok") else "✗", "command_timeout": "✗", "mode": "•", "model_message": "◆"}
+                        labels = {"tool_call": "▸", "tool_result": "✓" if payload.get("ok") else "✗", "verification_result": "✓" if payload.get("ok") else "✗", "command_result": "✓" if payload.get("ok") else "✗", "command_timeout": "✗", "mode": "•", "model_message": "◆", "model_progress": "…"}
                         if kind not in labels:
                             return
                         tool = str(payload.get("tool") or "")
@@ -1917,6 +1917,10 @@ def main(argv: list[str] | None = None) -> int:
                         color = "\x1b[32m" if labels[kind] == "✓" else ("\x1b[31m" if labels[kind] == "✗" else "\x1b[36m")
                         with output_lock:
                             elapsed = time.monotonic() - started_at
+                            if kind == "model_progress":
+                                print(f"\x1b[2K\r\x1b[35m… assistant  ({elapsed:.1f}s)\x1b[0m {payload.get('message', '')}")
+                                redraw_input_bar()
+                                return
                             if kind == "model_message":
                                 content = str(payload.get("content") or "").strip()
                                 if content:
