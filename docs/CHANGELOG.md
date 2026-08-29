@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.5.0 — 2026-08-29
+
+- Started the repair-focused release line. This release only updates the
+  version and records the theme; command-by-command fixes will follow after
+  real interactive reproduction.
+
 ## v0.4.4 — 2026-08-29
 
 - Added controlled background process tools: `run_background`,
