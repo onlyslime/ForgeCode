@@ -77,7 +77,10 @@ def _build_provider(effective):
         api_key=os.getenv(effective.api_key_env if effective else "FORGECODE_API_KEY", ""),
         base_url=effective.base_url if effective else os.getenv("FORGECODE_BASE_URL", "https://api.openai.com/v1"),
         model=effective.model if effective and effective.model else os.getenv("FORGECODE_MODEL", ""),
-        streaming=bool(effective and effective.streaming in {"on", "required"}),
+        # Human chat defaults to SSE when the provider supports it; ``auto``
+        # keeps compatibility by falling back to a normal completion if the
+        # transport has no streaming implementation.
+        streaming=bool(effective and effective.streaming in {"auto", "on", "required"}),
         stream_required=bool(effective and effective.streaming == "required"),
         timeout=effective.provider_timeout_seconds if effective else 60.0,
     )

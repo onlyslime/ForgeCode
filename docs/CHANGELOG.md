@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.3.4 — 2026-08-29
+
+- Enabled SSE streaming by default for profiles using `streaming = "auto"`;
+  providers without stream transport still fall back to normal completion.
+  This makes supported interactive providers visibly responsive without
+  changing machine-output contracts.
+
 ## v0.3.3 — 2026-08-29
 
 - Improved human-readable task timelines with numbered assistant turns,
