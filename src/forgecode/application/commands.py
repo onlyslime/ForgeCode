@@ -2197,7 +2197,7 @@ def main(argv: list[str] | None = None) -> int:
 
         def model_command(model_args: list[str]) -> Any:
             nonlocal settings
-            action = model_args[0] if model_args else "list"
+            action = model_args[0] if model_args else "show"
             try:
                 raw = ConfigLoader(workspace)._read_file()
                 profiles = raw.get("profiles", {}) if isinstance(raw, dict) else {}
@@ -2207,7 +2207,7 @@ def main(argv: list[str] | None = None) -> int:
                 if action == "show":
                     selected = settings.profile
                     config = ConfigLoader(workspace).load(profile=selected)
-                    return {"profile": selected, "config": config.to_dict()}
+                    return {"model_status": True, "profile": selected, "provider": config.provider, "model": config.model, "base_url": config.base_url, "configured": bool(config.model)}
                 if action == "select":
                     selected = model_args[1]
                     with active_service_lock:
@@ -2282,6 +2282,11 @@ def main(argv: list[str] | None = None) -> int:
             if mode == "act" and state.get("plan") is None:
                 return {"error": "create/review a plan before switching to act"}
             if mode == "act":
+                try:
+                    if not TrustStore(workspace).status().get("trusted", False) and not args.demo:
+                        return {"error": "workspace is not trusted; run `forgecode trust grant` before act mode", "code": "trust_required"}
+                except TrustError as exc:
+                    return {"error": str(exc), "code": "trust_error"}
                 latest_references = ReferenceResolver(guard).resolve_prompt(state["plan"].task)
                 latest_targets = [item.path for item in latest_references.items if item.path]
                 latest_rules = RuleEngine(guard).discover(latest_targets)

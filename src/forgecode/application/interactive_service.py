@@ -34,6 +34,8 @@ def _human_result(value: object) -> str | None:
         return None
     if value.get("connected") is True:
         return f"Connected: {value.get('model') or 'model'} @ {value.get('base_url') or 'endpoint'}"
+    if value.get("model_status") is True:
+        return f"Model: {value.get('model') or 'not configured'}\nProvider: {value.get('provider') or 'unknown'}\nEndpoint: {value.get('base_url') or 'not configured'}\nProfile: {value.get('profile') or 'default'}"
     if value.get("message") and value.get("state") == "completed":
         return _pretty_text(value["message"])
     if value.get("error"):
@@ -366,13 +368,13 @@ class InteractiveSession:
     stopped: bool = False
     controller: InteractiveRunController | None = None
 
-    COMMANDS = ("help", "status", "plan", "mode", "connect", "login", "rules", "files", "skills", "skill", "tree", "review", "test", "compact", "undo", "cancel", "pause", "resume", "clear", "quit")
+    COMMANDS = ("help", "status", "plan", "mode", "model", "connect", "login", "rules", "files", "skills", "skill", "tree", "review", "test", "compact", "undo", "cancel", "pause", "resume", "clear", "quit")
 
     def header(self, *, run_id: str = "", mode: str = "plan", profile: str = "default", rules_count: int = 0, budget: int = 60_000) -> str:
         return f"ForgeCode session run={run_id or '<new>'} workspace=. mode={mode} profile={profile} rules={rules_count} budget={budget}"
 
     def help_text(self) -> str:
-        return "/help /status /plan [show|refresh] /mode plan|act /connect /login /rules /files [prefix] /skills [id] /tree /review /test [command] /compact /undo [id|latest] /pause /resume /cancel /clear /quit; !<command> sends a bounded result to the model; !!<command> stays local"
+        return "/help /status /model /plan [show|refresh] /mode plan|act /connect /login /rules /files [prefix] /skills [id] /tree /review /test [command] /compact /undo [id|latest] /pause /resume /cancel /clear /quit; !<command> sends a bounded result to the model; !!<command> stays local"
 
     def dispatch(self, line: str) -> object | None:
         line = line.rstrip("\r\n")
@@ -409,6 +411,10 @@ class InteractiveSession:
             if len(args) != 1 or args[0] not in {"plan", "act"}:
                 raise SlashCommandError("usage: /mode plan|act")
             return self.set_mode(args[0])
+        if command == "model":
+            if args and args[0] not in {"show", "list", "select"}:
+                raise SlashCommandError("usage: /model [show|list|select <name>]")
+            return self.model(args)
         if command == "connect":
             if args:
                 raise SlashCommandError("usage: /connect (then enter API endpoint, API key, and model)")
