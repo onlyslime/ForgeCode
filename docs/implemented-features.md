@@ -163,10 +163,10 @@ updating a row.
   fixture setup because `write_file` was unavailable, while an exclude-tools
   run failed at its bounded step limit without a traceback. These checks
   support fail-closed narrowing, but do not replace full provider execution.
-- Review scanner hardening: test fixtures are excluded from the production
-  secret scan (syntax checks still include them), eliminating false positives;
-  `review latest --no-verify-files` now returns `ok=true`, exit 0 with zero
-  findings on the repository.
+- Review scanner hardening: tests remain in the production secret scan, while
+  a value-based, test-directory-scoped fixture allowlist removes only known
+  fake credentials; `review latest --no-verify-files` returns `ok=true`, exit 0
+  with zero findings on the repository.
 - Recovery boundary probe created a synthetic `acting` checkpoint with a file
   fingerprint. `run --resume --dry-run` returned exit 3 and a typed
   `recovery_conflict`; after modifying the file, the report additionally named

@@ -58,7 +58,7 @@ _STATUSES = {"pass", "fail", "skipped", "error"}
 _CHECK_IDS = ("secrets", "forbidden_paths", "suspicious_commands", "syntax")
 _PRIVATE_SCAN_DIRS = {
     ".git", ".forgecode", ".venv", "node_modules", "__pycache__", ".pytest_cache",
-    "dist", "build", "tmp", "temp", "docs/goals", "tests",
+    "dist", "build", "tmp", "temp", "docs/goals",
 }
 _SECRET_PATTERNS: tuple[tuple[str, re.Pattern[str], str], ...] = (
     ("private_key", re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----"), "private key material"),
@@ -70,6 +70,14 @@ _SECRET_PATTERNS: tuple[tuple[str, re.Pattern[str], str], ...] = (
     # useful detection for pasted credentials (``token=abc...``).
     ("credential_assignment", re.compile(r"(?i)\b(?:api[_-]?key|access[_-]?token|refresh[_-]?token|password|secret|cookie|authorization|token)\s*[:=]\s*[\"']?([A-Za-z0-9_./+=-]{12,})"), "credential assignment"),
     ("bearer", re.compile(r"(?i)\bbearer\s+[A-Za-z0-9._~+/=-]{12,}"), "bearer credential"),
+)
+# Deliberately fake values used by repository tests to exercise redaction and
+# secret detection.  Keep this allowlist value-based and test-directory
+# scoped; do not exclude the whole tests tree from scanning.
+_TEST_FIXTURE_MARKERS = (
+    "do-not-index", "do-not-expose", "must-not-index", "should-not-appear",
+    "inline-secret", "pw-value", "plaintext-secret", "top-secret",
+    "hidden-value", "hidden", "ghp_" + "abcdefghijklmnopqrstuvwxyz123456",
 )
 _SUSPICIOUS_REASONS = {
     "filesystem_destructive": "filesystem mutation or deletion",
@@ -670,8 +678,10 @@ def _run_secrets_check(guard: WorkspaceGuard, *, max_files: int, secrets: Iterab
                     or " or " in remainder
                     or remainder.startswith("or ")
                     or remainder.startswith(("(", "["))
+                    or literal.endswith("Token")
                 )
-                likely_secret = bool(match and not placeholder and not expression)
+                fixture_placeholder = relative.startswith("tests/") and any(marker in line for marker in _TEST_FIXTURE_MARKERS)
+                likely_secret = bool(match and not placeholder and not expression and not fixture_placeholder)
                 if likely_secret or any(value and value in line for value in secret_values):
                     evidence = f"file:{relative}#L{number}:{pattern_id}"
                     findings.append(_finding("secrets", "critical" if pattern_id == "private_key" else "high", "static.security", f"possible {label}; value redacted", path=relative, line=number, evidence_refs=(evidence,)))
