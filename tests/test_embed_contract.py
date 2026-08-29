@@ -54,6 +54,10 @@ def test_embed_stream_bounds_response_items():
     with pytest.raises(ForgeCodeError) as caught:
         list(stream([{"method": "doctor"}, {"method": "doctor"}], max_items=1))
     assert caught.value.code == "output_limit"
+    with pytest.raises(ValueError):
+        list(stream([], max_items="many"))
+    with pytest.raises(ValueError):
+        list(stream([], max_response_bytes="large"))
 
 
 def test_embed_stream_invalid_json_uses_typed_error(monkeypatch):

@@ -211,9 +211,9 @@ def config_policy(*, workspace: str | None = None, profile: str | None = None, m
 
 def stream(requests: Iterable[dict[str, Any]], *, raise_for_status: bool = False, max_items: int = 1024, max_response_bytes: int = 2_000_000) -> Iterable[dict[str, Any]]:
     """Process JSON-compatible RPC requests in order."""
-    if isinstance(max_items, bool) or max_items < 1 or max_items > 100_000:
+    if isinstance(max_items, bool) or not isinstance(max_items, int) or max_items < 1 or max_items > 100_000:
         raise ValueError("max_items must be between 1 and 100000")
-    if isinstance(max_response_bytes, bool) or max_response_bytes < 1:
+    if isinstance(max_response_bytes, bool) or not isinstance(max_response_bytes, int) or max_response_bytes < 1:
         raise ValueError("max_response_bytes must be positive")
     total = 0
     count = 0
