@@ -13,7 +13,7 @@ full claim still has a limitation. Update this table whenever behavior changes.
 | Structured multi-file patch with atomic write | `apply_patch`, `tools/patch.py` | valid target-only patch and traversal rejection observed; malformed multi-file/rollback stress pending | partial |
 | Command risk classes, approval, timeout and output limits | `run_command`, `tools/shell.py` | dangerous classification, deny approval, 1 MiB output truncation, and typed timeout observed | verified |
 | Secret redaction and privacy boundary | `security/redaction.py`, `privacy.md` | review found test fixtures are flagged as token-shaped; runtime redaction stress pending | partial |
-| Session JSONL persistence, checkpoints and recovery | `storage/`, `session`, `sessions` | `sessions --json` read existing bounded records; crash/recovery stress pending | partial |
+| Session JSONL persistence, checkpoints and recovery | `storage/`, `session`, `sessions` | synthetic checkpoint resume returns typed recovery conflict; changed file is detected by SHA-256; real process crash/restart stress remains pending | partial |
 | Transactions, hash conflict and undo | `transaction`, `rollback` | dry-run conflict probe | verified |
 | Provider protocol, retry/SSE validation and cancellation | `models/`, `agent/` | direct normal completion plus malformed JSON, duplicate `[DONE]`, and non-finite SSE rejection | verified |
 | Strict JSON/JSONL machine contract and exit codes | global `--json/--jsonl` | doctor/config/RPC responses parsed as JSON; full exit matrix pending | partial |
@@ -167,3 +167,8 @@ updating a row.
   secret scan (syntax checks still include them), eliminating false positives;
   `review latest --no-verify-files` now returns `ok=true`, exit 0 with zero
   findings on the repository.
+- Recovery boundary probe created a synthetic `acting` checkpoint with a file
+  fingerprint. `run --resume --dry-run` returned exit 3 and a typed
+  `recovery_conflict`; after modifying the file, the report additionally named
+  `file fingerprint changed since checkpoint`. This proves fail-closed stale
+  recovery, but not automatic recovery after an OS/process crash.
