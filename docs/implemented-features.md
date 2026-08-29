@@ -26,7 +26,7 @@ full claim still has a limitation. Update this table whenever behavior changes.
 | Named test profiles and bounded verification | `test`, `testing.py` | direct runner probe: plan=skipped, deny=denied, allow=passed (exit 0); no pytest command used | verified |
 | Evidence-driven review and export verification | `review`, `review.py` | repository review now excludes test fixtures from secret scan, reports 0 findings/exit 0; clean temporary workspace review/export also pass | verified |
 | Incremental context extensions | `context complete`, `context/repository.py` | temporary repository update/delete/add stress: digest update, removal, bounded search, and diagnostics all passed | verified |
-| Session tree/clone/import and trajectory evaluation | `session tree`, `eval` | completed-session tree/clone and canonical cross-workspace import verified; byte mutation is rejected; evaluator correctly returns `trajectory_incomplete` for unverified run | partial |
+| Session tree/clone/import and trajectory evaluation | `session tree`, `eval` | completed offline demo resume preview is inspect-only with no pending actions; canonical cross-workspace import verified and byte mutation rejected; evaluator correctly returns `trajectory_incomplete` for unverified run | partial |
 | Interactive pause/resume/cancel and Escape handling | `chat`, `interactive_service.py` | active controller cancellation stops a live worker and drains safely; PTY/Escape integration pending | partial |
 | RPC server plus Python/Node embedding | `rpc`, `rpc.py`, `sdk/node/index.mjs` | Python and Node SDK doctor/provider-health calls plus stream event-list smoke | verified |
 | Runtime tool narrowing (`--tools`, `--exclude-tools`, `--no-tools`) | CLI/config policy | `--no-tools` and allowlist lacking `write_file` fail closed during demo setup; exclude path reaches bounded run failure without traceback | verified |
@@ -191,3 +191,7 @@ updating a row.
   to inactive with no queued follow-up execution. This validates controller
   cancellation; terminal Escape delivery to a real provider worker remains
   platform/integration work.
+- A full offline demo reached `completed`; subsequent `run --resume --dry-run`
+  returned an inspect-only `recovery_preview` with no pending actions and did
+  not execute tools. This confirms completed sessions are safe to inspect;
+  actual `--fork` execution remains intentionally separate.
