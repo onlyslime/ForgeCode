@@ -44,8 +44,8 @@ Every commit and release tag uses `vA.B.C`.
 - Keep the changelog and the version files synchronized whenever a substantive
   release is made; do not create duplicate entries for intermediate commits.
 
-The current version is `v0.1.0`; the next ordinary versioned release is
-`v0.1.1` unless the user explicitly requests an A or B update. Keep ordinary
+The current version is `v0.6.2`; the next ordinary versioned release is
+`v0.6.3` unless the user explicitly requests an A or B update. Keep ordinary
 fixes and documentation commits on the current version; increment C only for
 substantive user-visible release content.
 
@@ -117,6 +117,17 @@ small change into an unbounded repository-wide activity.
 - Use `apply_patch` for source and documentation edits. Never use destructive Git commands to discard user work.
 - Run `uv run pytest`, `uv run forgecode doctor`, and relevant CLI checks before a release commit.
 - Keep credentials in environment variables or ignored local files. Never print or commit real credentials.
+
+## Public documentation
+
+- Write for people discovering an open-source tool, not for an assessment form.
+- Keep `README.md` short and concrete: Chinese first, English second, with
+  navigation links and runnable examples.
+- Keep `README.txt` as a compact handoff containing only the repository URL,
+  run instructions, real capabilities, and useful limitations; keep it under
+  1,000 Chinese characters.
+- Put release history in `docs/CHANGELOG.md`; do not create a second root
+  changelog.
 
 ## Push policy
 
