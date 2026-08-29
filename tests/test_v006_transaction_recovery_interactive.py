@@ -273,6 +273,7 @@ def test_interactive_context_and_events_commands_stay_local():
     assert service.dispatch("/events")["events_status"] is True
     assert service.dispatch("/events 1")["events_status"] is True
     assert service.dispatch("/events 5 tool_result")["events"][0]["kind"] == "tool_result"
+    assert service.dispatch("/events tool_result")["events"][0]["kind"] == "tool_result"
     assert calls == []
 
 

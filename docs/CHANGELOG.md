@@ -57,6 +57,8 @@
   `/events 20 error`), while retaining strict bounds on query size.
 - `/events` argument completion now suggests common audit kinds and the human
   renderer displays the active filter explicitly.
+- `/events <kind>` is now a shorthand for filtering the latest 40 events,
+  matching the completion menu and keeping the full bounded form available.
 - Provider request identities retain zero-based per-turn suffixes for
   compatibility with existing audit consumers while the UI remains 1-based.
 - Interactive Act/Bypass sessions now ask once whether the current workspace

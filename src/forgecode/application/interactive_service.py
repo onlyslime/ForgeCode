@@ -616,7 +616,7 @@ class InteractiveSession:
             "/rules /files /skills inspect project guidance and context sources\n"
             "/tree /diff            inspect repository structure and Git changes\n"
             "/context              inspect the local context index health\n"
-            "/events [limit] [kind] show recent events (Tab suggests common kinds)\n"
+            "/events [limit] [kind] show recent events (kind alone is also supported)\n"
             "/review /test          run review or verification checks\n"
             "/compact /undo         manage context and recoverable edits\n"
             "/pause /resume /cancel control an active worker\n"
@@ -705,13 +705,19 @@ class InteractiveSession:
         if command == "events":
             if len(args) > 2:
                 raise SlashCommandError("usage: /events [limit] [kind]")
-            try:
-                limit = int(args[0]) if args else 40
-            except ValueError as exc:
-                raise SlashCommandError("usage: /events [limit] [kind]") from exc
+            limit = 40
+            kind = None
+            if args:
+                try:
+                    limit = int(args[0])
+                except ValueError:
+                    # A kind-only shorthand is useful with completion:
+                    # ``/events error`` means the latest 40 errors.
+                    kind = args[0]
+            if len(args) == 2:
+                kind = args[1]
             if not 1 <= limit <= 100:
                 raise SlashCommandError("events limit must be between 1 and 100")
-            kind = args[1].strip() if len(args) == 2 else None
             if kind and (len(kind) > 64 or any(ch.isspace() for ch in kind)):
                 raise SlashCommandError("event kind must be bounded text")
             return self.events_info(limit, kind)
