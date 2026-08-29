@@ -80,6 +80,9 @@ class ContextBuilder:
 
         selected_indexes: list[int] = []
         for index, message in enumerate(normalized):
+            if message.role == "system" and "AUTOMATIC CONTEXT SUMMARY" in message.content:
+                selected_indexes.append(index)
+        for index, message in enumerate(normalized):
             if message.role == "system":
                 selected_indexes.append(index)
                 break

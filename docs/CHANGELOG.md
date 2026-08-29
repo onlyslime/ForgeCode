@@ -21,6 +21,8 @@
   completed tool-step count for live progress dashboards.
 - Provider retries and failed attempts now appear in the human timeline with
   bounded attempt/category details, while machine audit events remain intact.
+- Automatic context compaction now preserves its evidence summary as a
+  high-priority system message when fitting the next provider request.
 - Provider request identities retain zero-based per-turn suffixes for
   compatibility with existing audit consumers while the UI remains 1-based.
 - Interactive Act/Bypass sessions now ask once whether the current workspace
