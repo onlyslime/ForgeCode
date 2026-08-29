@@ -1929,7 +1929,7 @@ def main(argv: list[str] | None = None) -> int:
                             elapsed = time.monotonic() - started_at
                             phase = ""
                             if kind in {"model_progress", "model_message"}:
-                                phase = "Understand" if int(payload.get("step", 0)) == 0 else "Inspect"
+                                phase = "Understand" if int(payload.get("step", 0)) <= 1 else "Inspect"
                             elif tool in {"read_file", "search", "list_files", "workspace_summary", "repository_map"}:
                                 phase = "Inspect"
                             elif tool in {"write_file", "apply_patch"}:
@@ -2289,6 +2289,7 @@ def main(argv: list[str] | None = None) -> int:
                             # Remove the active input line before appending a
                             # response; the bar is redrawn immediately below.
                             print("\x1b[2K\r", end="")
+                            print("\n\x1b[1;36m─── Complete ───\x1b[0m")
                         print("\n" + rendered + "\n")
                         if not machine_json:
                             redraw_input_bar()
