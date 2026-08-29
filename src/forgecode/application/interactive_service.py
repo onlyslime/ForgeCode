@@ -573,7 +573,7 @@ class InteractiveSession:
     tree: Callable[[list[str]], object] = lambda _args: {}
     diff: Callable[[], object] = lambda: {}
     context_info: Callable[[], object] = lambda: {}
-    events_info: Callable[[int], object] = lambda _limit=40: {}
+    events_info: Callable[[int, str | None], object] = lambda _limit=40, _kind=None: {}
     cancel: Callable[[], object] = lambda: {"cancelled": True}
     pause: Callable[[], object] = lambda: {"paused": True}
     resume: Callable[[], object] = lambda: {"resumed": True}
@@ -614,7 +614,7 @@ class InteractiveSession:
             "/rules /files /skills inspect project guidance and context sources\n"
             "/tree /diff            inspect repository structure and Git changes\n"
             "/context              inspect the local context index health\n"
-            "/events [limit]       show recent persisted session events\n"
+            "/events [limit] [kind] show recent persisted session events\n"
             "/review /test          run review or verification checks\n"
             "/compact /undo         manage context and recoverable edits\n"
             "/pause /resume /cancel control an active worker\n"
@@ -701,15 +701,18 @@ class InteractiveSession:
             if args: raise SlashCommandError("usage: /context")
             return self.context_info()
         if command == "events":
-            if len(args) > 1:
-                raise SlashCommandError("usage: /events [limit]")
+            if len(args) > 2:
+                raise SlashCommandError("usage: /events [limit] [kind]")
             try:
                 limit = int(args[0]) if args else 40
             except ValueError as exc:
-                raise SlashCommandError("usage: /events [limit]") from exc
+                raise SlashCommandError("usage: /events [limit] [kind]") from exc
             if not 1 <= limit <= 100:
                 raise SlashCommandError("events limit must be between 1 and 100")
-            return self.events_info(limit)
+            kind = args[1].strip() if len(args) == 2 else None
+            if kind and (len(kind) > 64 or any(ch.isspace() for ch in kind)):
+                raise SlashCommandError("event kind must be bounded text")
+            return self.events_info(limit, kind)
         if command == "test": return self.test(args)
         if command == "compact":
             if args: raise SlashCommandError("usage: /compact")

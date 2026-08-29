@@ -53,6 +53,8 @@
   of the latest session activity without changing the persisted audit log.
 - Event failures now show their bounded error code inline in the human timeline,
   so common recovery causes are visible without opening the raw session log.
+- `/events` accepts an optional event-kind filter (for example
+  `/events 20 error`), while retaining strict bounds on query size.
 - Provider request identities retain zero-based per-turn suffixes for
   compatibility with existing audit consumers while the UI remains 1-based.
 - Interactive Act/Bypass sessions now ask once whether the current workspace
