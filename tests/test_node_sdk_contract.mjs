@@ -10,6 +10,8 @@ assert.equal(typeof trust, "function");
 assert.throws(() => invoke([], { timeoutMs: NaN }), TypeError);
 assert.throws(() => invoke(["x".repeat(1001)]), TypeError);
 assert.throws(() => invoke([], { signal: {} }), TypeError);
+assert.throws(() => trust("status", { workspace: "bad\npath" }), TypeError);
+assert.throws(() => trust("status", { workspace: "x".repeat(1001) }), TypeError);
 {
   const controller = new AbortController(); controller.abort();
   await assert.rejects(invoke([], { executable: process.execPath, signal: controller.signal }), (error) => error.code === "cancelled");

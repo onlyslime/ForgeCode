@@ -14,6 +14,9 @@ function validateParams(params) {
   try { encoded = JSON.stringify(params); } catch { throw new TypeError("params must be JSON-serializable"); }
   if (Buffer.byteLength(encoded, "utf8") > 1_000_000) throw new TypeError("params exceed 1 MiB");
 }
+function validateWorkspace(workspace) {
+  if (workspace !== undefined && (typeof workspace !== "string" || !workspace || workspace.length > 1000 || /[\r\n]/.test(workspace))) throw new TypeError("workspace must be bounded newline-safe text");
+}
 
 export class ForgeCodeError extends Error {
   constructor(message, { code = "sdk_error", envelope = null, exitCode = null } = {}) {
@@ -103,7 +106,7 @@ export function invokeStream(argv = [], options = {}) {
 }
 
 export const trust = (action = "status", { workspace, ...options } = {}) => invoke([
-  ...(workspace === undefined ? [] : ["--workspace", workspace]),
+  ...(validateWorkspace(workspace), workspace === undefined ? [] : ["--workspace", workspace]),
   "trust", action,
 ], options);
 export const login = ({ profile, provider, apiKeyEnv, ...options } = {}) => invoke([], {
