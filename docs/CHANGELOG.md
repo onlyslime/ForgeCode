@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.2.10 — 2026-08-29
+
+- Added a conversational execution contract: the model is instructed to give a
+  brief plan before tools, concise progress updates during multi-step work, and
+  a final summary with verification and remaining limitations.
+
 ## v0.2.9 — 2026-08-29
 
 - Interactive chat now renders assistant progress messages as soon as each

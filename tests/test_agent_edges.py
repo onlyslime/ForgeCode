@@ -171,6 +171,14 @@ def test_context_fit_keeps_tool_call_exchange_atomic():
     assert all(message.role != "tool" or message.tool_call_id in calls for message in fitted)
 
 
+def test_system_prompt_requires_conversational_progress_updates(tmp_path):
+    from forgecode.agent.context import ContextBuilder
+
+    prompt = ContextBuilder().system_message(tmp_path, ["read_file"], approval_mode="auto", mode="act").content
+    assert "three-phase workflow" in prompt
+    assert "Do not remain silent" in prompt
+
+
 def test_verification_failure_is_visible_without_invalid_tool_message(tmp_path):
     provider = ScriptedProvider([ModelResponse(Message("assistant", "done")), ModelResponse(Message("assistant", "still done"))])
     loop = _loop(tmp_path, provider, AllowAllApproval(), config=AgentConfig(verification_command="python -c \"import sys; sys.exit(2)\"", max_verification_attempts=1))

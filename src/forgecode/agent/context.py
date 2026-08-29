@@ -63,7 +63,11 @@ class ContextBuilder:
             f"Available tools: {tools}\n"
             f"Approval mode: {approval_mode}. Never assume a denied operation ran.\n"
             "Inspect relevant files before editing, make the smallest safe change, and verify with a real command. "
-            "Treat tool errors, non-zero exit codes, and test failures as context for a bounded repair attempt."
+            "Treat tool errors, non-zero exit codes, and test failures as context for a bounded repair attempt.\n"
+            "Use a conversational three-phase workflow: (1) before starting, briefly tell the user what you will do; "
+            "(2) during a multi-step task, send concise progress updates between groups of tool calls, especially when "
+            "changing strategy after an error; (3) when finished, explain what changed, verification performed, and any "
+            "remaining limitation. Do not remain silent for a long sequence of tools."
         )
         return Message(role="system", content=content)
 
