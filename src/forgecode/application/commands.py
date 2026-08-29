@@ -2351,8 +2351,21 @@ def main(argv: list[str] | None = None) -> int:
             defaults = PROVIDER_CATALOG[provider]
             print(f"Connect model ({provider})", flush=True)
             base_url = input(f"API endpoint [{defaults['base_url']}]: ").strip() or defaults["base_url"]
-            print(f"Recommended model: {defaults['model']}", flush=True)
-            model = input("Model (required): ").strip()
+            model_choices = tuple(defaults.get("models", (defaults["model"],)))
+            model = ""
+            try:
+                from prompt_toolkit.shortcuts import radiolist_dialog
+                from prompt_toolkit.styles import Style
+                values = [(item, item) for item in model_choices] + [("__custom__", "Enter another model ID…")]
+                picker_style = Style.from_dict({"dialog": "bg:#16181d #e6e6e6", "dialog.body": "bg:#16181d #e6e6e6", "dialog.frame": "bg:#16181d #e6e6e6", "dialog shadow": "bg:#000000", "radio-selected": "#7dd3fc bold", "radio": "#e6e6e6"})
+                selected_model = radiolist_dialog(title=f"ForgeCode · {provider}", text="Select a model (Esc cancels)", values=values, style=picker_style).run()
+                if selected_model == "__custom__":
+                    model = input("Model ID (required): ").strip()
+                else:
+                    model = selected_model or ""
+            except (ImportError, EOFError, KeyboardInterrupt):
+                print("Known model IDs:", ", ".join(model_choices), flush=True)
+                model = input("Model ID (required): ").strip()
             if provider not in SUPPORTED_PROVIDERS:
                 return {"error": f"unsupported provider: {provider}", "code": "unsupported_provider"}
             if not base_url or not model:

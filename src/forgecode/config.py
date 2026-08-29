@@ -29,10 +29,10 @@ class ConfigError(ValueError):
 MAX_CONFIG_BYTES = 1_000_000
 MAX_TOOL_POLICY_OPTION_CHARS = 4_000
 PROVIDER_CATALOG = {
-    "openai-compatible": {"base_url": "https://api.openai.com/v1", "api_key_env": "FORGECODE_API_KEY", "model": "gpt-4o-mini"},
+    "openai-compatible": {"base_url": "https://api.openai.com/v1", "api_key_env": "FORGECODE_API_KEY", "model": "gpt-4o-mini", "models": ("gpt-4o-mini", "gpt-4.1-mini", "o3-mini")},
     "anthropic": {"base_url": "https://api.anthropic.com/v1", "api_key_env": "ANTHROPIC_API_KEY", "model": "claude-3-5-sonnet-latest"},
     "google": {"base_url": "https://generativelanguage.googleapis.com/v1beta/openai", "api_key_env": "GOOGLE_API_KEY", "model": "gemini-2.0-flash"},
-    "deepseek": {"base_url": "https://api.deepseek.com", "api_key_env": "DEEPSEEK_API_KEY", "model": "deepseek-chat"},
+    "deepseek": {"base_url": "https://api.deepseek.com", "api_key_env": "DEEPSEEK_API_KEY", "model": "deepseek-chat", "models": ("deepseek-chat", "deepseek-reasoner")},
     "openrouter": {"base_url": "https://openrouter.ai/api/v1", "api_key_env": "OPENROUTER_API_KEY", "model": "openai/gpt-4o-mini"},
     "groq": {"base_url": "https://api.groq.com/openai/v1", "api_key_env": "GROQ_API_KEY", "model": "llama-3.3-70b-versatile"},
     "mistral": {"base_url": "https://api.mistral.ai/v1", "api_key_env": "MISTRAL_API_KEY", "model": "mistral-small-latest"},

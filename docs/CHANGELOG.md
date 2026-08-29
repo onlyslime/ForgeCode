@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.5.6 — 2026-08-29
+
+- Replaced the blue default provider dialog with a dark themed selector.
+- Added a second model picker with verified provider model IDs and an explicit
+  custom-model option; no model is silently guessed.
+- Based the picker flow on OpenCode's provider/model separation and cancellation
+  behavior.
+
 ## v0.5.5 — 2026-08-29
 
 - `/login` and `/connect` now open a modal provider picker in interactive TTYs.
