@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.5.8 — 2026-08-29
+
+- Replaced the full-screen provider dialog with an inline bounded overlay so
+  the chat background is not repainted blue.
+- Provider and live model choices remain separated and cancellable.
+
 ## v0.5.7 — 2026-08-29
 
 - Model selection now follows OpenCode's live `models.opencode.ai/api.json`

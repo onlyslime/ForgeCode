@@ -2330,20 +2330,17 @@ def main(argv: list[str] | None = None) -> int:
             if connect_args:
                 provider = connect_args[0]
             else:
-                # In the TTY use a modal selector like OpenCode's provider
-                # picker; retain a numbered fallback for pipes/non-TTY use.
-                try:
-                    from prompt_toolkit.shortcuts import radiolist_dialog
-                    values = [(name, f"{name} — {PROVIDER_CATALOG[name]['base_url']}") for name in SUPPORTED_PROVIDERS]
-                    provider = radiolist_dialog(title="ForgeCode · Connect", text="Select a provider (Esc cancels)", values=values).run() or ""
-                except (ImportError, EOFError, KeyboardInterrupt):
-                    print("Available providers:", flush=True)
-                    for index, name in enumerate(SUPPORTED_PROVIDERS, 1):
-                        catalog = PROVIDER_CATALOG[name]
-                        marker = " (local)" if name == "ollama" else ""
-                        print(f"  {index}. {name}{marker} — {catalog['base_url']}", flush=True)
-                    selection = input("Provider (name or number): ").strip()
-                    provider = SUPPORTED_PROVIDERS[int(selection) - 1] if selection.isdigit() and 1 <= int(selection) <= len(SUPPORTED_PROVIDERS) else selection
+                # Draw a bounded inline panel.  Full-screen prompt_toolkit
+                # dialogs repaint the entire terminal with their default blue
+                # background; OpenCode's picker is an overlay over its TUI.
+                print("┌─ ForgeCode · Connect ─────────────────────────────┐", flush=True)
+                print("│ Select a provider (number or name; blank cancels)    │", flush=True)
+                for index, name in enumerate(SUPPORTED_PROVIDERS, 1):
+                    marker = " (local)" if name == "ollama" else ""
+                    print(f"│ {index:>2}. {name}{marker} — {PROVIDER_CATALOG[name]['base_url']}", flush=True)
+                print("└─────────────────────────────────────────────────────┘", flush=True)
+                selection = input("Provider: ").strip()
+                provider = SUPPORTED_PROVIDERS[int(selection) - 1] if selection.isdigit() and 1 <= int(selection) <= len(SUPPORTED_PROVIDERS) else selection
                 if not provider:
                     return {"error": "provider selection cancelled", "code": "connect_cancelled"}
             if provider not in SUPPORTED_PROVIDERS:
@@ -2368,19 +2365,18 @@ def main(argv: list[str] | None = None) -> int:
             except (OSError, ValueError, urllib.error.URLError):
                 model_choices = ()
             model = ""
-            try:
-                from prompt_toolkit.shortcuts import radiolist_dialog
-                from prompt_toolkit.styles import Style
-                values = [(item, item) for item in model_choices] + [("__custom__", "Enter another model ID…")]
-                picker_style = Style.from_dict({"dialog": "bg:#16181d #e6e6e6", "dialog.body": "bg:#16181d #e6e6e6", "dialog.frame": "bg:#16181d #e6e6e6", "dialog shadow": "bg:#000000", "radio-selected": "#7dd3fc bold", "radio": "#e6e6e6"})
-                selected_model = radiolist_dialog(title=f"ForgeCode · {provider}", text="Select a model (Esc cancels)", values=values, style=picker_style).run()
-                if selected_model == "__custom__":
-                    model = input("Model ID (required): ").strip()
-                else:
-                    model = selected_model or ""
-            except (ImportError, EOFError, KeyboardInterrupt):
-                print("Known model IDs:", ", ".join(model_choices) if model_choices else "catalog unavailable; use the provider's exact model ID", flush=True)
-                model = input("Model ID (required): ").strip()
+            print("┌─ Model ────────────────────────────────────────────┐", flush=True)
+            if model_choices:
+                for index, item in enumerate(model_choices, 1):
+                    print(f"│ {index:>3}. {item}", flush=True)
+                print("│  c. Enter another model ID", flush=True)
+                print("└─────────────────────────────────────────────────────┘", flush=True)
+                selection = input("Model: ").strip()
+                model = model_choices[int(selection) - 1] if selection.isdigit() and 1 <= int(selection) <= len(model_choices) else (input("Model ID: ").strip() if selection.lower() == "c" else selection)
+            else:
+                print("│ Live model catalog unavailable; enter the exact model ID.", flush=True)
+                print("└─────────────────────────────────────────────────────┘", flush=True)
+                model = input("Model ID: ").strip()
             if provider not in SUPPORTED_PROVIDERS:
                 return {"error": f"unsupported provider: {provider}", "code": "unsupported_provider"}
             if not base_url or not model:
