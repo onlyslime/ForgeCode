@@ -127,15 +127,15 @@ export const login = ({ profile, provider, apiKeyEnv, ...options } = {}) => invo
 export const method = (name, options = {}) => invoke([], { ...options, method: name });
 export const run = (prompt, options = {}) => method("run", { ...options, params: { ...(options.params ?? {}), prompt } });
 export const sessionInspect = (session, { workspace, ...options } = {}) => { validateSession(session); validateWorkspace(workspace); return method("session.inspect", { ...options, params: { ...(options.params ?? {}), session, ...(workspace === undefined ? {} : { workspace }) } }); };
-export const sessionTree = ({ workspace, limit, ...options } = {}) => method("session.tree", {
+export const sessionTree = ({ workspace, limit, ...options } = {}) => (validateWorkspace(workspace), method("session.tree", {
   ...options,
   params: {
     ...(options.params ?? {}),
     ...(workspace === undefined ? {} : { workspace }),
     ...(limit === undefined ? {} : { limit }),
   },
-});
-export const sessionList = ({ workspace, state, limit, ...options } = {}) => method("session.list", {
+}));
+export const sessionList = ({ workspace, state, limit, ...options } = {}) => (validateWorkspace(workspace), method("session.list", {
   ...options,
   params: {
     ...(options.params ?? {}),
@@ -143,8 +143,8 @@ export const sessionList = ({ workspace, state, limit, ...options } = {}) => met
     ...(state === undefined ? {} : { state }),
     ...(limit === undefined ? {} : { limit }),
   },
-});
-export const sessionOpen = ({ workspace, mode, session, ...options } = {}) => method("session.open", {
+}));
+export const sessionOpen = ({ workspace, mode, session, ...options } = {}) => (validateWorkspace(workspace), mode !== undefined && !["plan", "act"].includes(mode) ? (() => { throw new TypeError("mode must be plan or act"); })() : method("session.open", {
   ...options,
   params: {
     ...(options.params ?? {}),
@@ -152,7 +152,7 @@ export const sessionOpen = ({ workspace, mode, session, ...options } = {}) => me
     ...(mode === undefined ? {} : { mode }),
     ...(session === undefined ? {} : { session }),
   },
-});
+}));
 export const sessionStatus = (session, { workspace, ...options } = {}) => { validateSession(session); validateWorkspace(workspace); return method("session.status", { ...options, params: { ...(options.params ?? {}), session, ...(workspace === undefined ? {} : { workspace }) } }); };
 export const sessionResult = (session, { workspace, ...options } = {}) => { validateSession(session); validateWorkspace(workspace); return method("session.result", { ...options, params: { ...(options.params ?? {}), session, ...(workspace === undefined ? {} : { workspace }) } }); };
 export const sessionWait = (session, { workspace, timeout, ...options } = {}) => { validateSession(session); validateWorkspace(workspace); return method("session.wait", { ...options, params: { ...(options.params ?? {}), session, ...(workspace === undefined ? {} : { workspace }), ...(timeout === undefined ? {} : { timeout }) } }); };
