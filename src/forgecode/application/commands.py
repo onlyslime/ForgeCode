@@ -2285,6 +2285,8 @@ def main(argv: list[str] | None = None) -> int:
                             redraw_input_bar()
 
         def interactive_output(text: str) -> None:
+            if machine_json:
+                return
             with output_lock:
                 # Keep asynchronous model output above the persistent prompt.
                 print("\x1b[2K\r", end="")
@@ -2607,6 +2609,26 @@ def main(argv: list[str] | None = None) -> int:
             effective_model = settings.effective.model if settings.effective else settings.model
             print(f"\x1b[90mstatus  ready   mode: {state['mode']}   model: {effective_model or 'not configured'}\x1b[0m")
             print(f"\x1b[90mtools   {len(registry.names())} enabled   workspace: trusted\x1b[0m\n")
+            if state["mode"] in {"act", "bypass"} and bool(getattr(sys.stdin, "isatty", lambda: False)()):
+                try:
+                    trust_status = TrustStore(workspace).status()
+                except TrustError as exc:
+                    trust_status = {"trusted": False}
+                    print(f"Workspace trust unavailable: {exc}")
+                if not trust_status.get("trusted"):
+                    print("This workspace is not trusted for file changes or commands.")
+                    try:
+                        answer = input("Trust this workspace? [y/N] ").strip().lower()
+                    except (EOFError, KeyboardInterrupt):
+                        answer = ""
+                    if answer in {"y", "yes"}:
+                        try:
+                            TrustStore(workspace).grant()
+                            print("Workspace trusted for this directory.\n")
+                        except TrustError as exc:
+                            print(f"Could not save workspace trust: {exc}\n")
+                    else:
+                        print("Continuing without workspace trust; side effects will be denied.\n")
         if initial_prompt:
             initial_result = interactive.dispatch(initial_prompt)
             if initial_result is not None:

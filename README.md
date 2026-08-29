@@ -65,6 +65,11 @@ fcc
 The short command is `fcc`; pass `--plan`, `--act`, or `--bypass` to choose a
 mode. Connection values are kept in local ForgeCode state, not the repository.
 
+When an interactive Act or Bypass session opens an untrusted workspace,
+ForgeCode asks whether to trust that directory for side effects. Answer `y` to
+save the local trust record, or press Enter to continue with side effects
+denied. The equivalent explicit command is `forgecode trust grant`.
+
 ## What it does
 
 Give ForgeCode a task. It inspects the workspace, calls bounded tools, edits

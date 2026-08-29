@@ -2,6 +2,9 @@
 
 ## v0.7.0 — 2026-08-29
 
+- Interactive Act/Bypass sessions now ask once whether the current workspace
+  should be trusted for side effects; declining keeps the session read-only.
+- Machine-readable chat output no longer receives terminal redraw escape codes.
 - Added grouped, human-readable `/tools` output for read-only, change,
   execution, and evidence capabilities.
 - Refined completed-run summaries so verification, elapsed time, and tool-step
