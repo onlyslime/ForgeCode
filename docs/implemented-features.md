@@ -15,7 +15,7 @@ full claim still has a limitation. Update this table whenever behavior changes.
 | Secret redaction and privacy boundary | `security/redaction.py`, `privacy.md` | review found test fixtures are flagged as token-shaped; runtime redaction stress pending | partial |
 | Session JSONL persistence, checkpoints and recovery | `storage/`, `session`, `sessions` | `sessions --json` read existing bounded records; crash/recovery stress pending | partial |
 | Transactions, hash conflict and undo | `transaction`, `rollback` | dry-run conflict probe | verified |
-| Provider protocol, retry/SSE validation and cancellation | `models/`, `agent/` | provider health is offline/no-network; malformed-stream stress pending | partial |
+| Provider protocol, retry/SSE validation and cancellation | `models/`, `agent/` | direct normal completion plus malformed JSON, duplicate `[DONE]`, and non-finite SSE rejection | verified |
 | Strict JSON/JSONL machine contract and exit codes | global `--json/--jsonl` | doctor/config/RPC responses parsed as JSON; full exit matrix pending | partial |
 | Rules and scoped `AGENTS.md` precedence | `rules`, `rules.py` | nested-rule smoke | verified |
 | Explicit context references and bounded context index | `context`, `context/index.py` | index/search/path-boundary smoke | verified |
@@ -97,3 +97,7 @@ updating a row.
   three safety outcomes: plan mode is `skipped`, DenyAllApproval is `denied`,
   and AllowAllApproval runs a bounded command with `passed`/exit 0. This used
   `python -c`, not pytest.
+- Provider parser probes accepted a normal Chat Completion and rejected
+  malformed SSE JSON, repeated `[DONE]`, and `NaN` frames with typed
+  `ProviderError(stream_protocol_error)`; no tool call was emitted for the
+  invalid streams.
