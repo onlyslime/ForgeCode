@@ -169,6 +169,9 @@ The Node `login({ profile, provider, apiKeyEnv })` helper forwards the same
 bounded selectors as the CLI and RPC login methods.
 
 Python embedding mirrors this contract with `forgecode.embed.ForgeCodeError`.
+It also exposes `session_cancel`, `session_pause`, `session_resume`, and
+`session_approval`; each forwards the same workspace-bound RPC control and
+returns the standard JSON envelope.
 `invoke(..., raise_for_status=True)` and `stream(..., raise_for_status=True)`
 raise typed failures while preserving the original envelope; responses are
 bounded by `max_response_bytes`. Malformed JSON received during `stream()` is

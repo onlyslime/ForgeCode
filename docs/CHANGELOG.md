@@ -14,6 +14,13 @@ slice.
   deadlines and side-effect conflicts.
 - Verification: cancellation hardening regression and recovery tests.
 
+## v0.0.38 — 2026-08-29
+
+- Added Python embedding session controls (`session_cancel`, `session_pause`,
+  `session_resume`, `session_approval`) with bounded workspace validation and
+  standard RPC envelopes, bringing Python parity with Node and CLI controls.
+- Verification: embedding contract and compile checks.
+
 ## v0.0.37 — 2026-08-29
 
 - Enforced canonical workspace binding on RPC session controls. A caller
