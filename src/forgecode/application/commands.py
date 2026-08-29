@@ -2750,7 +2750,20 @@ def main(argv: list[str] | None = None) -> int:
     if command == "tools":
         machine_json = bool(getattr(args, "json", False) or getattr(args, "jsonl", False))
         command_name = "tools"
-        tool_data = [{"name": definition.name, "description": definition.description, "side_effecting": definition.side_effecting, "parameters": definition.parameters} for definition in registry.definitions()]
+        evidence_names = {"review", "test", "git_status", "git_diff", "transaction", "rollback", "eval"}
+        execution_names = {"run_command", "run_background", "process_status", "poll_process", "kill_process"}
+        change_names = {"write_file", "apply_patch", "git_commit"}
+        tool_data = []
+        for definition in registry.definitions():
+            if definition.name in evidence_names:
+                category = "evidence"
+            elif definition.name in execution_names:
+                category = "execution"
+            elif definition.name in change_names or definition.side_effecting:
+                category = "changes"
+            else:
+                category = "read_only"
+            tool_data.append({"name": definition.name, "description": definition.description, "side_effecting": definition.side_effecting, "category": category, "parameters": definition.parameters})
         if getattr(args, "json", False) and not getattr(args, "jsonl", False):
             # ``tools --json`` predates the envelope and is consumed by
             # clients that iterate the top-level array.  Keep that explicit
