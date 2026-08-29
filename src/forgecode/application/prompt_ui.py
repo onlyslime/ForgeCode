@@ -15,15 +15,34 @@ def run_prompt_ui(session, *, mode: Callable[[], str]) -> None:
     from prompt_toolkit.completion import Completer, Completion
 
     slash_commands = ("/help", "/status", "/tools", "/model", "/plan", "/mode", "/connect", "/login", "/rules", "/files", "/skills", "/tree", "/diff", "/review", "/test", "/compact", "/undo", "/pause", "/resume", "/cancel", "/clear", "/quit", "/exit")
+    argument_choices = {
+        "/mode": ("plan", "act", "bypass"),
+        "/plan": ("show", "refresh"),
+        "/model": ("show", "list", "select"),
+        "/undo": ("latest",),
+    }
 
     class SlashCompleter(Completer):
         def get_completions(self, document, complete_event):
-            word = document.text_before_cursor.split()[-1] if document.text_before_cursor.split() else ""
+            before = document.text_before_cursor
+            words = before.split()
+            if not words:
+                return
+            command = words[0].lower()
+            if command in argument_choices and (len(words) > 1 or before.endswith((" ", "\t"))):
+                prefix = words[-1]
+                if before.endswith((" ", "\t")):
+                    prefix = ""
+                for choice in argument_choices[command]:
+                    if choice.startswith(prefix):
+                        yield Completion(choice, start_position=-len(prefix), display=choice)
+                return
+            word = words[-1]
             if not word.startswith("/"):
                 return
-            for command in slash_commands:
-                if command.startswith(word):
-                    yield Completion(command, start_position=-len(word), display=command)
+            for candidate in slash_commands:
+                if candidate.startswith(word):
+                    yield Completion(candidate, start_position=-len(word), display=candidate)
 
     bindings = KeyBindings()
 
