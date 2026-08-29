@@ -2330,22 +2330,28 @@ def main(argv: list[str] | None = None) -> int:
             if connect_args:
                 provider = connect_args[0]
             else:
-                print("Available providers:")
-                for index, name in enumerate(SUPPORTED_PROVIDERS, 1):
-                    catalog = PROVIDER_CATALOG[name]
-                    marker = " (local)" if name == "ollama" else ""
-                    print(f"  {index}. {name}{marker} — {catalog['base_url']}")
-                selection = input("Provider (name or number): ").strip()
-                if selection.isdigit() and 1 <= int(selection) <= len(SUPPORTED_PROVIDERS):
-                    provider = SUPPORTED_PROVIDERS[int(selection) - 1]
-                else:
-                    provider = selection
+                # In the TTY use a modal selector like OpenCode's provider
+                # picker; retain a numbered fallback for pipes/non-TTY use.
+                try:
+                    from prompt_toolkit.shortcuts import radiolist_dialog
+                    values = [(name, f"{name} — {PROVIDER_CATALOG[name]['base_url']}") for name in SUPPORTED_PROVIDERS]
+                    provider = radiolist_dialog(title="ForgeCode · Connect", text="Select a provider (Esc cancels)", values=values).run() or ""
+                except (ImportError, EOFError, KeyboardInterrupt):
+                    print("Available providers:", flush=True)
+                    for index, name in enumerate(SUPPORTED_PROVIDERS, 1):
+                        catalog = PROVIDER_CATALOG[name]
+                        marker = " (local)" if name == "ollama" else ""
+                        print(f"  {index}. {name}{marker} — {catalog['base_url']}", flush=True)
+                    selection = input("Provider (name or number): ").strip()
+                    provider = SUPPORTED_PROVIDERS[int(selection) - 1] if selection.isdigit() and 1 <= int(selection) <= len(SUPPORTED_PROVIDERS) else selection
+                if not provider:
+                    return {"error": "provider selection cancelled", "code": "connect_cancelled"}
             if provider not in SUPPORTED_PROVIDERS:
                 return {"error": f"unsupported provider: {provider}", "code": "unsupported_provider", "available": list(SUPPORTED_PROVIDERS)}
             defaults = PROVIDER_CATALOG[provider]
-            print(f"Connect model ({provider})")
+            print(f"Connect model ({provider})", flush=True)
             base_url = input(f"API endpoint [{defaults['base_url']}]: ").strip() or defaults["base_url"]
-            print(f"Recommended model: {defaults['model']}")
+            print(f"Recommended model: {defaults['model']}", flush=True)
             model = input("Model (required): ").strip()
             if provider not in SUPPORTED_PROVIDERS:
                 return {"error": f"unsupported provider: {provider}", "code": "unsupported_provider"}

@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.5.5 — 2026-08-29
+
+- `/login` and `/connect` now open a modal provider picker in interactive TTYs.
+- Connection prompts are flushed in the correct order and models require an
+  explicit value instead of silently accepting a default.
+
 ## v0.5.4 — 2026-08-29
 
 - Unified interactive `/login` with `/connect` and added an explicit provider
