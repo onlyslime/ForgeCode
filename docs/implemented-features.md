@@ -13,7 +13,7 @@ full claim still has a limitation. Update this table whenever behavior changes.
 | Structured multi-file patch with atomic write | `apply_patch`, `tools/patch.py` | malformed second hunk is rejected pre-write; injected second-file I/O failure returns `write_failed`, rolls back first file, and preserves both originals | verified |
 | Command risk classes, approval, timeout and output limits | `run_command`, `tools/shell.py` | dangerous classification, deny approval, 1 MiB output truncation, and typed timeout observed | verified |
 | Secret redaction and privacy boundary | `security/redaction.py`, `privacy.md` | named/bearer/bracketed secrets redact correctly; review scanner excludes test fixtures and repository review has zero findings | verified |
-| Session JSONL persistence, checkpoints and recovery | `storage/`, `session`, `sessions` | synthetic checkpoint resume returns typed recovery conflict; changed file is detected by SHA-256; 8-thread/200-event append stress had zero issues; malformed checkpoint overwrite is refused; real process crash/restart stress remains pending | partial |
+| Session JSONL persistence, checkpoints and recovery | `storage/`, `session`, `sessions` | forced process-tree termination left a durable checkpoint; a fresh `run --resume --dry-run` returned bounded `recovery_preview` (`state=discovering`) with no side effects; stale-file and corruption checks remain fail-closed; full resumed execution still pending | partial |
 | Transactions, hash conflict and undo | `transaction`, `rollback` | dry-run conflict probe | verified |
 | Provider protocol, retry/SSE validation and cancellation | `models/`, `agent/` | direct normal completion plus malformed JSON, duplicate `[DONE]`, and non-finite SSE rejection | verified |
 | Strict JSON/JSONL machine contract and exit codes | global `--json/--jsonl` | 13-command success/error matrix emits one parseable JSON line, stable 0/2 codes, and no traceback; exhaustive provider/runtime matrix pending | partial |
@@ -220,3 +220,8 @@ updating a row.
 - Checkpoint corruption probe wrote malformed JSON, and `CheckpointStore.load`
   returned a bounded `ValueError`; a later save refused to overwrite the
   unreadable checkpoint. This preserves fail-closed recovery state.
+- Process-tree crash probe terminated an in-flight offline run after checkpoint
+  creation. A fresh process found the durable JSONL/checkpoint and
+  `run --resume --dry-run` returned `recovery_preview` in `discovering` state
+  with no side effects. The interrupted atomic checkpoint write left an orphan
+  `.tmp` file in the ignored runtime directory; recovery ignored it safely.
