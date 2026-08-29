@@ -292,8 +292,8 @@ updating a row.
 
 ## 2026-08-29 interactive UX additions
 
-- Added interactive `/connect`, which explicitly prompts for API endpoint URL,
-  model name, and hidden API key; values remain process-local and are never
+- Added interactive `/connect`, which explicitly prompts for API endpoint,
+  model, and visible API key; values remain process-local and are never
   persisted. Profile inspection remains available through CLI config commands,
   while the interactive `/model` command is intentionally not exposed.
 - Added `/clear` (screen reset only), a compact text ready banner, and a

@@ -3,7 +3,6 @@
 import argparse
 import asyncio
 from dataclasses import asdict, replace
-import getpass
 import json
 import json as jsonlib
 import os
@@ -1876,7 +1875,10 @@ def main(argv: list[str] | None = None) -> int:
                         session.append("plan_updated", {"plan": current.to_dict()}, mode=state["mode"])
                     except ValueError:
                         pass
-                return {"stopped_reason": result.stopped_reason, "state": result.state, "succeeded": result.succeeded, "verification_ok": result.verification_ok, "run_id": result.run_id}
+                payload = {"stopped_reason": result.stopped_reason, "state": result.state, "succeeded": result.succeeded, "verification_ok": result.verification_ok, "run_id": result.run_id}
+                if result.error:
+                    payload["error"] = _redact_display(result.error, [api_key])
+                return payload
             except ShortcutParseError as exc:
                 return {"accepted": False, "shortcut": True, "error": str(exc), "code": exc.code}
             except (ProviderError, ValueError, OSError) as exc:
@@ -2170,16 +2172,16 @@ def main(argv: list[str] | None = None) -> int:
             nonlocal settings, api_key
             effective = settings.effective
             provider = effective.provider if effective else "openai-compatible"
-            print("Connect a model provider (values are kept only for this process).")
-            base_url = input("API endpoint URL (e.g. https://api.openai.com/v1): ").strip()
-            model = input("Model name (e.g. gpt-4o-mini): ").strip()
+            print("Connect model")
+            base_url = input("API endpoint: ").strip()
+            model = input("Model: ").strip()
             if provider not in SUPPORTED_PROVIDERS:
                 return {"error": f"unsupported provider: {provider}", "code": "unsupported_provider"}
             if not base_url or not model:
                 return {"error": "API endpoint URL and model name are required", "code": "connect_incomplete"}
             requires_key = provider_requires_credential(provider)
             if requires_key:
-                entered = getpass.getpass("API key (input hidden; never saved): ").strip()
+                entered = input("API key: ").strip()
                 if not entered:
                     return {"error": "API key must not be empty", "code": "credential_missing"}
                 # Keep the credential process-local and never write it to config/session.

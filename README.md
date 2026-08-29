@@ -20,7 +20,7 @@ Chat Completions 返回结构化 tool calls，ForgeCode 在用户指定工作区
   和命令仍经过审批。
 - **连接与交互外观**：交互会话支持 `/connect`（交互式配置 API endpoint、
   API key 和 model）以及 `/clear`，并在真实终端显示黑底输入栏和就绪横幅；
-  凭据只保存在当前进程环境。
+  凭据只保存在当前进程环境。API key 输入为可见文本，请注意终端隐私。
 - **结构化 `apply_patch`**：支持 unified diff 和 `*** Begin Patch`，多文件/多
   hunk、行偏移、新建和显式删除；执行前检查路径、UTF-8、大小、上下文和符号
   链接边界，内存预验证后才原子写入，并展示有上限的 diff preview。
