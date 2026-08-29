@@ -6,20 +6,49 @@ ForgeCode 是一个简洁、可审计的终端工具。它自己处理模型消�
 
 ## 安装与开始
 
-需要 Python 3.11+ 和 [uv](https://docs.astral.sh/uv/)：
+推荐使用 `fcc`。下面分别说明空白电脑和 GitHub ZIP 两种情况。
+
+### 空白 Windows 电脑
+
+在 PowerShell 安装 [uv](https://docs.astral.sh/uv/)：
+
+```powershell
+irm https://astral.sh/uv/install.ps1 | iex
+```
+
+重新打开 PowerShell，直接从 GitHub 安装 ForgeCode：
+
+```powershell
+uv tool install "git+https://github.com/onlyslime/ForgeCode.git"
+uv tool update-shell
+```
+
+再次打开 PowerShell 后，`fcc` 可在任意目录使用：
+
+```powershell
+fcc --version
+fcc
+```
+
+### 已下载 GitHub ZIP
+
+解压 ZIP，在解压后的项目目录打开 PowerShell：
 
 ```powershell
 uv sync
 uv run forgecode doctor
-uv run forgecode chat
+uv run fcc
 ```
 
-没有 Python 或 uv 时，可安装带独立运行文件的 npm 包（当前先提供 Windows x64）：
+`uv sync` 只负责同步当前项目环境，不会注册全局命令。如果希望在任意目录
+直接使用 `fcc`，在项目目录执行一次：
 
 ```powershell
-npm install -g @onlyslime/forgecode
-fcc
+uv tool install --editable .
+uv tool update-shell
 ```
+
+重新打开 PowerShell 即可。由于这是 editable 安装，请保留项目目录。
 
 配置模型时，在 `fcc` 中输入 `/login`，填写服务商提供的 URL、ID 和 KEY：
 
