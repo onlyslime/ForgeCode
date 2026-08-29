@@ -73,6 +73,6 @@ The release acceptance uses deterministic offline cases for calculator, JSON,
 interactive Plan/Act, named test profiles, compaction, resume/fork, hash
 conflicts, undo, cancellation, unresolved providers, review export/verify and
 broken SSE. The release-gate count is recorded in
-`docs/v008-acceptance-report.md` after the final test run. Symlink-alias tests
+`docs/releases/v008-acceptance-report.md` after the final test run. Symlink-alias tests
 are platform-conditional and are skipped only when the current Windows process
 lacks symlink creation permission; the report records the exact skip reason.

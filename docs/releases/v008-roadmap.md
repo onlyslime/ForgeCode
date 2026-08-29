@@ -5,7 +5,7 @@ completion contract for v0.0.8. The implementation makes test execution,
 review, recovery and diagnostics first-class while retaining the self-built,
 local and auditable boundary. Items below describe shipped code; the exact
 fresh-workspace evidence and final test count are kept in
-`docs/v008-acceptance-report.md`.
+`docs/releases/v008-acceptance-report.md`.
 
 ## Baseline and gaps
 

@@ -21,7 +21,7 @@ Before the release commit, confirm that `VERSION`, `pyproject.toml` and
 test suites, `compileall`, `forgecode doctor`, and the documented CLI smoke
 commands. Inspect `git status --short --ignored` for credentials, private
 paths, generated runtime data and the ignored `docs/goals/` prompts. The
-acceptance record in `docs/v008-acceptance-report.md` must contain only bounded
+acceptance record in `docs/releases/v008-acceptance-report.md` must contain only bounded
 command results, identifiers and digest summaries. Create exactly one commit
 with subject `v0.0.8: harden cancellation, recovery, and evidence workflows`,
 create annotated tag `v0.0.8`, and push the branch and tag only after local

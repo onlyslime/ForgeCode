@@ -246,16 +246,18 @@ tests/               deterministic offline regression tests
 docs/assignment/     assessment PDF
 docs/research/       research plan and feature report
 docs/demo-script.md  reproducible two-minute demo script
-docs/v008-acceptance-report.md  bounded release acceptance evidence
+docs/releases/       versioned roadmaps and acceptance/release reports
 docs/goals/          ignored timestamped goal prompts (private)
+docs/strategy/       ignored local planning/status notes
 ```
 
-See [docs/architecture.md](docs/architecture.md) for data flow and safety
+See [docs/README.md](docs/README.md) for the documentation map, and
+[docs/architecture.md](docs/architecture.md) for data flow and safety
 semantics, [docs/demo-script.md](docs/demo-script.md) for the assessment
 walk-through, [AGENTS.md](AGENTS.md) for repository rules, and
 [docs/VERSIONING.md](docs/VERSIONING.md) for version policy. The bounded
-release evidence is summarized in
-[docs/v008-acceptance-report.md](docs/v008-acceptance-report.md).
+release evidence is kept under
+[`docs/releases/`](docs/releases/).
 
 ## Safety and scope
 
