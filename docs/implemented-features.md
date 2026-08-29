@@ -79,3 +79,8 @@ updating a row.
   zero/huge limits and unknown/duplicate tool policy values also returned
   structured errors without traceback. Interactive `run` without approval
   correctly stopped with `approval_denied` (exit 1).
+- SessionStore malformed-input probes (bad JSON, non-object event, 120k event
+  line, and invalid UTF-8) returned one bounded issue each; strict mode raised
+  `SessionFormatError` without a traceback. ConfigLoader/CLI probes rejected
+  malformed TOML, plaintext secret fields, and unknown tool names with typed
+  `config_invalid` errors and exit code 2.
