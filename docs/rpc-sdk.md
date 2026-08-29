@@ -169,6 +169,8 @@ The Node `login({ profile, provider, apiKeyEnv })` helper forwards the same
 bounded selectors as the CLI and RPC login methods.
 
 Python embedding mirrors this contract with `forgecode.embed.ForgeCodeError`.
+`session_open` and `session_run` create and drive durable sessions using the
+same bounded workspace, mode, session, and prompt fields as the RPC contract.
 It also exposes `session_cancel`, `session_pause`, `session_resume`, and
 `session_approval`; each forwards the same workspace-bound RPC control and
 returns the standard JSON envelope.

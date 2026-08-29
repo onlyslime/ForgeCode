@@ -14,6 +14,13 @@ slice.
   deadlines and side-effect conflicts.
 - Verification: cancellation hardening regression and recovery tests.
 
+## v0.0.39 — 2026-08-29
+
+- Added Python embedding `session_open` and `session_run` helpers so
+  programmatic clients can create and drive durable sessions through the same
+  RPC envelope and workspace/mode/prompt validation as Node and CLI clients.
+- Verification: embedding contract, compile, and RPC envelope tests.
+
 ## v0.0.38 — 2026-08-29
 
 - Added Python embedding session controls (`session_cancel`, `session_pause`,

@@ -129,6 +129,31 @@ def _session_control(action: str, session: str, *, workspace: str | None = None,
     return list(stream([request], raise_for_status=raise_for_status))
 
 
+def session_open(*, workspace: str = ".", mode: str = "plan", session: str | None = None, request_id: str | int | None = None, raise_for_status: bool = False) -> list[dict[str, Any]]:
+    if not isinstance(workspace, str) or not workspace or len(workspace) > 1_000 or any(ch in workspace for ch in "\r\n"):
+        raise ValueError("workspace must be bounded newline-safe text")
+    if mode not in {"plan", "act"}: raise ValueError("mode must be plan or act")
+    params: dict[str, Any] = {"workspace": workspace, "mode": mode}
+    if session is not None:
+        if not isinstance(session, str) or not session or len(session) > 512 or any(ch in session for ch in "\r\n"): raise ValueError("session must be bounded newline-safe text")
+        params["session"] = session
+    request = {"method": "session.open", "params": params}
+    if request_id is not None: request["id"] = request_id
+    return list(stream([request], raise_for_status=raise_for_status))
+
+
+def session_run(session: str, prompt: str, *, workspace: str | None = None, request_id: str | int | None = None, raise_for_status: bool = False) -> list[dict[str, Any]]:
+    if not isinstance(session, str) or not session or len(session) > 512 or any(ch in session for ch in "\r\n"): raise ValueError("session must be bounded newline-safe text")
+    if not isinstance(prompt, str) or not prompt.strip() or len(prompt) > 8_000: raise ValueError("prompt must be non-empty and bounded")
+    params: dict[str, Any] = {"session": session, "prompt": prompt}
+    if workspace is not None:
+        if not isinstance(workspace, str) or not workspace or len(workspace) > 1_000 or any(ch in workspace for ch in "\r\n"): raise ValueError("workspace must be bounded newline-safe text")
+        params["workspace"] = workspace
+    request = {"method": "session.run", "params": params}
+    if request_id is not None: request["id"] = request_id
+    return list(stream([request], raise_for_status=raise_for_status))
+
+
 def session_cancel(session: str, **kwargs: Any) -> list[dict[str, Any]]:
     return _session_control("cancel", session, **kwargs)
 
@@ -194,7 +219,7 @@ def stream(requests: Iterable[dict[str, Any]], *, raise_for_status: bool = False
         yield envelope
 
 
-__all__ = ["ForgeCodeError", "invoke", "session_result", "session_wait", "session_list", "session_tree", "session_cancel", "session_pause", "session_resume", "session_approval", "config_policy", "stream"]
+__all__ = ["ForgeCodeError", "invoke", "session_open", "session_run", "session_result", "session_wait", "session_list", "session_tree", "session_cancel", "session_pause", "session_resume", "session_approval", "config_policy", "stream"]
 
 
 class EmbeddedSession:

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from forgecode.embed import ForgeCodeError, config_policy, invoke, session_result, session_wait, session_tree, session_cancel, session_pause, session_resume, session_approval, stream
+from forgecode.embed import ForgeCodeError, config_policy, invoke, session_open, session_run, session_result, session_wait, session_tree, session_cancel, session_pause, session_resume, session_approval, stream
 import forgecode
 
 
@@ -69,6 +69,8 @@ def test_embed_session_result_validates_handle():
     with pytest.raises(ValueError):
         session_result("x\ny")
     assert forgecode.session_result_embedded is session_result
+    assert forgecode.session_open_embedded is session_open
+    assert forgecode.session_run_embedded is session_run
     assert forgecode.session_wait_embedded is session_wait
     assert forgecode.session_tree_embedded is session_tree
     assert forgecode.session_cancel_embedded is session_cancel
@@ -91,7 +93,7 @@ def test_embed_session_result_validates_handle():
 
 
 def test_embed_session_controls_use_rpc_envelopes(tmp_path):
-    opened = list(stream([{"method": "session.open", "params": {"workspace": str(tmp_path), "mode": "plan"}}], raise_for_status=True))
+    opened = session_open(workspace=str(tmp_path), raise_for_status=True)
     handle = opened[-1]["data"]["session"]
     cancelled = session_cancel(handle, workspace=str(tmp_path), raise_for_status=True)
     assert cancelled[-1]["command"] == "session.cancel"
