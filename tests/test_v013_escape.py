@@ -10,5 +10,5 @@ def test_escape_byte_requests_immediate_cancel():
 
 
 def test_slash_login_is_available():
-    session = InteractiveSession(lambda _: None, login=lambda: {"storage": "environment-only"})
+    session = InteractiveSession(lambda _: None, connect=lambda _args: {"storage": "environment-only"})
     assert session.dispatch("/login")["storage"] == "environment-only"
