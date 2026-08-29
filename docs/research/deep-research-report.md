@@ -722,7 +722,7 @@ provider 回归测试均已通过。
 - **P1 工程上下文：部分完成**。仓库 map、增量索引、符号列表和 bounded 诊断可用；
   LSP 级 definition/reference/hover 仍是后续工作。
 
-本审计以 `uv run pytest -rs` 的完整门禁（484 passed、8 个 Windows symlink
+本审计以 `uv run pytest -rs` 的完整门禁（485 passed、8 个 Windows symlink
 条件 skip、2 warnings）及 `uv run forgecode doctor` 输出为证据，不把未能访问的
 Codex 官方页面或未实现的竞品特性当作本项目已完成能力。
 
