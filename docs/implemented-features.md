@@ -23,7 +23,7 @@ full claim still has a limitation. Update this table whenever behavior changes.
 | Skills manifest validation and bounded execution | `skills`, `skills.py` | list/check malformed manifest | verified |
 | Provider diagnostics and profile selection | `provider`, `config profiles` | `provider health/list` and `config profiles --json` pass offline | verified |
 | Lifecycle hooks with fail-closed behavior | `hooks.py` | direct exception, timeout, recursion, cancellation and redaction probes | verified |
-| Named test profiles and bounded verification | `test`, `testing.py` | help/schema smoke (pytest intentionally not run) | partial |
+| Named test profiles and bounded verification | `test`, `testing.py` | direct runner probe: plan=skipped, deny=denied, allow=passed (exit 0); no pytest command used | verified |
 | Evidence-driven review and export verification | `review`, `review.py` | fresh workspace review smoke | partial |
 | Incremental context extensions | `context complete`, `context/repository.py` | source inspection; large-tree stress pending | partial |
 | Session tree/clone/import and trajectory evaluation | `session tree`, `eval` | help and empty-session boundary probes | partial |
@@ -93,3 +93,7 @@ updating a row.
   `unresolved`, recursive emission is blocked, and history redacts sensitive
   dictionary keys. A 150-file temporary repository indexed successfully;
   bounded search returned five results and the `.env` secret file was excluded.
+- TestProfileRunner direct probe with a temporary `tests.toml` confirmed the
+  three safety outcomes: plan mode is `skipped`, DenyAllApproval is `denied`,
+  and AllowAllApproval runs a bounded command with `passed`/exit 0. This used
+  `python -c`, not pytest.
