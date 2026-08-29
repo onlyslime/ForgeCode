@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.2.6 — 2026-08-29
+
+- Added elapsed runtime markers to interactive progress events and a final
+  `Worked for …` duration in completed chat responses.
+
 ## v0.2.5 — 2026-08-29
 
 - Removed the default fixed 12-step AgentLoop cap. Runs now continue until the

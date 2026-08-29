@@ -37,12 +37,28 @@ def _human_result(value: object) -> str | None:
     if value.get("model_status") is True:
         return f"Model: {value.get('model') or 'not configured'}\nProvider: {value.get('provider') or 'unknown'}\nEndpoint: {value.get('base_url') or 'not configured'}\nProfile: {value.get('profile') or 'default'}"
     if value.get("message") and value.get("state") == "completed":
-        return _pretty_text(value["message"])
+        duration = value.get("duration_seconds")
+        suffix = f"\n\nWorked for {_format_duration(duration)}" if isinstance(duration, (int, float)) else ""
+        return _pretty_text(value["message"]) + suffix
     if value.get("error"):
         return f"Error: {_pretty_text(value.get('error'))}"
     if value.get("stopped") is True or value.get("cleared") is True:
         return None
     return None
+
+
+def _format_duration(seconds: object) -> str:
+    try:
+        total = max(0.0, float(seconds))
+    except (TypeError, ValueError):
+        return "0s"
+    if total < 60:
+        return f"{total:.1f}s"
+    minutes, remainder = divmod(int(total), 60)
+    if minutes < 60:
+        return f"{minutes}m {remainder}s"
+    hours, minutes = divmod(minutes, 60)
+    return f"{hours}h {minutes}m {remainder}s"
 
 
 @dataclass(frozen=True)

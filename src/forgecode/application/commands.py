@@ -1897,6 +1897,7 @@ def main(argv: list[str] | None = None) -> int:
                     # intent immediately after the loop becomes addressable.
                     controller.flush_pending_controls()
                 try:
+                    started_at = time.monotonic()
                     file_snapshots: dict[str, str] = {}
                     def progress_event(kind: str, payload: dict[str, Any]) -> None:
                         if machine_json:
@@ -1911,7 +1912,8 @@ def main(argv: list[str] | None = None) -> int:
                         text = f"{verbs.get(tool, tool or kind)} {detail}".strip()
                         color = "\x1b[32m" if labels[kind] == "✓" else ("\x1b[31m" if labels[kind] == "✗" else "\x1b[36m")
                         with output_lock:
-                            print(f"\x1b[2K\r{color}{labels[kind]} {text}\x1b[0m")
+                            elapsed = time.monotonic() - started_at
+                            print(f"\x1b[2K\r{color}{labels[kind]} {text}  ({elapsed:.1f}s)\x1b[0m")
                             if kind == "tool_result" and tool == "read_file" and payload.get("ok"):
                                 path = str(payload.get("metadata", {}).get("path") or arguments.get("path") or "")
                                 file_snapshots[path] = str(payload.get("output") or "")
@@ -1952,7 +1954,7 @@ def main(argv: list[str] | None = None) -> int:
                         session.append("plan_updated", {"plan": current.to_dict()}, mode=state["mode"])
                     except ValueError:
                         pass
-                payload = {"stopped_reason": result.stopped_reason, "state": result.state, "succeeded": result.succeeded, "verification_ok": result.verification_ok, "run_id": result.run_id}
+                payload = {"stopped_reason": result.stopped_reason, "state": result.state, "succeeded": result.succeeded, "verification_ok": result.verification_ok, "run_id": result.run_id, "duration_seconds": round(time.monotonic() - started_at, 3)}
                 if result.error:
                     payload["error"] = _redact_display(result.error, [api_key])
                 # Interactive callers need to see the assistant's actual
