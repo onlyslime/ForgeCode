@@ -289,3 +289,12 @@ updating a row.
   receive it. Existing lexical/metadata checks remain covered by direct
   rejection probes; a positive OS-link rejection test must be repeated under
   an account with symlink privilege.
+
+## 2026-08-29 interactive UX additions
+
+- Added `/connect [provider model base_url]` for process-local provider setup;
+  API keys are entered with hidden input and are never persisted. `/model`
+  continues to list/show/select validated profiles.
+- Added `/clear`, a startup `WELCOME to ForgeCode` banner, and a visible
+  `forgecode> ` prompt when running on an interactive terminal. JSON/JSONL
+  transports remain prompt-free and machine-readable.

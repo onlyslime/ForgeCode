@@ -316,6 +316,7 @@ class InteractiveSession:
     files: Callable[..., object] = lambda *_args: {}
     skills: Callable[[list[str]], object] = lambda _args: {}
     model: Callable[[list[str]], object] = lambda _args: {}
+    connect: Callable[[list[str]], object] = lambda _args: {"error": "connect is unavailable"}
     login: Callable[[], object] = lambda: {"provider": "openai-compatible", "storage": "environment-only"}
     tree: Callable[[list[str]], object] = lambda _args: {}
     cancel: Callable[[], object] = lambda: {"cancelled": True}
@@ -323,6 +324,8 @@ class InteractiveSession:
     resume: Callable[[], object] = lambda: {"resumed": True}
     quit: Callable[[], object] = lambda: {"stopped": True}
     output: Callable[[str], None] = print
+    raw_output: Callable[[str], None] = lambda text: print(text, end="", flush=True)
+    clear_screen: Callable[[], object] = lambda: {"cleared": True}
     json_mode: bool = False
     # ``json_mode`` is retained for the v0.0.7 event shape.  ``jsonl_mode``
     # opts into the v0.0.8 command-envelope contract while keeping the old
@@ -335,13 +338,13 @@ class InteractiveSession:
     stopped: bool = False
     controller: InteractiveRunController | None = None
 
-    COMMANDS = ("help", "status", "plan", "mode", "model", "login", "rules", "files", "skills", "skill", "tree", "review", "test", "compact", "undo", "cancel", "pause", "resume", "quit")
+    COMMANDS = ("help", "status", "plan", "mode", "model", "connect", "login", "rules", "files", "skills", "skill", "tree", "review", "test", "compact", "undo", "cancel", "pause", "resume", "clear", "quit")
 
     def header(self, *, run_id: str = "", mode: str = "plan", profile: str = "default", rules_count: int = 0, budget: int = 60_000) -> str:
         return f"ForgeCode session run={run_id or '<new>'} workspace=. mode={mode} profile={profile} rules={rules_count} budget={budget}"
 
     def help_text(self) -> str:
-        return "/help /status /plan [show|refresh] /mode plan|act /model [list|show|select <name>] /login /rules /files [prefix] /skills [id] /tree /review /test [command] /compact /undo [id|latest] /pause /resume /cancel /quit; !<command> sends a bounded result to the model; !!<command> stays local"
+        return "/help /status /plan [show|refresh] /mode plan|act /connect [provider model base_url] /model [list|show|select <name>] /login /rules /files [prefix] /skills [id] /tree /review /test [command] /compact /undo [id|latest] /pause /resume /cancel /clear /quit; !<command> sends a bounded result to the model; !!<command> stays local"
 
     def dispatch(self, line: str) -> object | None:
         line = line.rstrip("\r\n")
@@ -384,6 +387,10 @@ class InteractiveSession:
             if args and args[0] == "select" and len(args) != 2:
                 raise SlashCommandError("usage: /model select <name>")
             return self.model(args)
+        if command == "connect":
+            if len(args) > 3:
+                raise SlashCommandError("usage: /connect [provider model base_url]")
+            return self.connect(args)
         if command == "login":
             if args:
                 raise SlashCommandError("usage: /login")
@@ -419,6 +426,9 @@ class InteractiveSession:
         if command == "resume":
             if args: raise SlashCommandError("usage: /resume")
             return self.resume()
+        if command == "clear":
+            if args: raise SlashCommandError("usage: /clear")
+            return self.clear_screen()
         if command == "quit":
             if args: raise SlashCommandError("usage: /quit")
             result = self.quit()
@@ -442,7 +452,15 @@ class InteractiveSession:
 
     def run_stream(self, stream: Iterable[str]) -> list[object]:
         results: list[object] = []
-        for line in stream:
+        iterator = iter(stream)
+        is_tty = bool(getattr(stream, "isatty", lambda: False)()) and not (self.json_mode or self.jsonl_mode)
+        while True:
+            if is_tty:
+                self.raw_output("forgecode> ")
+            try:
+                line = next(iterator)
+            except StopIteration:
+                break
             if self.stopped:
                 break
             # Terminals commonly deliver Escape as a standalone control byte

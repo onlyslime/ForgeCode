@@ -2,7 +2,8 @@
 
 import argparse
 import asyncio
-from dataclasses import asdict
+from dataclasses import asdict, replace
+import getpass
 import json
 import json as jsonlib
 import os
@@ -2164,6 +2165,46 @@ def main(argv: list[str] | None = None) -> int:
             except (ConfigError, OSError, ValueError) as exc:
                 return {"error": _redact_display(str(exc), [api_key])}
 
+        def connect_command(connect_args: list[str]) -> Any:
+            """Configure a provider for this chat process without persisting secrets."""
+            nonlocal settings, api_key
+            effective = settings.effective
+            provider = connect_args[0] if connect_args else (effective.provider if effective else "openai-compatible")
+            model = connect_args[1] if len(connect_args) > 1 else (settings.model or os.getenv("FORGECODE_MODEL", ""))
+            base_url = connect_args[2] if len(connect_args) > 2 else (effective.base_url if effective else os.getenv("FORGECODE_BASE_URL", "https://api.openai.com/v1"))
+            if provider not in SUPPORTED_PROVIDERS:
+                return {"error": f"unsupported provider: {provider}", "code": "unsupported_provider"}
+            if not model:
+                model = input("Model name: ").strip()
+            if not base_url:
+                base_url = input("Base URL: ").strip()
+            requires_key = provider_requires_credential(provider)
+            if requires_key:
+                entered = getpass.getpass("API key (input hidden): ").strip()
+                if not entered:
+                    return {"error": "API key must not be empty", "code": "credential_missing"}
+                # Keep the credential process-local and never write it to config/session.
+                api_key = entered
+                os.environ["FORGECODE_API_KEY"] = entered
+                api_key_env = "FORGECODE_API_KEY"
+            else:
+                api_key_env = effective.api_key_env if effective else "FORGECODE_API_KEY"
+            if effective is not None:
+                updated = replace(effective, provider=provider, model=model or None, base_url=base_url, api_key_env=api_key_env)
+            else:
+                updated = None
+            settings = Settings(workspace=workspace, model=model or None, api_key_env=api_key_env, base_url=base_url, profile=settings.profile, effective=updated)
+            return {"connected": True, "provider": provider, "model": model or None, "base_url": base_url, "api_key_configured": (not requires_key) or bool(api_key), "storage": "process-environment-only"}
+
+        def clear_screen_command() -> Any:
+            if not machine_json:
+                print("\x1b[2J\x1b[H", end="")
+                print(" _ _  _  _  _  _  _  _  _  _  _")
+                print("|  _|| || || || || || || || || |")
+                print("|_|  |_|/__/|_|/__/|_|/__/|_|/__/\n")
+                print("WELCOME to ForgeCode\n")
+            return {"cleared": True, "welcome": "WELCOME"}
+
         def status() -> Any:
             manifests = transaction_store.list(limit=20)
             controller = controller_holder["value"]
@@ -2351,6 +2392,7 @@ def main(argv: list[str] | None = None) -> int:
             plan=plan_command,
             set_mode=set_mode,
             model=model_command,
+            connect=connect_command,
             login=login_command,
             review=review,
             test=test_command,
@@ -2365,6 +2407,8 @@ def main(argv: list[str] | None = None) -> int:
             resume=controller.resume,
             quit=quit_session,
             output=interactive_output,
+            raw_output=lambda text: print(text, end="", flush=True),
+            clear_screen=clear_screen_command,
             json_mode=bool(getattr(args, "json", False)),
             jsonl_mode=bool(getattr(args, "jsonl", False)),
             controller=controller,
@@ -2374,6 +2418,10 @@ def main(argv: list[str] | None = None) -> int:
             _emit_machine(_machine_envelope("chat", "interactive_header", True, data=header_data, exit_code=0, type="interactive_header", **_compat_aliases(header_data)))
         else:
             print(interactive.header(run_id=session.run_id, mode=state["mode"], rules_count=rules_count))
+            print(" _ _  _  _  _  _  _  _  _  _  _")
+            print("|  _|| || || || || || || || || |")
+            print("|_|  |_|/__/|_|/__/|_|/__/|_|/__/\n")
+            print("WELCOME to ForgeCode\n")
         if initial_prompt:
             initial_result = interactive.dispatch(initial_prompt)
             if initial_result is not None:
