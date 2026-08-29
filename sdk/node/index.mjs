@@ -164,6 +164,9 @@ export const sessionControl = (session, action, { workspace, ...options } = {}) 
   validateWorkspace(workspace);
   return method(`session.${action}`, { ...options, params: { ...(options.params ?? {}), session, ...(workspace === undefined ? {} : { workspace }) } });
 };
+export const sessionCancel = (session, options = {}) => sessionControl(session, "cancel", options);
+export const sessionPause = (session, options = {}) => sessionControl(session, "pause", options);
+export const sessionResume = (session, options = {}) => sessionControl(session, "resume", options);
 export const sessionClose = (session, options = {}) => sessionControl(session, "close", options);
 export const sessionApproval = (session, approved, { workspace, ...options } = {}) => {
   validateSession(session);

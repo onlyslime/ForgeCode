@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { ForgeCodeError, invoke, invokeStream, interactive, sessionApproval, sessionControl, sessionEvents, sessionList, sessionOpen, sessionResult, sessionRun, sessionTree, trust } from "../sdk/node/index.mjs";
+import { ForgeCodeError, invoke, invokeStream, interactive, sessionApproval, sessionCancel, sessionControl, sessionEvents, sessionList, sessionOpen, sessionPause, sessionResult, sessionResume, sessionRun, sessionTree, trust } from "../sdk/node/index.mjs";
 
 assert.equal(typeof ForgeCodeError, "function");
 assert.equal(typeof sessionList, "function");
@@ -16,6 +16,9 @@ assert.throws(() => trust("delete"), TypeError);
 assert.throws(() => sessionApproval("session", "yes"), TypeError);
 assert.throws(() => sessionApproval("bad\nsession", true), TypeError);
 assert.throws(() => sessionControl("session", "explode"), TypeError);
+assert.equal(typeof sessionCancel, "function");
+assert.equal(typeof sessionPause, "function");
+assert.equal(typeof sessionResume, "function");
 assert.throws(() => sessionResult("bad\nsession"), TypeError);
 assert.throws(() => sessionOpen({ workspace: "bad\npath" }), TypeError);
 assert.throws(() => sessionOpen({ mode: "unsafe" }), TypeError);

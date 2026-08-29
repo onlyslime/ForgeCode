@@ -14,6 +14,12 @@ slice.
   deadlines and side-effect conflicts.
 - Verification: cancellation hardening regression and recovery tests.
 
+## v0.0.41 — 2026-08-29
+
+- Added Node SDK convenience controls `sessionCancel`, `sessionPause`, and
+  `sessionResume`, matching Python embedding and the RPC session protocol.
+- Verification: Node SDK parity smoke, full regression, and compile checks.
+
 ## v0.0.40 — 2026-08-29
 
 - Added Python embedding `session_inspect` and `session_events` read APIs for
