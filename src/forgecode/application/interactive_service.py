@@ -105,6 +105,8 @@ def _human_result(value: object) -> str | None:
     if value.get("events_status") is True:
         events = value.get("events") or []
         lines = ["Recent events", "─────────────", f"showing: {len(events)}"]
+        if value.get("filter"):
+            lines.append(f"filter: {value['filter']}")
         for item in events:
             if isinstance(item, dict):
                 outcome = f" · {item['outcome']}" if item.get("outcome") else ""
@@ -614,7 +616,7 @@ class InteractiveSession:
             "/rules /files /skills inspect project guidance and context sources\n"
             "/tree /diff            inspect repository structure and Git changes\n"
             "/context              inspect the local context index health\n"
-            "/events [limit] [kind] show recent persisted session events\n"
+            "/events [limit] [kind] show recent events (Tab suggests common kinds)\n"
             "/review /test          run review or verification checks\n"
             "/compact /undo         manage context and recoverable edits\n"
             "/pause /resume /cancel control an active worker\n"

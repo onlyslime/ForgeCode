@@ -20,6 +20,7 @@ def run_prompt_ui(session, *, mode: Callable[[], str]) -> None:
         "/plan": ("show", "refresh"),
         "/model": ("show", "list", "select"),
         "/undo": ("latest",),
+        "/events": ("run_created", "model_request", "provider_retry", "tool_call", "tool_result", "error", "verification_result"),
     }
 
     class SlashCompleter(Completer):
