@@ -20,6 +20,9 @@ function validateWorkspace(workspace) {
 function validateTrustAction(action) {
   if (action !== "status" && action !== "grant" && action !== "revoke") throw new TypeError("trust action must be status, grant, or revoke");
 }
+function validateSession(session) {
+  if (typeof session !== "string" || !session || session.length > 512 || /[\r\n]/.test(session)) throw new TypeError("session must be bounded newline-safe text");
+}
 
 export class ForgeCodeError extends Error {
   constructor(message, { code = "sdk_error", envelope = null, exitCode = null } = {}) {
@@ -158,6 +161,7 @@ export const sessionRun = (session, prompt, { workspace, ...options } = {}) => m
 export const sessionControl = (session, action, { workspace, ...options } = {}) => method(`session.${action}`, { ...options, params: { ...(options.params ?? {}), session, ...(workspace === undefined ? {} : { workspace }) } });
 export const sessionClose = (session, options = {}) => sessionControl(session, "close", options);
 export const sessionApproval = (session, approved, { workspace, ...options } = {}) => {
+  validateSession(session);
   if (typeof approved !== "boolean") throw new TypeError("approved must be boolean");
   validateWorkspace(workspace);
   return method("session.approval", { ...options, params: { ...(options.params ?? {}), session, approved, ...(workspace === undefined ? {} : { workspace }) } });
