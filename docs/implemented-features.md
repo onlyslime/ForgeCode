@@ -22,7 +22,7 @@ full claim still has a limitation. Update this table whenever behavior changes.
 | Structured plans and interactive controls | `plan`, `chat` | help available; interactive FIFO/pause/cancel stress pending | partial |
 | Skills manifest validation and bounded execution | `skills`, `skills.py` | list/check malformed manifest | verified |
 | Provider diagnostics and profile selection | `provider`, `config profiles` | `provider health/list` and `config profiles --json` pass offline | verified |
-| Lifecycle hooks with fail-closed behavior | `hooks.py` | source inspection; failure injection pending | partial |
+| Lifecycle hooks with fail-closed behavior | `hooks.py` | direct exception, timeout, recursion, cancellation and redaction probes | verified |
 | Named test profiles and bounded verification | `test`, `testing.py` | help/schema smoke (pytest intentionally not run) | partial |
 | Evidence-driven review and export verification | `review`, `review.py` | fresh workspace review smoke | partial |
 | Incremental context extensions | `context complete`, `context/repository.py` | source inspection; large-tree stress pending | partial |
