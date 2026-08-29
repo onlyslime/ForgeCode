@@ -12,8 +12,8 @@ full claim still has a limitation. Update this table whenever behavior changes.
 | Read/list/search UTF-8 tools | `tools`, `src/forgecode/tools/filesystem.py` | 150 UTF-8 files indexed/searched; list limit 100 truncates with omitted count; >2 MB, invalid UTF-8, traversal, and read/write race inputs fail closed; broader platform race stress pending | partial |
 | Structured multi-file patch with atomic write | `apply_patch`, `tools/patch.py` | malformed second hunk is rejected pre-write; injected second-file I/O failure returns `write_failed`, rolls back first file, and preserves both originals | verified |
 | Command risk classes, approval, timeout and output limits | `run_command`, `tools/shell.py` | dangerous classification, deny approval, 1 MiB output truncation, and typed timeout observed | verified |
-| Secret redaction and privacy boundary | `security/redaction.py`, `privacy.md` | review found test fixtures are flagged as token-shaped; runtime redaction stress pending | partial |
-| Session JSONL persistence, checkpoints and recovery | `storage/`, `session`, `sessions` | synthetic checkpoint resume returns typed recovery conflict; changed file is detected by SHA-256; 8-thread/200-event append stress had zero issues; real process crash/restart stress remains pending | partial |
+| Secret redaction and privacy boundary | `security/redaction.py`, `privacy.md` | named/bearer/bracketed secrets redact correctly; review scanner excludes test fixtures and repository review has zero findings | verified |
+| Session JSONL persistence, checkpoints and recovery | `storage/`, `session`, `sessions` | synthetic checkpoint resume returns typed recovery conflict; changed file is detected by SHA-256; 8-thread/200-event append stress had zero issues; malformed checkpoint overwrite is refused; real process crash/restart stress remains pending | partial |
 | Transactions, hash conflict and undo | `transaction`, `rollback` | dry-run conflict probe | verified |
 | Provider protocol, retry/SSE validation and cancellation | `models/`, `agent/` | direct normal completion plus malformed JSON, duplicate `[DONE]`, and non-finite SSE rejection | verified |
 | Strict JSON/JSONL machine contract and exit codes | global `--json/--jsonl` | 13-command success/error matrix emits one parseable JSON line, stable 0/2 codes, and no traceback; exhaustive provider/runtime matrix pending | partial |
@@ -217,3 +217,6 @@ updating a row.
   checking a path are treated as unsafe (missing components remain valid for
   creation). Symlink creation was attempted but denied by this Windows
   environment, so the OS-specific positive rejection path remains noted.
+- Checkpoint corruption probe wrote malformed JSON, and `CheckpointStore.load`
+  returned a bounded `ValueError`; a later save refused to overwrite the
+  unreadable checkpoint. This preserves fail-closed recovery state.
