@@ -261,6 +261,19 @@ def test_interactive_dispatch_has_real_commands_fifo_and_never_sends_slash_to_pr
     assert "/compact" in service.help_text() and service.dispatch("/compact") == {"omitted": 1}
 
 
+def test_interactive_context_and_events_commands_stay_local():
+    calls = []
+    service = InteractiveSession(
+        lambda message: calls.append(message) or {"message": message},
+        context_info=lambda: {"context_status": True, "metadata": {"counts": {"files": 2}}, "stale": [], "errors": []},
+        events_info=lambda: {"events_status": True, "events": [{"sequence": 1, "kind": "run_created"}]},
+        output=lambda _text: None,
+    )
+    assert service.dispatch("/context")["context_status"] is True
+    assert service.dispatch("/events")["events_status"] is True
+    assert calls == []
+
+
 def test_interactive_unknown_plan_denial_and_quit_are_recoverable():
     service = InteractiveSession(lambda message: message, set_mode=lambda mode: {"error": "approval denied"} if mode == "act" else {"mode": mode}, output=lambda _text: None)
     results = service.run_stream(["/unknown\n", "/mode act\n", "/quit\n", "ignored\n"])
