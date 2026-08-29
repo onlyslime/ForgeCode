@@ -88,3 +88,11 @@ def test_embed_session_result_validates_handle():
         session_cancel("x", workspace="bad\npath")
     with pytest.raises(ValueError):
         session_approval("x", "yes")
+
+
+def test_embed_session_controls_use_rpc_envelopes(tmp_path):
+    opened = list(stream([{"method": "session.open", "params": {"workspace": str(tmp_path), "mode": "plan"}}], raise_for_status=True))
+    handle = opened[-1]["data"]["session"]
+    cancelled = session_cancel(handle, workspace=str(tmp_path), raise_for_status=True)
+    assert cancelled[-1]["command"] == "session.cancel"
+    assert cancelled[-1]["data"]["state"] == "cancelled"
