@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.2.1 — 2026-08-29
+
+- Added live human-readable progress events for interactive runs, including
+  tool calls, successful/failed results, and verification status.
+- Progress lines use cyan, green, and red markers and remain above the input
+  area.
+
 ## v0.2.0 — 2026-08-29
 
 - Promoted the stable multiline, fixed-footer terminal chat interface to the

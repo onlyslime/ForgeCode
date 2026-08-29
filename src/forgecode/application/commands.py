@@ -1896,7 +1896,18 @@ def main(argv: list[str] | None = None) -> int:
                     # intent immediately after the loop becomes addressable.
                     controller.flush_pending_controls()
                 try:
-                    result = asyncio.run(service.execute(enriched, mode=state["mode"], secrets=(api_key,) if api_key else ()))
+                    def progress_event(kind: str, payload: dict[str, Any]) -> None:
+                        if machine_json:
+                            return
+                        labels = {"tool_call": "▸", "tool_result": "✓" if payload.get("ok") else "✗", "verification_result": "✓" if payload.get("ok") else "✗", "mode": "•"}
+                        if kind not in labels:
+                            return
+                        text = str(payload.get("tool") or payload.get("command") or payload.get("mode") or kind)
+                        color = "\x1b[32m" if labels[kind] == "✓" else ("\x1b[31m" if labels[kind] == "✗" else "\x1b[36m")
+                        with output_lock:
+                            print(f"\x1b[2K\r{color}{labels[kind]} {text}\x1b[0m")
+                            redraw_input_bar()
+                    result = asyncio.run(service.execute(enriched, mode=state["mode"], secrets=(api_key,) if api_key else (), on_event=progress_event))
                 finally:
                     with active_service_lock:
                         if active_service is service:
