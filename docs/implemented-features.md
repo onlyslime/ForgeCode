@@ -25,7 +25,7 @@ full claim still has a limitation. Update this table whenever behavior changes.
 | Lifecycle hooks with fail-closed behavior | `hooks.py` | direct exception, timeout, recursion, cancellation and redaction probes | verified |
 | Named test profiles and bounded verification | `test`, `testing.py` | direct runner probe: plan=skipped, deny=denied, allow=passed (exit 0); no pytest command used | verified |
 | Evidence-driven review and export verification | `review`, `review.py` | clean temporary workspace review and export returned `ok=true`, exit 0; repository scan remains blocked by fixture findings | partial |
-| Incremental context extensions | `context complete`, `context/repository.py` | source inspection; large-tree stress pending | partial |
+| Incremental context extensions | `context complete`, `context/repository.py` | temporary repository update/delete/add stress: digest update, removal, bounded search, and diagnostics all passed | verified |
 | Session tree/clone/import and trajectory evaluation | `session tree`, `eval` | completed-session tree/clone (no replay) verified; evaluator correctly returns `trajectory_incomplete` for unverified run | partial |
 | Interactive pause/resume/cancel and Escape handling | `chat`, `interactive_service.py` | controller pause/cancel boundary verified; PTY/Escape integration pending | partial |
 | RPC server plus Python/Node embedding | `rpc`, `rpc.py`, `sdk/node/index.mjs` | Python RPC JSONL smoke verified; Node SDK validation passed, executable discovery unavailable in current shell | partial |
@@ -115,6 +115,11 @@ updating a row.
   this is intentional but needs a dedicated semantic check before claiming
   arbitrary sequence handling. `eval` correctly rejected the same trajectory
   as `trajectory_incomplete` because verification was absent.
+- Incremental context stress created two files, indexed them, then modified
+  one, deleted one, and added a secret-shaped `.env` file. The second index
+  reported `added=1`, `updated=1`, `removed=1`; diagnostics had no stale files,
+  changed content was searchable, and the secret value was returned only as
+  `[REDACTED]`.
 - Node SDK calls validated parameter rejection (`params=null`, >1 MiB params)
   without starting a process. A valid call could not be completed because the
   shell has no `forgecode` executable on PATH; Python RPC remains verified.
