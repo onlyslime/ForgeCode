@@ -12,6 +12,7 @@ import subprocess
 import sys
 import re
 import threading
+import queue
 import uuid
 import hashlib as hashlib_lib
 import urllib.request
@@ -1757,13 +1758,28 @@ def main(argv: list[str] | None = None) -> int:
                 return
         hook_registry.register(Hook("session-audit", "*", _audit_hook, failure_policy="observe_only", timeout_seconds=1.0))
         configured_approval = settings.effective.approval if settings.effective else "interactive"
-        approval = DenyAllApproval() if configured_approval == "deny" and not (args.auto_approve or args.demo) else InteractiveApproval(auto_approve=args.auto_approve or args.demo or configured_approval == "auto", output_fn=_approval_output(machine_json), prompt_to_output=machine_json, secrets=[api_key])
+        approval = None
         state = {"mode": args.mode, "last": None, "plan": None, "plan_targets": (), "reference_specs": (), "rules_fingerprint": "", "reference_fingerprint": "", "index_fingerprint": "", "last_message": "", "last_verification": None}
         active_service: RunService | None = None
         active_service_lock = threading.RLock()
         controller_holder: dict[str, InteractiveRunController | None] = {"value": None}
         shortcut_control: dict[str, Any] = {"token": None, "pause": None, "fingerprint": None}
         output_lock = threading.RLock()
+        approval_lines: queue.Queue[str] = queue.Queue()
+        approval_waiting = threading.Event()
+        def approval_input(prompt: str = "") -> str:
+            if threading.current_thread() is threading.main_thread():
+                return input(prompt)
+            approval_waiting.set()
+            if prompt and not machine_json:
+                print(prompt, end="", flush=True)
+            try:
+                return approval_lines.get(timeout=300.0)
+            except queue.Empty:
+                return ""
+            finally:
+                approval_waiting.clear()
+        approval = DenyAllApproval() if configured_approval == "deny" and not (args.auto_approve or args.demo) else InteractiveApproval(auto_approve=args.auto_approve or args.demo or configured_approval == "auto", input_fn=approval_input, output_fn=_approval_output(machine_json), prompt_to_output=machine_json, secrets=[api_key])
         if args.demo and not any((workspace / name).exists() for name in ("demo_calculator.py", "demo_config.json")):
             # The demo fixture is a bounded, explicit offline setup action.
             # Prepare it before reading stdin so legacy scripted chat clients
@@ -2426,6 +2442,8 @@ def main(argv: list[str] | None = None) -> int:
             raw_output=lambda text: print(text, end="", flush=True),
             input_bar=redraw_input_bar,
             clear_screen=clear_screen_command,
+            approval_pending=approval_waiting.is_set,
+            submit_approval=lambda line: approval_lines.put(line),
             json_mode=bool(getattr(args, "json", False)),
             jsonl_mode=bool(getattr(args, "jsonl", False)),
             controller=controller,

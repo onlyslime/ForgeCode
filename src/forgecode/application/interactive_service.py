@@ -352,6 +352,8 @@ class InteractiveSession:
     raw_output: Callable[[str], None] = lambda text: print(text, end="", flush=True)
     input_bar: Callable[[], None] = lambda: None
     clear_screen: Callable[[], object] = lambda: {"cleared": True}
+    approval_pending: Callable[[], bool] = lambda: False
+    submit_approval: Callable[[str], None] = lambda _line: None
     json_mode: bool = False
     # ``json_mode`` is retained for the v0.0.7 event shape.  ``jsonl_mode``
     # opts into the v0.0.8 command-envelope contract while keeping the old
@@ -483,6 +485,12 @@ class InteractiveSession:
                 break
             if self.stopped:
                 break
+            # A background agent must never read stdin directly. Route the
+            # next terminal line to its pending approval request instead of
+            # treating `y`/`n` as a new model prompt.
+            if self.approval_pending():
+                self.submit_approval(line.rstrip("\r\n"))
+                continue
             # Terminals commonly deliver Escape as a standalone control byte
             # (``\x1b``). Treat it as an immediate cancellation request rather
             # than waiting for a slash command or a completed prompt.
