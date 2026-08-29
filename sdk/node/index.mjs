@@ -23,6 +23,9 @@ function validateTrustAction(action) {
 function validateSession(session) {
   if (typeof session !== "string" || !session || session.length > 512 || /[\r\n]/.test(session)) throw new TypeError("session must be bounded newline-safe text");
 }
+function validateBoundedText(value, name, max = 4000) {
+  if (value !== undefined && (typeof value !== "string" || !value || value.length > max || /[\r\n]/.test(value))) throw new TypeError(`${name} must be bounded newline-safe text`);
+}
 
 export class ForgeCodeError extends Error {
   constructor(message, { code = "sdk_error", envelope = null, exitCode = null } = {}) {
@@ -177,7 +180,7 @@ export const sessionApproval = (session, approved, { workspace, ...options } = {
 export const configProfiles = ({ workspace, ...options } = {}) => { validateWorkspace(workspace); return method("config.profiles", { ...options, params: { ...(options.params ?? {}), ...(workspace === undefined ? {} : { workspace }) } }); };
 export const configPolicy = ({ workspace, profile, mode, tools, excludeTools, noTools, ...options } = {}) => (validateWorkspace(workspace), method("config.policy", {
   ...options,
-  params: { ...(options.params ?? {}), ...(workspace === undefined ? {} : { workspace }), ...(profile === undefined ? {} : { profile: (typeof profile === "string" && profile.length <= 4000 && !/[\r\n]/.test(profile) && profile ? profile : (() => { throw new TypeError("profile must be bounded newline-safe text"); })()) }), ...(mode === undefined ? {} : (["plan", "act"].includes(mode) ? { mode } : (() => { throw new TypeError("mode must be plan or act"); })())), ...(tools === undefined ? {} : { tools }), ...(excludeTools === undefined ? {} : { exclude_tools: excludeTools }), ...(noTools === undefined ? {} : (typeof noTools === "boolean" ? { no_tools: noTools } : (() => { throw new TypeError("noTools must be boolean"); })())) },
+  params: { ...(options.params ?? {}), ...(workspace === undefined ? {} : { workspace }), ...(profile === undefined ? {} : { profile: (validateBoundedText(profile, "profile"), profile) }), ...(mode === undefined ? {} : (["plan", "act"].includes(mode) ? { mode } : (() => { throw new TypeError("mode must be plan or act"); })())), ...(tools === undefined ? {} : (validateBoundedText(tools, "tools"), { tools })), ...(excludeTools === undefined ? {} : (validateBoundedText(excludeTools, "excludeTools"), { exclude_tools: excludeTools })), ...(noTools === undefined ? {} : (typeof noTools === "boolean" ? { no_tools: noTools } : (() => { throw new TypeError("noTools must be boolean"); })())) },
 }));
 
 export function interactive(workspace, { mode = "plan", executable = "forgecode", maxEvents = 2048 } = {}) {
