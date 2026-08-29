@@ -120,6 +120,12 @@ updating a row.
   reported `added=1`, `updated=1`, `removed=1`; diagnostics had no stale files,
   changed content was searchable, and the secret value was returned only as
   `[REDACTED]`.
+- Session corruption probe appended two events, then rewrote the second
+  sequence number backward. `read_with_issues()` surfaced
+  `event sequence is not strictly increasing` (and the lifecycle inconsistency)
+  instead of accepting the stream; strict mode is available for callers that
+  must fail closed. This confirms detection, while a full checkpoint
+  crash/restart scenario remains pending.
 - Node SDK calls validated parameter rejection (`params=null`, >1 MiB params)
   without starting a process. A valid call could not be completed because the
   shell has no `forgecode` executable on PATH; Python RPC remains verified.
