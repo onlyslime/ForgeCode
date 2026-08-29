@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.2.0 — 2026-08-29
+
+- Promoted the stable multiline, fixed-footer terminal chat interface to the
+  0.2 feature release.
+- Enter submits input, Shift+Enter inserts newlines, and multiline rendering
+  remains compatible with the supported prompt-toolkit callback signature.
+
 ## v0.1.6 — 2026-08-29
 
 - Fixed multiline prompt rendering on prompt_toolkit versions that pass the
