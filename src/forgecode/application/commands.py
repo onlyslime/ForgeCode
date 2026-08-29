@@ -2351,7 +2351,22 @@ def main(argv: list[str] | None = None) -> int:
             defaults = PROVIDER_CATALOG[provider]
             print(f"Connect model ({provider})", flush=True)
             base_url = input(f"API endpoint [{defaults['base_url']}]: ").strip() or defaults["base_url"]
-            model_choices = tuple(defaults.get("models", (defaults["model"],)))
+            # OpenCode resolves model IDs from the live models.dev catalog
+            # (models.opencode.ai), rather than embedding a stale hand-picked
+            # list.  Fetch the same catalog with a short timeout for the
+            # picker; users can still enter a custom ID when offline.
+            model_choices: tuple[str, ...] = ()
+            try:
+                request = urllib.request.Request("https://models.opencode.ai/api.json", headers={"User-Agent": "forgecode"})
+                with urllib.request.urlopen(request, timeout=10) as response:
+                    catalog = json.loads(response.read().decode("utf-8"))
+                catalog_provider = "openai" if provider == "openai-compatible" else provider
+                provider_data = catalog.get(catalog_provider, {}) if isinstance(catalog, dict) else {}
+                models = provider_data.get("models", {}) if isinstance(provider_data, dict) else {}
+                if isinstance(models, dict):
+                    model_choices = tuple(sorted(str(model_id) for model_id, item in models.items() if isinstance(item, dict) and item.get("status") != "deprecated"))[:200]
+            except (OSError, ValueError, urllib.error.URLError):
+                model_choices = ()
             model = ""
             try:
                 from prompt_toolkit.shortcuts import radiolist_dialog
@@ -2364,7 +2379,7 @@ def main(argv: list[str] | None = None) -> int:
                 else:
                     model = selected_model or ""
             except (ImportError, EOFError, KeyboardInterrupt):
-                print("Known model IDs:", ", ".join(model_choices), flush=True)
+                print("Known model IDs:", ", ".join(model_choices) if model_choices else "catalog unavailable; use the provider's exact model ID", flush=True)
                 model = input("Model ID (required): ").strip()
             if provider not in SUPPORTED_PROVIDERS:
                 return {"error": f"unsupported provider: {provider}", "code": "unsupported_provider"}

@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.5.7 — 2026-08-29
+
+- Model selection now follows OpenCode's live `models.opencode.ai/api.json`
+  catalog and omits deprecated entries.
+- Removed stale hard-coded model choices from the interactive picker; offline
+  use falls back to an explicit custom model ID.
+
 ## v0.5.6 — 2026-08-29
 
 - Replaced the blue default provider dialog with a dark themed selector.
