@@ -9,6 +9,8 @@
   write/patch tool results, alongside verification and timing metrics.
 - Human interactive sessions now emit a bounded five-second working heartbeat
   during provider waits; machine JSON/JSONL output is unchanged.
+- `/tools` machine envelopes now include stable capability categories matching
+  the human-readable inventory.
 - Interactive Act/Bypass sessions now ask once whether the current workspace
   should be trusted for side effects; declining keeps the session read-only.
 - Machine-readable chat output no longer receives terminal redraw escape codes.

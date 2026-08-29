@@ -78,6 +78,14 @@ def test_recovery_prompt_stays_within_plan_task_bound_and_keeps_follow_up():
 def test_context_jsonl_contains_results_in_one_envelope(capsys, tmp_path: Path):
     (tmp_path / "main.py").write_text("def hello():\n    return 'hello'\n", encoding="utf-8")
     assert main(["--workspace", str(tmp_path), "context", "search", "hello", "--jsonl"]) == 0
+
+
+def test_tools_json_exposes_stable_capability_categories(capsys, tmp_path: Path):
+    assert main(["--workspace", str(tmp_path), "tools", "--jsonl"]) == 0
+    record = _json_lines(capsys.readouterr().out)[0]
+    _assert_envelope(record, command="tools", ok=True)
+    categories = {row["category"] for row in record["data"]["tools"]}
+    assert {"read_only", "changes", "execution", "evidence"} <= categories
     output = capsys.readouterr()
     assert output.err == ""
     records = _json_lines(output.out)
