@@ -171,7 +171,7 @@ class EffectiveConfig:
     default_mode: str = "act"
     approval: str = "interactive"
     streaming: str = "auto"
-    max_steps: int = 12
+    max_steps: int | None = None
     max_tool_calls: int = 512
     context_budget_chars: int = 60_000
     compact_threshold_chars: int = 48_000
@@ -215,6 +215,8 @@ class EffectiveConfig:
             ("session_max_chars", self.session_max_chars, 128, 10_000_000),
             ("transaction_max_bytes", self.transaction_max_bytes, 1_024, 1_000_000_000),
         ):
+            if value is None and name == "max_steps":
+                continue
             if isinstance(value, bool) or not isinstance(value, int) or not lower <= value <= upper:
                 raise ConfigError(f"{name} must be an integer between {lower} and {upper}")
         for name, value in (("provider_timeout_seconds", self.provider_timeout_seconds), ("run_timeout_seconds", self.run_timeout_seconds)):
@@ -385,7 +387,7 @@ class ConfigLoader:
         _reject_secret_fields(raw)
         merged: dict[str, Any] = {
             "workspace": self.workspace, "profile": "default", "provider": "openai-compatible", "base_url": "https://api.openai.com/v1", "model": None,
-            "api_key_env": "FORGECODE_API_KEY", "default_mode": "act", "approval": "interactive", "streaming": "auto", "max_steps": 12,
+            "api_key_env": "FORGECODE_API_KEY", "default_mode": "act", "approval": "interactive", "streaming": "auto", "max_steps": None,
             "max_tool_calls": 512, "context_budget_chars": 60_000, "compact_threshold_chars": 48_000, "provider_timeout_seconds": 90.0,
             "run_timeout_seconds": 600.0, "verification_command": None, "repair_attempts": 2, "session_max_chars": 100_000, "transaction_max_bytes": 50_000_000, "offline": False, "telemetry": "off",
             "tool_policy": ToolPolicy(), "sources": ("defaults",),

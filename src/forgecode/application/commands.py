@@ -884,7 +884,7 @@ def main(argv: list[str] | None = None) -> int:
             return 2
     if command == "run":
         args.mode = args.mode or (settings.effective.default_mode if settings.effective else AgentMode.ACT.value)
-        args.max_steps = args.max_steps if args.max_steps is not None else (settings.effective.max_steps if settings.effective else 12)
+        args.max_steps = args.max_steps if args.max_steps is not None else (settings.effective.max_steps if settings.effective else None)
     if command in {"test", "tests"}:
         # Test profiles are side-effecting by nature (they execute a process),
         # so use the typed project default while still allowing an explicit

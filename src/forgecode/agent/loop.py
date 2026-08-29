@@ -28,7 +28,7 @@ from .verification import VerificationResult
 
 @dataclass(frozen=True)
 class AgentConfig:
-    max_steps: int = 12
+    max_steps: int | None = None
     max_repeated_calls: int = 2
     verification_command: str | None = None
     max_verification_attempts: int = 2
@@ -109,7 +109,9 @@ class AgentLoop:
         self._recorded_provider_retries: set[tuple[str, str]] = set()
         self._provider_event_counter = 0
         self._last_provider_unresolved = False
-        integer_limits = (self.config.max_steps, self.config.max_repeated_calls, self.config.max_verification_attempts, self.config.max_tool_calls_per_turn, self.config.max_tool_calls_total, self.config.max_auto_compactions, self.config.rolling_window_messages)
+        integer_limits = (self.config.max_repeated_calls, self.config.max_verification_attempts, self.config.max_tool_calls_per_turn, self.config.max_tool_calls_total, self.config.max_auto_compactions, self.config.rolling_window_messages)
+        if self.config.max_steps is not None and (isinstance(self.config.max_steps, bool) or not isinstance(self.config.max_steps, int) or self.config.max_steps < 1):
+            raise ValueError("max_steps must be positive when set")
         if any(isinstance(value, bool) or not isinstance(value, int) or value < 1 for value in integer_limits):
             raise ValueError("loop limits must be positive")
         timeouts = (self.config.total_timeout_seconds, self.config.provider_timeout_seconds, self.config.provider_cleanup_grace_seconds)
@@ -766,7 +768,9 @@ class AgentLoop:
         explored: list[str] = []
         total_tool_calls = 0
 
-        for step in range(self.config.max_steps):
+        step = 0
+        while self.config.max_steps is None or step < self.config.max_steps:
+            step += 1
             if self.context.cancelled:
                 return self._cancelled_result(messages, verification_ok, explored, reason=self.context.cancellation_reason)
             if self.context.deadline_monotonic is not None and self.context.deadline_monotonic <= time.monotonic():

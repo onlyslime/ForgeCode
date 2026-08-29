@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.2.5 — 2026-08-29
+
+- Removed the default fixed 12-step AgentLoop cap. Runs now continue until the
+  model finishes, fails, is cancelled, or an explicit `max_steps` is set.
+
 ## v0.2.4 — 2026-08-29
 
 - Added dark-background file previews with unified red deletion and green
