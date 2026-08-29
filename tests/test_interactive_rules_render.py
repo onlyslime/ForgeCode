@@ -81,3 +81,8 @@ def test_human_status_renders_active_elapsed_time():
     })
     assert "elapsed: 12.3s" in rendered
     assert "phase: Inspect · tools: 4" in rendered
+
+
+def test_human_diff_result_renders_clean_state_and_content():
+    assert "Working tree is clean" in _human_result({"diff_status": True, "diff": ""})
+    assert "Git diff" in _human_result({"diff_status": True, "diff": "+ added line"})

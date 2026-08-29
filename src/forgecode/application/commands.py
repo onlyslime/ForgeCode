@@ -2607,6 +2607,12 @@ def main(argv: list[str] | None = None) -> int:
             except (OSError, ValueError) as exc:
                 return {"error": _redact_display(str(exc), [api_key])}
 
+        def diff_command() -> Any:
+            try:
+                return {"diff_status": True, "diff": _git_diff(workspace)[:20_000]}
+            except OSError as exc:
+                return {"diff_status": False, "error": _redact_display(str(exc), [api_key])}
+
         controller = InteractiveRunController(
             start=run_message,
             on_result=emit_interactive_result,
@@ -2633,6 +2639,7 @@ def main(argv: list[str] | None = None) -> int:
             files=files_command,
             skills=skills_command,
             tree=tree_command,
+            diff=diff_command,
             cancel=controller.cancel,
             pause=controller.pause,
             resume=controller.resume,

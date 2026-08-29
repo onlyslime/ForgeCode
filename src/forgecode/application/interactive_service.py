@@ -94,6 +94,9 @@ def _human_result(value: object) -> str | None:
                 if isinstance(node, dict):
                     lines.append(f"  • {node.get('run_id', '?')}  {node.get('state', 'unknown')}  ({node.get('events', 0)} events)")
         return "\n".join(lines)
+    if value.get("diff_status") is True:
+        diff = str(value.get("diff") or "")
+        return "Git diff\n────────\n" + (diff[:20_000] if diff else "Working tree is clean")
     if "rollback_available" in value and "transaction_id" in value:
         lines = ["Review", "──────", f"transaction: {value.get('transaction_id')}", f"state: {value.get('state', 'unknown')}", f"rollback: {'available' if value.get('rollback_available') else 'unavailable'}"]
         issues = value.get("rollback_conflicts") or value.get("store_issues") or []
@@ -532,6 +535,7 @@ class InteractiveSession:
     connect: Callable[[list[str]], object] = lambda _args: {"error": "connect is unavailable"}
     login: Callable[[], object] = lambda: {"provider": "openai-compatible", "storage": "environment-only"}
     tree: Callable[[list[str]], object] = lambda _args: {}
+    diff: Callable[[], object] = lambda: {}
     cancel: Callable[[], object] = lambda: {"cancelled": True}
     pause: Callable[[], object] = lambda: {"paused": True}
     resume: Callable[[], object] = lambda: {"resumed": True}
@@ -554,13 +558,13 @@ class InteractiveSession:
     stopped: bool = False
     controller: InteractiveRunController | None = None
 
-    COMMANDS = ("help", "status", "tools", "plan", "mode", "model", "connect", "login", "rules", "files", "skills", "skill", "tree", "review", "test", "compact", "undo", "cancel", "pause", "resume", "clear", "quit", "exit")
+    COMMANDS = ("help", "status", "tools", "plan", "mode", "model", "connect", "login", "rules", "files", "skills", "skill", "tree", "diff", "review", "test", "compact", "undo", "cancel", "pause", "resume", "clear", "quit", "exit")
 
     def header(self, *, run_id: str = "", mode: str = "plan", profile: str = "default", rules_count: int = 0, budget: int = 60_000) -> str:
         return f"ForgeCode session run={run_id or '<new>'} workspace=. mode={mode} profile={profile} rules={rules_count} budget={budget}"
 
     def help_text(self) -> str:
-        return "/help /status /tools /model /plan [show|refresh] /mode plan|act|bypass /connect [provider] /login (alias) /rules /files [prefix] /skills [id] /tree /review /test [command] /compact /undo [id|latest] /pause /resume /cancel /clear /quit (/exit); !<command> sends a bounded result to the model; !!<command> stays local"
+        return "/help /status /tools /model /plan [show|refresh] /mode plan|act|bypass /connect [provider] /login (alias) /rules /files [prefix] /skills [id] /tree /diff /review /test [command] /compact /undo [id|latest] /pause /resume /cancel /clear /quit (/exit); !<command> sends a bounded result to the model; !!<command> stays local"
 
     def dispatch(self, line: str) -> object | None:
         line = line.rstrip("\r\n")
@@ -627,6 +631,9 @@ class InteractiveSession:
         if command == "tree":
             if args: raise SlashCommandError("usage: /tree")
             return self.tree([])
+        if command == "diff":
+            if args: raise SlashCommandError("usage: /diff")
+            return self.diff()
         if command == "test": return self.test(args)
         if command == "compact":
             if args: raise SlashCommandError("usage: /compact")
