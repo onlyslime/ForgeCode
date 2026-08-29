@@ -10,11 +10,30 @@ def run_prompt_ui(session, *, mode: Callable[[], str]) -> None:
     from prompt_toolkit import PromptSession
     from prompt_toolkit.patch_stdout import patch_stdout
     from prompt_toolkit.formatted_text import HTML
+    from prompt_toolkit.key_binding import KeyBindings
+    from prompt_toolkit.keys import Keys
+    from prompt_toolkit.styles import Style
 
-    prompt_session = PromptSession(multiline=True)
+    bindings = KeyBindings()
+
+    @bindings.add("enter")
+    def _(event) -> None:
+        # Enter submits, matching Codex-style chat. Shift+Enter below is the
+        # explicit multiline insertion gesture.
+        event.current_buffer.validate_and_handle()
+
+    @bindings.add("s-enter")
+    def _(event) -> None:
+        event.current_buffer.insert_text("\n")
+
+    style = Style.from_dict({
+        "prompt": "bg:#202123 #f5f5f5 bold",
+        "bottom-toolbar": "bg:#202123 #f5f5f5",
+    })
+    prompt_session = PromptSession(multiline=True, key_bindings=bindings, style=style)
 
     def prompt() -> HTML:
-        return HTML(f"<ansiblack>╭─ forgecode │ {mode()}\n╰─❯ </ansiblack>")
+        return HTML(f"<prompt>╭─ forgecode │ {mode()}\n╰─❯ </prompt>")
 
     with patch_stdout(raw=True):
         while not session.stopped:

@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.1.3 — 2026-08-29
+
+- Enter now submits chat input; Shift+Enter inserts a newline in the multiline
+  buffer.
+- Added explicit dark styling for the fixed input area.
+
 ## v0.1.2 — 2026-08-29
 
 - Added a prompt-toolkit chat surface with a fixed bottom multiline input
