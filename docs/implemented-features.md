@@ -9,7 +9,7 @@ full claim still has a limitation. Update this table whenever behavior changes.
 |---|---|---|---|
 | Plan/Act mode and fail-closed tool policy | `plan`, `src/forgecode/agent/loop.py` | filtered registry returns typed `tool_unavailable` for side-effect calls, `unknown_tool` for forged names, and `mode_denied` in plan mode | verified |
 | Workspace path and symlink guard | `src/forgecode/security/workspace.py` | CLI parent traversal and direct `WorkspaceGuard` traversal rejection; symlink stress pending | partial |
-| Read/list/search UTF-8 tools | `tools`, `src/forgecode/tools/filesystem.py` | 150 UTF-8 files indexed/searched; list limit 100 truncates with omitted count; traversal and invalid-input checks are typed; race stress pending | partial |
+| Read/list/search UTF-8 tools | `tools`, `src/forgecode/tools/filesystem.py` | 150 UTF-8 files indexed/searched; list limit 100 truncates with omitted count; >2 MB, invalid UTF-8, traversal, and read/write race inputs fail closed; broader platform race stress pending | partial |
 | Structured multi-file patch with atomic write | `apply_patch`, `tools/patch.py` | malformed second hunk is rejected during pre-parse and both target files remain byte-identical; write-failure injection still pending | partial |
 | Command risk classes, approval, timeout and output limits | `run_command`, `tools/shell.py` | dangerous classification, deny approval, 1 MiB output truncation, and typed timeout observed | verified |
 | Secret redaction and privacy boundary | `security/redaction.py`, `privacy.md` | review found test fixtures are flagged as token-shaped; runtime redaction stress pending | partial |
@@ -200,3 +200,7 @@ updating a row.
   verification event. `forgecode eval --json` returned status `completed`,
   score `1.0`, and exit code 0; an invalid lifecycle transition was correctly
   classified as `recovery_required`.
+- File-read race probe continuously rewrote a 100,000-byte file while issuing
+  100 reads; all attempts failed closed with the file-changed check (no mixed
+  content was returned). Separate 2,000,001-byte and invalid-UTF-8 fixtures
+  returned bounded `ValueError` messages and no traceback.
