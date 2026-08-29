@@ -7,6 +7,8 @@
   the single canonical history location.
 - Reworked public documentation into a concise English README with a linked
   standalone Chinese README, plus a compact assessment handoff.
+- Documented `/login` as the primary connection path and removed the unused
+  `.env.example` template from the public setup flow.
 
 ## v0.6.1 — 2026-08-29
 

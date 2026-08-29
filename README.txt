@@ -7,8 +7,8 @@
 
 离线运行：
 `uv run forgecode --workspace <临时目录> run --demo --auto-approve`。
-在线运行：设置 `FORGECODE_API_KEY`、`FORGECODE_BASE_URL`、
-`FORGECODE_MODEL`，再执行 `uv run forgecode chat`；交互别名为 `fcc`。
+在线运行：执行 `uv run forgecode chat`（交互别名为 `fcc`），输入 `/login`，
+按提示填写 URL、ID、KEY。
 
 特色：自研 AgentLoop、模型 tool calling、Plan/Act/Bypass、安全文件读写与
 apply_patch、命令风险/审批/超时/取消、真实测试与有限修复、事务撤销、规则与

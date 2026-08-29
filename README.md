@@ -19,16 +19,16 @@ uv run forgecode doctor
 uv run forgecode chat
 ```
 
-For an online OpenAI-compatible provider, set:
+For an online provider, run ForgeCode and enter the three values it gives you:
 
 ```sh
-export FORGECODE_API_KEY="your-key"
-export FORGECODE_BASE_URL="https://api.openai.com/v1"
-export FORGECODE_MODEL="your-tool-calling-model"
+fcc
+/login
+# URL, ID, KEY
 ```
 
-On Windows PowerShell, use `$env:NAME = "value"`. The short command is `fcc`;
-pass `--plan`, `--act`, or `--bypass` to choose a mode.
+The short command is `fcc`; pass `--plan`, `--act`, or `--bypass` to choose a
+mode. Connection values are kept in local ForgeCode state, not the repository.
 
 ## What it does
 

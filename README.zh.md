@@ -14,13 +14,12 @@ uv run forgecode doctor
 uv run forgecode chat
 ```
 
-配置模型时填写服务商提供的 URL、模型 ID 和 Key：
+配置模型时，在 `fcc` 中输入 `/login`，填写服务商提供的 URL、ID 和 KEY：
 
 ```powershell
-$env:FORGECODE_API_KEY = "your-key"
-$env:FORGECODE_BASE_URL = "https://api.openai.com/v1"
-$env:FORGECODE_MODEL = "your-tool-calling-model"
 fcc --act
+/login
+# URL、ID、KEY
 ```
 
 ## 它能做什么
