@@ -175,6 +175,8 @@ same bounded workspace, mode, session, and prompt fields as the RPC contract.
 incremental audit events.
 `config_profiles` provides provider/model profile discovery with the same
 workspace-bound RPC request semantics.
+Node and Python clients also expose `providerList`/`provider_list` and
+`providerHealth`/`provider_health` for provider capability and health discovery.
 It also exposes `session_cancel`, `session_pause`, `session_resume`, and
 `session_approval`; each forwards the same workspace-bound RPC control and
 returns the standard JSON envelope.

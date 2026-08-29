@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { ForgeCodeError, configPolicy, configProfiles, invoke, invokeStream, interactive, sessionApproval, sessionCancel, sessionControl, sessionEvents, sessionList, sessionOpen, sessionPause, sessionResult, sessionResume, sessionRun, sessionTree, trust } from "../sdk/node/index.mjs";
+import { ForgeCodeError, configPolicy, configProfiles, invoke, invokeStream, interactive, providerHealth, providerList, sessionApproval, sessionCancel, sessionControl, sessionEvents, sessionList, sessionOpen, sessionPause, sessionResult, sessionResume, sessionRun, sessionTree, trust } from "../sdk/node/index.mjs";
 
 assert.equal(typeof ForgeCodeError, "function");
 assert.equal(typeof sessionList, "function");
@@ -30,6 +30,8 @@ assert.throws(() => configProfiles({ workspace: "bad\npath" }), TypeError);
 assert.throws(() => configPolicy({ mode: "unsafe" }), TypeError);
 assert.throws(() => configPolicy({ noTools: "yes" }), TypeError);
 assert.throws(() => configPolicy({ tools: "bad\npolicy" }), TypeError);
+assert.equal(typeof providerList, "function");
+assert.equal(typeof providerHealth, "function");
 {
   const controller = new AbortController(); controller.abort();
   await assert.rejects(invoke([], { executable: process.execPath, signal: controller.signal }), (error) => error.code === "cancelled");

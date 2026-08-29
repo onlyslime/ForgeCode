@@ -14,6 +14,12 @@ slice.
   deadlines and side-effect conflicts.
 - Verification: cancellation hardening regression and recovery tests.
 
+## v0.0.43 — 2026-08-29
+
+- Added provider discovery and health helpers to Node/Python SDKs, exposing
+  the existing `provider.list`/`provider.health` RPC contract programmatically.
+- Verification: SDK, embedding, RPC, doctor, compile, and regression tests.
+
 ## v0.0.42 — 2026-08-29
 
 - Added Python embedding `config_profiles` provider/model discovery, bringing
