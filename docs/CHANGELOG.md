@@ -11,6 +11,8 @@
   during provider waits; machine JSON/JSONL output is unchanged.
 - `/tools` machine envelopes now include stable capability categories matching
   the human-readable inventory.
+- Quality `diagnostics` is classified as evidence in both human and machine
+  tool inventories, matching its verification role.
 - Provider request identities retain zero-based per-turn suffixes for
   compatibility with existing audit consumers while the UI remains 1-based.
 - Interactive Act/Bypass sessions now ask once whether the current workspace
