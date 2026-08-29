@@ -256,3 +256,8 @@ updating a row.
   `session tree --limit 5` returns parseable node/edge metadata. Clone is
   therefore an inspect-only evidence branch by design; automatic replay of
   recorded side effects is not an implemented capability.
+
+- Tool-policy matrix probe (2026-08-29): seven combinations covering no
+  narrowing, allowlist, exclusion, `--no-tools`, duplicate names, overlap,
+  and unknown names passed or failed closed as expected through
+  `parse_tool_policy_options`; no tool was invoked during the probe.
