@@ -2314,6 +2314,7 @@ def main(argv: list[str] | None = None) -> int:
 
         def interactive_output(text: str) -> None:
             if machine_json:
+                print(text)
                 return
             with output_lock:
                 # Keep asynchronous model output above the persistent prompt.
