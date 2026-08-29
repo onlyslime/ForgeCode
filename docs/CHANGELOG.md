@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.2.4 — 2026-08-29
+
+- Added dark-background file previews with unified red deletion and green
+  addition lines during write operations.
+
 ## v0.2.3 — 2026-08-29
 
 - Added inline previews for write and patch operations in interactive progress,

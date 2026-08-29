@@ -11,6 +11,7 @@ import shlex
 import subprocess
 import sys
 import re
+import difflib
 import threading
 import queue
 import uuid
@@ -1896,6 +1897,7 @@ def main(argv: list[str] | None = None) -> int:
                     # intent immediately after the loop becomes addressable.
                     controller.flush_pending_controls()
                 try:
+                    file_snapshots: dict[str, str] = {}
                     def progress_event(kind: str, payload: dict[str, Any]) -> None:
                         if machine_json:
                             return
@@ -1910,13 +1912,20 @@ def main(argv: list[str] | None = None) -> int:
                         color = "\x1b[32m" if labels[kind] == "✓" else ("\x1b[31m" if labels[kind] == "✗" else "\x1b[36m")
                         with output_lock:
                             print(f"\x1b[2K\r{color}{labels[kind]} {text}\x1b[0m")
+                            if kind == "tool_result" and tool == "read_file" and payload.get("ok"):
+                                path = str(payload.get("metadata", {}).get("path") or arguments.get("path") or "")
+                                file_snapshots[path] = str(payload.get("output") or "")
                             if kind == "tool_call" and tool in {"write_file", "apply_patch"}:
                                 preview = arguments.get("content") or arguments.get("patch")
                                 if isinstance(preview, str):
-                                    for line in preview[:4_000].splitlines()[:40]:
-                                        prefix = "+ " if tool == "write_file" else ("- " if line.startswith("-") else ("+ " if line.startswith("+") else "  "))
-                                        line_color = "\x1b[32m" if prefix == "+ " else ("\x1b[31m" if prefix == "- " else "\x1b[90m")
-                                        print(f"  {line_color}{prefix}{line.lstrip('+- ')}\x1b[0m")
+                                    path = str(arguments.get("path") or "")
+                                    before = file_snapshots.get(path, "").splitlines()
+                                    after = preview.splitlines() if tool == "write_file" else preview.splitlines()
+                                    lines = list(difflib.unified_diff(before, after, lineterm="")) if before else [("+ " + line) for line in after]
+                                    print("  \x1b[100;97m file preview \x1b[0m")
+                                    for line in lines[:80]:
+                                        line_color = "\x1b[32m" if line.startswith("+") and not line.startswith("+++") else ("\x1b[31m" if line.startswith("-") and not line.startswith("---") else "\x1b[90m")
+                                        print(f"  \x1b[100m{line_color}{line}\x1b[0m")
                             if kind == "tool_result" and isinstance(payload.get("metadata"), dict):
                                 diff = payload["metadata"].get("diff")
                                 if isinstance(diff, str):
