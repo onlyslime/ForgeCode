@@ -153,6 +153,24 @@ def test_context_budget_bounds_nested_arguments_and_many_tool_calls(tmp_path):
     assert sum(_message_size(message) for message in provider.requests[1][0]) <= 2_000
 
 
+def test_context_fit_keeps_tool_call_exchange_atomic():
+    from forgecode.agent.context import ContextBuilder
+
+    messages = [
+        Message("system", "system"),
+        Message("user", "request"),
+        Message("assistant", tool_calls=(ToolCall("a", "read_file", {"path": "a"}), ToolCall("b", "read_file", {"path": "b"}))),
+        Message("tool", "result a", tool_call_id="a"),
+        Message("tool", "result b", tool_call_id="b"),
+        Message("user", "next"),
+    ]
+    fitted = ContextBuilder(max_chars=80, max_message_chars=40).fit(messages)
+    calls = {call.id for message in fitted if message.role == "assistant" for call in message.tool_calls}
+    results = {message.tool_call_id for message in fitted if message.role == "tool"}
+    assert calls == results
+    assert all(message.role != "tool" or message.tool_call_id in calls for message in fitted)
+
+
 def test_verification_failure_is_visible_without_invalid_tool_message(tmp_path):
     provider = ScriptedProvider([ModelResponse(Message("assistant", "done")), ModelResponse(Message("assistant", "still done"))])
     loop = _loop(tmp_path, provider, AllowAllApproval(), config=AgentConfig(verification_command="python -c \"import sys; sys.exit(2)\"", max_verification_attempts=1))

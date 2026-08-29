@@ -70,8 +70,9 @@ class ContextBuilder:
     def fit(self, messages: Sequence[Message]) -> list[Message]:
         """Keep system/user intent plus the newest complete-looking context."""
         normalized = [self._truncate(message) for message in messages]
+        units = self._message_units(normalized)
         if sum(_message_size(message) for message in normalized) <= self.max_chars:
-            return normalized
+            return [normalized[index] for unit in units for index in unit]
 
         selected_indexes: list[int] = []
         for index, message in enumerate(normalized):
@@ -84,14 +85,14 @@ class ContextBuilder:
                 break
 
         used = sum(_message_size(normalized[index]) for index in selected_indexes)
-        for index in range(len(normalized) - 1, -1, -1):
-            if index in selected_indexes:
+        selected_set = set(selected_indexes)
+        for unit in reversed(units):
+            if any(index in selected_set for index in unit):
                 continue
-            message = normalized[index]
-            size = _message_size(message)
+            size = sum(_message_size(normalized[index]) for index in unit)
             if used + size > self.max_chars:
                 continue
-            selected_indexes.append(index)
+            selected_indexes.extend(unit)
             used += size
         selected_indexes.sort()
         selected = [normalized[index] for index in selected_indexes]
@@ -103,12 +104,20 @@ class ContextBuilder:
         # Drop optional context first, then shrink retained messages until the
         # serialized estimate is within the configured budget.
         while len(selected) > 1 and sum(_message_size(message) for message in selected) > self.max_chars:
-            removable = next((index for index, message in enumerate(selected) if message.role not in {"system", "user"}), None)
-            if removable is None:
+            removable_unit = next((unit for unit in self._message_units(selected)
+                                   if all(selected[index].role not in {"system", "user"} for index in unit)), None)
+            if removable_unit is None:
                 break
-            selected.pop(removable)
+            for index in reversed(removable_unit):
+                selected.pop(index)
         if sum(_message_size(message) for message in selected) > self.max_chars:
             while selected and sum(_message_size(message) for message in selected) > self.max_chars:
+                candidates = [unit for unit in self._message_units(selected)
+                              if all(selected[index].role not in {"system", "user"} for index in unit)]
+                if candidates:
+                    for index in reversed(max(candidates, key=lambda unit: sum(_message_size(selected[i]) for i in unit))):
+                        selected.pop(index)
+                    continue
                 largest = max(range(len(selected)), key=lambda index: _message_size(selected[index]))
                 current = selected[largest]
                 current_size = _message_size(current)
@@ -118,7 +127,37 @@ class ContextBuilder:
                     selected.pop(largest)
                 else:
                     selected[largest] = candidate
-        return selected
+        return [selected[index] for unit in self._message_units(selected) for index in unit]
+
+    @staticmethod
+    def _message_units(messages: Sequence[Message]) -> list[tuple[int, ...]]:
+        """Group assistant tool calls with all matching tool results.
+
+        OpenAI-compatible providers require these messages to stay together;
+        dropping only one side produces HTTP 400 errors on the next request.
+        Orphan or incomplete tool exchanges are excluded entirely.
+        """
+        units: list[tuple[int, ...]] = []
+        index = 0
+        while index < len(messages):
+            message = messages[index]
+            if message.role == "tool":
+                index += 1
+                continue
+            if message.role == "assistant" and message.tool_calls:
+                ids = [call.id for call in message.tool_calls]
+                end = index + 1
+                found: list[int] = []
+                while end < len(messages) and messages[end].role == "tool":
+                    found.append(end)
+                    end += 1
+                if len(found) == len(ids) and [messages[i].tool_call_id for i in found] == ids:
+                    units.append(tuple([index, *found]))
+                index = end
+                continue
+            units.append((index,))
+            index += 1
+        return units
 
     def _fit_message(self, message: Message, budget: int) -> Message:
         """Return the largest useful content truncation whose estimate fits."""
