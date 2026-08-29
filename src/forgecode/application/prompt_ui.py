@@ -11,19 +11,19 @@ def run_prompt_ui(session, *, mode: Callable[[], str]) -> None:
     from prompt_toolkit.patch_stdout import patch_stdout
     from prompt_toolkit.formatted_text import HTML
     from prompt_toolkit.key_binding import KeyBindings
-    from prompt_toolkit.keys import Keys
     from prompt_toolkit.styles import Style
 
     bindings = KeyBindings()
 
     @bindings.add("enter")
     def _(event) -> None:
-        # Enter submits, matching Codex-style chat. Shift+Enter below is the
-        # explicit multiline insertion gesture.
+        # Enter submits, matching Codex-style chat.
         event.current_buffer.validate_and_handle()
 
-    @bindings.add("s-enter")
+    @bindings.add("c-j")
     def _(event) -> None:
+        # Ctrl-J is supported consistently across prompt_toolkit terminals
+        # and provides an explicit multiline insertion gesture.
         event.current_buffer.insert_text("\n")
 
     style = Style.from_dict({

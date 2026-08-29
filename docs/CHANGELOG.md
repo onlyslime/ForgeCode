@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.1.4 — 2026-08-29
+
+- Fixed chat startup failure caused by an unsupported prompt-toolkit
+  `s-enter` binding; Ctrl-J now inserts a newline while Enter submits.
+
 ## v0.1.3 — 2026-08-29
 
 - Enter now submits chat input; Shift+Enter inserts a newline in the multiline
