@@ -2315,8 +2315,8 @@ def main(argv: list[str] | None = None) -> int:
 
         def clear_screen_command() -> Any:
             if not machine_json:
-                print("\x1b[2J\x1b[H", end="")
-            return None
+                print("\x1b[2J\x1b[H", end="", flush=True)
+            return {"cleared": True}
 
         def status() -> Any:
             manifests = transaction_store.list(limit=20)

@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.2.12 — 2026-08-29
+
+- Added `fcc --plan` and `fcc --act` launch shortcuts alongside
+  `fcc --bypass`.
+- Fixed `/clear` to flush the terminal clear sequence immediately and return
+  a structured result for interactive transports.
+
 ## v0.2.11 — 2026-08-29
 
 - Added `fcc --bypass` to launch directly in bypass mode.
