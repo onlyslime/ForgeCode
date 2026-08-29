@@ -2655,6 +2655,15 @@ def main(argv: list[str] | None = None) -> int:
             except (ContextIndexError, OSError, ValueError) as exc:
                 return {"context_status": False, "error": _redact_display(str(exc), [api_key])}
 
+        def events_info_command() -> Any:
+            """Return a small, content-free tail of the session audit log."""
+            try:
+                persisted = list(session.read(strict=False))
+                tail = persisted[-40:]
+                return {"events_status": True, "events": [{"sequence": event.sequence, "kind": event.kind, "mode": event.mode, "outcome": event.outcome, "error_code": event.error_code} for event in tail]}
+            except (OSError, ValueError) as exc:
+                return {"events_status": False, "error": _redact_display(str(exc), [api_key])}
+
         controller = InteractiveRunController(
             start=run_message,
             on_result=emit_interactive_result,
@@ -2683,6 +2692,7 @@ def main(argv: list[str] | None = None) -> int:
             tree=tree_command,
             diff=diff_command,
             context_info=context_info_command,
+            events_info=events_info_command,
             cancel=controller.cancel,
             pause=controller.pause,
             resume=controller.resume,

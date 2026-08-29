@@ -102,6 +102,14 @@ def _human_result(value: object) -> str | None:
         if not stale and not errors:
             lines.append("Index is healthy")
         return "\n".join(lines)
+    if value.get("events_status") is True:
+        events = value.get("events") or []
+        lines = ["Recent events", "─────────────", f"showing: {len(events)}"]
+        for item in events:
+            if isinstance(item, dict):
+                outcome = f" · {item['outcome']}" if item.get("outcome") else ""
+                lines.append(f"  {item.get('sequence', '?'):>4}  {item.get('kind', 'event')}{outcome}")
+        return "\n".join(lines)
     if "nodes" in value and "roots" in value and "edges" in value:
         nodes = value.get("nodes") or []
         lines = ["Session tree", "────────────", f"sessions: {len(nodes)}", f"roots: {len(value.get('roots') or [])}"]
@@ -563,6 +571,7 @@ class InteractiveSession:
     tree: Callable[[list[str]], object] = lambda _args: {}
     diff: Callable[[], object] = lambda: {}
     context_info: Callable[[], object] = lambda: {}
+    events_info: Callable[[], object] = lambda: {}
     cancel: Callable[[], object] = lambda: {"cancelled": True}
     pause: Callable[[], object] = lambda: {"paused": True}
     resume: Callable[[], object] = lambda: {"resumed": True}
@@ -585,7 +594,7 @@ class InteractiveSession:
     stopped: bool = False
     controller: InteractiveRunController | None = None
 
-    COMMANDS = ("help", "status", "tools", "plan", "mode", "model", "connect", "login", "rules", "files", "skills", "skill", "tree", "diff", "context", "review", "test", "compact", "undo", "cancel", "pause", "resume", "clear", "quit", "exit")
+    COMMANDS = ("help", "status", "tools", "plan", "mode", "model", "connect", "login", "rules", "files", "skills", "skill", "tree", "diff", "context", "events", "review", "test", "compact", "undo", "cancel", "pause", "resume", "clear", "quit", "exit")
 
     def header(self, *, run_id: str = "", mode: str = "plan", profile: str = "default", rules_count: int = 0, budget: int = 60_000) -> str:
         return f"ForgeCode session run={run_id or '<new>'} workspace=. mode={mode} profile={profile} rules={rules_count} budget={budget}"
@@ -603,6 +612,7 @@ class InteractiveSession:
             "/rules /files /skills inspect project guidance and context sources\n"
             "/tree /diff            inspect repository structure and Git changes\n"
             "/context              inspect the local context index health\n"
+            "/events               show recent persisted session events\n"
             "/review /test          run review or verification checks\n"
             "/compact /undo         manage context and recoverable edits\n"
             "/pause /resume /cancel control an active worker\n"
@@ -688,6 +698,9 @@ class InteractiveSession:
         if command == "context":
             if args: raise SlashCommandError("usage: /context")
             return self.context_info()
+        if command == "events":
+            if args: raise SlashCommandError("usage: /events")
+            return self.events_info()
         if command == "test": return self.test(args)
         if command == "compact":
             if args: raise SlashCommandError("usage: /compact")

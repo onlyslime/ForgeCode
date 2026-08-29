@@ -103,3 +103,8 @@ def test_human_diff_result_renders_clean_state_and_content():
 def test_human_context_status_renders_index_health():
     rendered = _human_result({"context_status": True, "metadata": {"counts": {"files": 12}}, "stale": [], "errors": []})
     assert "files: 12" in rendered and "Index is healthy" in rendered
+
+
+def test_human_events_status_renders_bounded_tail():
+    rendered = _human_result({"events_status": True, "events": [{"sequence": 4, "kind": "tool_result", "outcome": "success"}]})
+    assert "Recent events" in rendered and "tool_result · success" in rendered
