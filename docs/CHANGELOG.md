@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.124 — 2026-08-31
+
+- **Extension definition safety:** reject all ASCII control characters in tool names and descriptions, keeping registered extension metadata safe for logs and protocol payloads.
+- **Verification:** security-edge regression tests, compile checks, and manual registration checks passed.
+
 ## v0.8.123 — 2026-08-31
 
 - **Usage metadata safety:** reject control-character usage field names in provider parsing and provider-neutral validation before they reach logs or telemetry.

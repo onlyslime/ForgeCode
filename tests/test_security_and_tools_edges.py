@@ -207,6 +207,14 @@ def test_registry_validates_extension_definition_fields():
         raise AssertionError("expected tool definition validation")
 
 
+def test_registry_rejects_other_control_characters_in_definition():
+    for field, value in (("name", "bad\tname"), ("description", "bad\x1bdescription")):
+        definition = type("D", (), {"name": "safe", "description": "", "parameters": {}})()
+        setattr(definition, field, value)
+        with pytest.raises(ValueError, match="newline-safe"):
+            ToolRegistry().register(type("T", (), {"definition": definition})())
+
+
 def test_registry_rejects_non_json_or_oversized_schemas():
     for parameters in ({"x": float("nan")}, {"x": "a" * 1_000_001}):
         class Bad:

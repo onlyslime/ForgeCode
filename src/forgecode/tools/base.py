@@ -158,9 +158,9 @@ class ToolRegistry:
         description = getattr(definition, "description", None)
         parameters = getattr(definition, "parameters", None)
         side_effecting = getattr(definition, "side_effecting", False)
-        if not isinstance(name, str) or not name or len(name) > 128 or any(ch in name for ch in "\r\n"):
+        if not isinstance(name, str) or not name or len(name) > 128 or any(ord(ch) < 32 for ch in name):
             raise ValueError("tool name must be bounded newline-safe text")
-        if not isinstance(description, str) or len(description) > 4_000 or any(ch in description for ch in "\r\n"):
+        if not isinstance(description, str) or len(description) > 4_000 or any(ord(ch) < 32 for ch in description):
             raise ValueError("tool description must be bounded newline-safe text")
         if not isinstance(parameters, dict):
             raise ValueError("tool parameters must be an object")
