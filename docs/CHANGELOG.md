@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.201 — 2026-08-31
+
+- **Demo verification compatibility fix:** removed an over-strict final deadline gate in `run_command` that could classify a completed offline verification as failed when the overall run budget elapsed during result assembly.
+- **Verification:** affected CLI, recovery, workflow, extension, and RPC tests passed after reproducing the regression.
+
 ## v0.8.200 — 2026-08-31
 
 - **RPC session write-path hardening:** session persistence now validates the destination directory and target file against symlink/junction aliases before and after directory creation.
