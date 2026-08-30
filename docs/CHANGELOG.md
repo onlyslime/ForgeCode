@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.73 — 2026-08-31
+
+- Made `process_status` return a failed tool result for unknown task IDs,
+  matching `poll_process` and preventing false-positive status checks.
+- Verification: status contract regression, manual unknown-task invocation,
+  compileall, and diff checks passed.
+
 ## v0.8.72 — 2026-08-31
 
 - Made `process_status` derive its message and metadata from one snapshot,

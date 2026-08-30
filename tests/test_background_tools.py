@@ -42,6 +42,12 @@ def test_background_snapshot_rejects_invalid_cursor(tmp_path):
             raise AssertionError("expected cursor validation")
 
 
+def test_process_status_reports_unknown_task_as_failure(tmp_path):
+    result = ProcessStatusTool(None, ProcessManager()).execute({"task_id": "missing"}, None)
+    assert result.ok is False
+    assert result.metadata["error"] == "unknown_task"
+
+
 def test_background_manager_bounds_task_id(tmp_path):
     manager = ProcessManager()
     for task_id in ("", "x\n", "x" * 129):

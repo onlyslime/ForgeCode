@@ -178,7 +178,7 @@ class ProcessStatusTool:
     def __init__(self, guard, manager): self.manager = manager
     def execute(self, arguments, context):
         data = self.manager.snapshot(str(arguments.get("task_id", "")))
-        return ToolResult(True, str(data), data)
+        return ToolResult("error" not in data, str(data), data)
 
 class ListProcessesTool:
     definition = ToolDefinition("list_processes", "List bounded ForgeCode background task summaries.", {"type":"object"})
