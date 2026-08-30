@@ -368,6 +368,8 @@ class InteractiveRunController:
     _cancel_requested: bool = field(default=False, init=False, repr=False)
     _pending_pause: bool = field(default=False, init=False, repr=False)
     _pending_cancel: bool = field(default=False, init=False, repr=False)
+    _pending_steering: list[str] = field(default_factory=list, init=False, repr=False)
+    _pending_steering_chars: int = field(default=0, init=False, repr=False)
     _started_monotonic: float | None = field(default=None, init=False, repr=False)
     _last_elapsed_seconds: float | None = field(default=None, init=False, repr=False)
     _last_tool_steps: int = field(default=0, init=False, repr=False)
@@ -394,6 +396,8 @@ class InteractiveRunController:
                 "stopped": self._stopped,
                 "cancellation_requested": self._cancel_requested,
                 "pause_requested": self._pending_pause,
+                "steering_items": len(self._pending_steering),
+                "steering_chars": self._pending_steering_chars,
                 "last_elapsed_seconds": self._last_elapsed_seconds,
                 "last_tool_steps": self._last_tool_steps,
             }
@@ -409,6 +413,17 @@ class InteractiveRunController:
             if self._cancel_requested:
                 return {"accepted": False, "error": "run cancellation is already requested", "code": "cancellation_requested"}
         result = self.steer_active(text)
+        if self._is_no_active_worker(result):
+            with self._condition:
+                if not self._active or self._cancel_requested:
+                    return {"accepted": False, "error": "active run is no longer steerable"}
+                if len(self._pending_steering) >= 8 or self._pending_steering_chars + len(text) > 16_000:
+                    return {"accepted": False, "error": "steering queue is full"}
+                self._pending_steering.append(text)
+                self._pending_steering_chars += len(text)
+                position = len(self._pending_steering)
+            self.event_sink("steering_pending", {"chars": len(text), "position": position, "reason": "worker_initializing"})
+            return {"accepted": True, "steering": True, "pending": True, "position": position}
         if isinstance(result, dict) and result.get("accepted") is True:
             self.event_sink("steering_enqueued", {"chars": len(text), "position": result.get("position", 1)})
         return result
@@ -482,6 +497,8 @@ class InteractiveRunController:
                     self._last_tool_steps = self._tool_steps
                     self._queue.clear()
                     self._queue_chars = 0
+                    self._pending_steering.clear()
+                    self._pending_steering_chars = 0
                     self._active = False
                     self._started_monotonic = None
                     self._tool_steps = 0
@@ -509,12 +526,17 @@ class InteractiveRunController:
         with self._condition:
             pending_cancel = self._pending_cancel
             pending_pause = self._pending_pause and not pending_cancel
+            pending_steering = list(self._pending_steering) if not pending_cancel else []
             self._pending_cancel = False
             self._pending_pause = False
+            self._pending_steering.clear()
+            self._pending_steering_chars = 0
         if pending_cancel:
             results.append(self.cancel_active())
         elif pending_pause:
             results.append(self.pause_active())
+        for message in pending_steering:
+            results.append(self.steer_active(message))
         return tuple(results)
 
     def pause(self) -> object:
@@ -546,6 +568,8 @@ class InteractiveRunController:
             self._cancel_requested = True
             self._queue.clear()
             self._queue_chars = 0
+            self._pending_steering.clear()
+            self._pending_steering_chars = 0
         result = self.cancel_active()
         if self._is_no_active_worker(result):
             with self._condition:
@@ -561,6 +585,8 @@ class InteractiveRunController:
                 self._cancel_requested = True
             self._queue.clear()
             self._queue_chars = 0
+            self._pending_steering.clear()
+            self._pending_steering_chars = 0
             self._condition.notify_all()
         if cancel:
             result = self.cancel_active()

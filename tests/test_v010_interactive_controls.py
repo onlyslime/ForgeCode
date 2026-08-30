@@ -49,6 +49,36 @@ def test_controller_snapshot_retains_last_run_metrics_after_completion():
     assert snapshot["last_tool_steps"] == 0
 
 
+def test_controller_retains_steering_during_worker_initialization():
+    assembling = threading.Event()
+    continue_setup = threading.Event()
+    delivered: list[str] = []
+    ready = False
+
+    def steer_active(message: str):
+        if not ready:
+            return {"accepted": False, "error": "no active worker"}
+        delivered.append(message)
+        return {"accepted": True, "steering": True, "position": len(delivered)}
+
+    def start(_message: str):
+        nonlocal ready
+        assembling.set()
+        continue_setup.wait(2)
+        ready = True
+        controller.flush_pending_controls()
+        return {"message": "done"}
+
+    controller = InteractiveRunController(start, steer_active=steer_active)
+    assert controller.submit("start")['accepted'] is True
+    assert assembling.wait(1)
+    pending = controller.steer("change direction")
+    assert pending["accepted"] is True and pending["pending"] is True
+    continue_setup.set()
+    assert controller.join(2)
+    assert delivered == ["change direction"]
+
+
 def test_agent_loop_pause_after_provider_return_then_resume(tmp_path: Path):
     guard = WorkspaceGuard(tmp_path)
     session = SessionStore(tmp_path / "run.jsonl", run_id="pause-run", mode="act")
