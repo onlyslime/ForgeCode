@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.204 — 2026-08-31
+
+- **Provider credential boundary:** API keys are now type-checked and reject
+  control characters and oversized values before entering HTTP headers.
+- **Verification:** provider/config regression tests, compile, and diff checks
+  passed; newline injection was manually rejected.
+
 ## v0.8.203 — 2026-08-31
 
 - **Configuration fail-closed parsing:** malformed `FORGECODE_OFFLINE`

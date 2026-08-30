@@ -36,6 +36,12 @@ def test_config_rejects_malformed_offline_environment(monkeypatch, tmp_path: Pat
         ConfigLoader(tmp_path).load()
 
 
+def test_provider_rejects_control_character_api_key():
+    from forgecode.models.openai_compatible import OpenAICompatibleProvider
+    with pytest.raises(ProviderError, match="API_KEY"):
+        OpenAICompatibleProvider(api_key="key\nforged", base_url="https://example.test/v1", model="m")
+
+
 def test_config_loads_scoped_approval_decisions(tmp_path: Path):
     directory = tmp_path / ".forgecode"
     directory.mkdir()
