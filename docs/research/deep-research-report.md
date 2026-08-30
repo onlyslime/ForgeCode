@@ -1245,6 +1245,13 @@ v0.7.42 在此基础上为 `session.events` 增加有界 `type` 过滤；客户�
 内容当作当前能力证据；OpenCode 权限页仍返回 HTTP 200。后续比较 Cline 时仅采用
 可重新访问的官方入口或源码，不用搜索摘要替代证据。
 
+Pi coding-agent README 当前可直接访问（GitHub raw，HTTP 200）。README 明确列出
+interactive/print/JSON/RPC/SDK 四种入口，并提供 providers/models、session branching、
+compaction、message queue、skills、extensions、themes、prompt templates 和可从 npm/git
+加载的 Pi Packages。ForgeCode 已有 JSONL RPC、skills、hooks、session compact 与模型
+配置，但仍缺少成熟的消息队列、扩展包加载和跨进程 SDK 生态；这些列为 P1/P2，而不在
+当前安全与恢复主线中抢占优先级。
+
 ### 流式协议复核（2026-08-30）
 
 源码审计确认 OpenAI-compatible provider 对 SSE 做了有界 fail-closed 处理：拒绝重复
