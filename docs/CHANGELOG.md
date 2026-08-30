@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.139 — 2026-08-31
+
+- **Transport request boundary:** validate URL and header mapping types before provider-specific rewriting, preventing malformed custom calls from leaking attribute errors.
+- **Verification:** provider tests, compile checks, and manual malformed-header inspection passed.
+
 ## v0.8.138 — 2026-08-31
 
 - **Transport body validation:** reject non-byte request bodies before decoding, converting malformed custom transport inputs into clear `ValueError`s.

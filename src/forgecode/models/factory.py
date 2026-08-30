@@ -37,6 +37,10 @@ class _ProtocolTransport:
         self.delegate, self.provider, self.api_key = delegate, provider, api_key
 
     def _request(self, url: str, headers: dict[str, str], body: bytes) -> tuple[str, dict[str, str], bytes]:
+        if not isinstance(url, str) or not url or len(url) > 2_048:
+            raise ValueError("provider request URL is invalid")
+        if not isinstance(headers, dict) or any(not isinstance(key, str) or not isinstance(value, str) for key, value in headers.items()):
+            raise ValueError("provider request headers are invalid")
         if not isinstance(body, (bytes, bytearray)):
             raise ValueError("provider request body must be bytes")
         try:
