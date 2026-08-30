@@ -1131,3 +1131,9 @@
 
 - Productized extensible local agent workflows with rules, references, plans,
   skills, repository context, and auditable CLI contracts.
+# v0.8.0 — 2026-08-30
+
+- Refined the interactive terminal presentation with persistent command hints,
+  visible tool cards, clearer error guidance, and phase-aware progress output.
+- Long-running model waits are explicitly distinguished from active tool work.
+- Verification: targeted interactive UI tests, compileall, and forgecode doctor.

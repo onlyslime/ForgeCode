@@ -236,7 +236,10 @@ def _human_result(value: object) -> str | None:
             summary += "\nFiles changed: " + ", ".join(str(path) for path in changed[:20])
         return summary + "\n\n" + _pretty_text(value["message"])
     if value.get("error"):
-        return f"Error: {_pretty_text(value.get('error'))}"
+        error = _pretty_text(value.get('error'))
+        code = value.get("code") or value.get("stopped_reason")
+        detail = f"\ncode: {code}" if code else ""
+        return "Error\n─────\n✗ " + error + detail + "\n\nTip: press Esc to stop a running task, or use /status for diagnostics."
     if value.get("stopped") is True or value.get("cleared") is True:
         return None
     return None

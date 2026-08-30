@@ -1979,6 +1979,8 @@ def main(argv: list[str] | None = None) -> int:
                                 tool_steps += 1
                                 active_tool = text
                                 controller.update_metrics(tool_steps=tool_steps, phase=current_phase)
+                                print(f"\x1b[90m  ┌─ tool {tool_steps} ─────────────────────────────\x1b[0m")
+                                print(f"\x1b[90m  │ {text}\x1b[0m")
                             elif kind in {"tool_result", "command_result", "command_timeout"}:
                                 active_tool = ""
                             if kind == "tool_result" and tool == "read_file" and payload.get("ok"):
@@ -2346,7 +2348,7 @@ def main(argv: list[str] | None = None) -> int:
             """Draw the persistent human input area at the current bottom."""
             if machine_json:
                 return
-            print(f"\x1b[40;97m╭─ forgecode │ {state['mode']}\n╰─❯ \x1b[0m", end="", flush=True)
+            print(f"\x1b[40;97m╭─ forgecode │ {state['mode']}  ·  /help  /tools  /status\n╰─❯ \x1b[0m", end="", flush=True)
 
         def model_command(model_args: list[str]) -> Any:
             nonlocal settings
