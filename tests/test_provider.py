@@ -154,6 +154,12 @@ def test_provider_transport_rejects_non_object_request():
         transport._request("https://example/v1/chat/completions", {}, b"[]")
 
 
+def test_google_transport_rejects_non_object_tool_schema():
+    transport = _ProtocolTransport(object(), "google", "secret")
+    with pytest.raises(ValueError, match="tool schemas must be objects"):
+        transport._request("https://example/v1/chat/completions", {}, json.dumps({"messages": [], "tools": [None]}).encode())
+
+
 def test_provider_transport_rejects_non_object_response():
     transport = _ProtocolTransport(object(), "anthropic", "secret")
     with pytest.raises(ValueError, match="response body must be an object"):

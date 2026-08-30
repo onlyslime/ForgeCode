@@ -79,8 +79,10 @@ class _ProtocolTransport:
                 raise ValueError("provider messages must be objects")
             model = payload.get("model")
             raw_tools = payload.pop("tools", [])
+            if not isinstance(raw_tools, list) or any(not isinstance(tool, dict) for tool in raw_tools):
+                raise ValueError("provider tool schemas must be objects")
             declarations = []
-            for tool in raw_tools if isinstance(raw_tools, list) else []:
+            for tool in raw_tools:
                 function = tool.get("function", {}) if isinstance(tool, dict) else {}
                 if isinstance(function, dict) and function.get("name"):
                     declarations.append({"name": function["name"], "description": str(function.get("description", "")), "parameters": function.get("parameters", {"type": "object"})})

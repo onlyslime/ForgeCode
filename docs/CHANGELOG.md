@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.137 — 2026-08-31
+
+- **Google request validation:** malformed non-list or non-object tool schemas are now rejected instead of silently dropped during provider translation.
+- **Verification:** provider tests, compile checks, and manual malformed-tool inspection passed.
+
 ## v0.8.136 — 2026-08-31
 
 - **Transport header validation:** constrain custom transport response headers to bounded string keys and values without control characters.
