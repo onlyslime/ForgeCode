@@ -60,6 +60,17 @@ fcc --act
 需要收窄一次运行时的工具范围时，可以使用风险组，例如
 `fcc --tools read_only` 或 `fcc --exclude-tools execution`。组名会根据当前模式实际
 注册的工具展开；它们只是运行时策略，不等同于操作系统沙箱。
+
+也可以在 `.forgecode/config.toml` 中按风险域配置审批：
+
+```toml
+[approval_scopes]
+changes = "ask"
+execution = "deny"
+evidence = "allow"
+```
+
+未填写的风险域继续遵循全局审批模式；Bypass 仍是明确的操作者选择。
 也可以使用显式命令：`forgecode trust grant`。
 
 ## 它能做什么

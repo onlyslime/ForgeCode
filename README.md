@@ -97,6 +97,18 @@ For a deliberately narrow run, use an audited group such as
 against tools registered in the current mode; they narrow runtime policy and
 are not an OS sandbox.
 
+Approval can also be scoped in `.forgecode/config.toml`:
+
+```toml
+[approval_scopes]
+changes = "ask"
+execution = "deny"
+evidence = "allow"
+```
+
+An omitted scope follows the global approval mode. Bypass remains an explicit
+operator choice.
+
 ## Architecture
 
 ForgeCode keeps the complete agent boundary in this repository:
