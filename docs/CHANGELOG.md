@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.141 — 2026-08-31
+
+- **HTTP status strictness:** custom transport results now require an integer status code, rejecting floats and strings that could be silently coerced into valid codes.
+- **Verification:** provider tests, compile checks, and manual status coercion inspection passed.
+
 ## v0.8.140 — 2026-08-31
 
 - **Transport body strictness:** custom transport results now require bytes-like response bodies instead of accepting implicit integer-to-zero-byte conversions.

@@ -199,6 +199,8 @@ def test_ollama_transport_rejects_invalid_message():
 def test_transport_result_rejects_invalid_status():
     with pytest.raises(ValueError, match="invalid HTTP status"):
         _json_result((True, b"{}"))
+    with pytest.raises(ValueError, match="invalid HTTP status"):
+        _json_result((200.5, b"{}"))
 
 
 def test_transport_result_rejects_non_string_headers():
