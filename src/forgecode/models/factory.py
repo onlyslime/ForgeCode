@@ -80,7 +80,13 @@ class _ProtocolTransport:
             tools = payload.get("tools", [])
             if not isinstance(tools, list) or any(not isinstance(tool, dict) for tool in tools):
                 raise ValueError("provider tool schemas must be objects")
-            payload["tools"] = [{"name": t.get("function", {}).get("name"), "description": t.get("function", {}).get("description", ""), "input_schema": t.get("function", {}).get("parameters", {})} for t in tools]
+            converted_tools = []
+            for tool in tools:
+                function = tool.get("function", {})
+                if not isinstance(function, dict):
+                    raise ValueError("provider tool function must be an object")
+                converted_tools.append({"name": function.get("name"), "description": function.get("description", ""), "input_schema": function.get("parameters", {})})
+            payload["tools"] = converted_tools
             headers = {k: v for k, v in headers.items() if k.lower() != "authorization"} | {"x-api-key": self.api_key, "anthropic-version": "2023-06-01"}
             url = url.rsplit("/chat/completions", 1)[0] + "/messages"
         elif self.provider == "google":
@@ -94,7 +100,9 @@ class _ProtocolTransport:
             declarations = []
             for tool in raw_tools:
                 function = tool.get("function", {}) if isinstance(tool, dict) else {}
-                if isinstance(function, dict) and function.get("name"):
+                if not isinstance(function, dict):
+                    raise ValueError("provider tool function must be an object")
+                if function.get("name"):
                     declarations.append({"name": function["name"], "description": str(function.get("description", "")), "parameters": function.get("parameters", {"type": "object"})})
             google_contents = []
             call_names: dict[str, str] = {}

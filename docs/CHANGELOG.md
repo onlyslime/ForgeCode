@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.145 — 2026-08-31
+
+- **Provider tool conversion:** validate nested `function` objects in Anthropic and Google request translation, preventing malformed schemas from raising attribute errors.
+- **Verification:** provider tests, compile checks, and manual nested-schema inspection passed.
+
 ## v0.8.144 — 2026-08-31
 
 - **Request header safety:** custom transport request headers now enforce bounded, non-empty string keys and values without control characters.
