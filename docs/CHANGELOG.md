@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.8.3 — 2026-08-30
+
+- Added bounded workspace-local user memory with explicit `memory add/show/remove/clear` commands.
+- Memory is atomically persisted, schema-checked, isolated under `.forgecode`, injected as untrusted context, and never exposed as a model mutation tool.
+- Manually verified round-trip, tamper rejection, context loading, and removal.
+
 ## v0.8.2 — 2026-08-30
 
 - Added bounded `/steer <message>` control for guiding an active run at its

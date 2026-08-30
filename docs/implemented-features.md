@@ -37,6 +37,9 @@ locations are mapped in [`capability-trace.md`](capability-trace.md).
   `changes`, `execution`, and `evidence` decisions.
 - Bounded `/steer` instructions injected at the next model boundary; steering
   never interrupts synchronous tool side effects and is cleared on cancel.
+- Explicitly managed, bounded workspace memory (`memory add/show/remove/clear`)
+  is atomically persisted and injected as untrusted context; models cannot
+  mutate it implicitly.
 - Scoped `AGENTS.md` rules, explicit references, incremental context indexing,
   context search/show/complete, compaction, and health diagnostics.
 - Validated skills and lifecycle hooks with bounded prompt text, quotas, and

@@ -60,10 +60,12 @@ class ToolContext:
     # approval decision and before a side-effecting tool mutates anything, so
     # an interactive pause cannot race approval into execution.
     pause_wait: Callable[[], None] | None = None
+    memory_context: str = ""
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "mode", AgentMode(self.mode))
         object.__setattr__(self, "secrets", tuple(secret for secret in self.secrets if isinstance(secret, str) and secret))
+        object.__setattr__(self, "memory_context", str(self.memory_context)[:20_000])
         if self.deadline_monotonic is not None and (isinstance(self.deadline_monotonic, bool) or not isinstance(self.deadline_monotonic, (int, float)) or not math.isfinite(self.deadline_monotonic)):
             raise ValueError("deadline_monotonic must be a finite number or None")
 

@@ -43,6 +43,7 @@ from ..security.json import bounded_json_loads
 from ..security.workspace import WorkspaceGuard
 from ..security.trust import TrustError, TrustStore
 from ..telemetry import Telemetry
+from ..memory import MemoryError, MemoryStore
 from ..storage import Checkpoint, CheckpointStore, RecoveryConflict, SessionFormatError, SessionStore
 from ..tools import AgentMode, AllowAllApproval, DenyAllApproval, InteractiveApproval, RiskScopedApproval, ToolContext, build_default_registry
 from ..hooks import Hook, HookRegistry
@@ -386,6 +387,11 @@ def _parser() -> argparse.ArgumentParser:
     rules_explain.add_argument("--compatible", action="store_true")
     rules_explain.add_argument("--json", action="store_true", default=argparse.SUPPRESS, dest="json")
     rules_explain.add_argument("--jsonl", action="store_true", default=argparse.SUPPRESS, dest="jsonl")
+    memory_parser = subparsers.add_parser("memory", help="inspect and explicitly manage bounded workspace memory")
+    memory_parser.add_argument("memory_action", choices=["show", "add", "remove", "clear"], nargs="?", default="show")
+    memory_parser.add_argument("value", nargs="?", help="text for add, or entry id for remove")
+    memory_parser.add_argument("--json", action="store_true", default=argparse.SUPPRESS, dest="json")
+    memory_parser.add_argument("--jsonl", action="store_true", default=argparse.SUPPRESS, dest="jsonl")
     config_parser = subparsers.add_parser("config", help="inspect or validate typed effective configuration")
     config_parser.add_argument("--json", action="store_true", default=argparse.SUPPRESS, dest="json")
     config_parser.add_argument("--jsonl", action="store_true", default=argparse.SUPPRESS, dest="jsonl")
@@ -639,6 +645,7 @@ def _parsed_command_name(args: argparse.Namespace) -> str:
         "config": "config_action",
         "provider": "provider_action",
         "rules": "rules_action",
+        "memory": "memory_action",
         "skills": "skills_action",
         "context": "context_action",
         "test": "test_action",
@@ -659,11 +666,12 @@ def _raw_command_name(argv: list[str]) -> str:
     and its immediate nested action, while deliberately ignoring option
     values (which may contain arbitrary prompt text).
     """
-    commands = {"doctor", "tools", "skills", "skill", "rules", "config", "provider", "login", "trust", "rpc", "transaction", "rollback", "review", "chat", "start", "inspect", "map", "context", "test", "tests", "sessions", "diff", "status", "session", "plan", "run", "eval", "benchmark"}
-    actions = {"skills": {"list", "check", "show", "run"}, "skill": {"list", "check", "show", "run"}, "rules": {"show", "check", "explain"}, "config": {"show", "validate", "profiles", "policy"}, "provider": {"health", "list"}, "trust": {"status", "grant", "revoke"}, "context": {"show", "index", "search", "complete", "explain", "diagnostics", "clear"}, "test": {"list", "show", "run"}, "tests": {"list", "show", "run"}, "session": {"show", "export", "inspect", "compact", "fork", "tree", "clone", "import"}}
+    commands = {"doctor", "tools", "skills", "skill", "rules", "memory", "config", "provider", "login", "trust", "rpc", "transaction", "rollback", "review", "chat", "start", "inspect", "map", "context", "test", "tests", "sessions", "diff", "status", "session", "plan", "run", "eval", "benchmark"}
+    actions = {"skills": {"list", "check", "show", "run"}, "skill": {"list", "check", "show", "run"}, "rules": {"show", "check", "explain"}, "memory": {"show", "add", "remove", "clear"}, "config": {"show", "validate", "profiles", "policy"}, "provider": {"health", "list"}, "trust": {"status", "grant", "revoke"}, "context": {"show", "index", "search", "complete", "explain", "diagnostics", "clear"}, "test": {"list", "show", "run"}, "tests": {"list", "show", "run"}, "session": {"show", "export", "inspect", "compact", "fork", "tree", "clone", "import"}}
     command = "doctor"
     command_index = -1
     options_with_values = {
+        "--workspace", "--profile", "--session", "--task", "--budget-chars", "--max-steps", "--verify", "--demo-task", "--resume", "--timeout", "--timeout-seconds", "--name", "--input", "--line-range", "--line-start", "--line-end", "--language", "--path", "--glob", "--regex", "--max-results", "--context-lines", "--max-chars", "--transaction", "--transaction-id", "--export", "--export-path", "--import", "--import-path", "--limit", "--tools", "--exclude-tools",
         "--workspace", "--profile", "--session", "--task", "--budget-chars", "--max-steps", "--verify", "--demo-task", "--resume", "--timeout", "--timeout-seconds", "--name", "--input", "--line-range", "--line-start", "--line-end", "--language", "--path", "--glob", "--regex", "--max-results", "--context-lines", "--max-chars", "--transaction", "--transaction-id", "--export", "--export-path", "--import", "--import-path", "--limit", "--tools", "--exclude-tools",
     }
     skip_next = False
@@ -777,6 +785,49 @@ def main(argv: list[str] | None = None) -> int:
             # Diagnostics must never make an otherwise safe CLI invocation
             # fail; the policy itself remains visible in doctor/config output.
             pass
+    if command == "memory":
+        command_name = "memory " + getattr(args, "memory_action", "show")
+        try:
+            store = MemoryStore(WorkspaceGuard(workspace))
+            action = getattr(args, "memory_action", "show")
+            value = getattr(args, "value", None)
+            if action == "show":
+                if value:
+                    raise MemoryError("memory show does not accept a value")
+                payload = {"entries": [entry.to_dict() for entry in store.read()], "path": ".forgecode/memory.json"}
+            elif action == "add":
+                if not value:
+                    raise MemoryError("memory add requires text")
+                payload = {"entry": store.add(value).to_dict()}
+            elif action == "remove":
+                if not value:
+                    raise MemoryError("memory remove requires an entry id")
+                payload = {"removed": store.remove(value).to_dict()}
+            else:
+                if value:
+                    raise MemoryError("memory clear does not accept a value")
+                payload = {"cleared": store.clear()}
+        except MemoryError as exc:
+            if machine_json:
+                _emit_machine(_machine_error(command_name, "memory_error", str(exc), exit_code=2))
+            else:
+                print(str(exc), file=sys.stderr)
+            return 2
+        if machine_json:
+            _emit_machine(_machine_envelope(command_name, "memory", True, data=payload, exit_code=0))
+        else:
+            if "entries" in payload:
+                for entry in payload["entries"]:
+                    print(f"{entry['id']}  {entry['text']}")
+                if not payload["entries"]:
+                    print("workspace memory is empty")
+            elif "entry" in payload:
+                print(f"added {payload['entry']['id']}")
+            elif "removed" in payload:
+                print(f"removed {payload['removed']['id']}")
+            else:
+                print(f"cleared {payload['cleared']} entr{'y' if payload['cleared'] == 1 else 'ies'}")
+        return 0
     base_registry = build_default_registry(guard)
     try:
         cli_tool_policy = parse_tool_policy_options(

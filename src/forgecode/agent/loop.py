@@ -161,7 +161,7 @@ class AgentLoop:
         configured_deadline = now + self.config.total_timeout_seconds
         if context.deadline_monotonic is not None:
             configured_deadline = min(configured_deadline, context.deadline_monotonic)
-        self.context = ToolContext(context.guard, context.approval, approval_observer=record_approval, mode=context.mode, secrets=context.secrets, deadline_monotonic=configured_deadline, cancellation_requested=context.cancellation_requested, cancellation_token=self.cancellation_token, transaction_store=context.transaction_store, run_id=context.run_id or (session.run_id if session else ""), plan_id=context.plan_id, plan_item_id=context.plan_item_id, pre_side_effect_check=context.pre_side_effect_check, rules_fingerprint=context.rules_fingerprint, plan_fingerprint=context.plan_fingerprint, config_fingerprint=context.config_fingerprint, hooks=context.hooks, correlation_id=context.correlation_id, pause_wait=self._wait_for_side_effect_boundary)
+        self.context = ToolContext(context.guard, context.approval, approval_observer=record_approval, mode=context.mode, secrets=context.secrets, deadline_monotonic=configured_deadline, cancellation_requested=context.cancellation_requested, cancellation_token=self.cancellation_token, transaction_store=context.transaction_store, run_id=context.run_id or (session.run_id if session else ""), plan_id=context.plan_id, plan_item_id=context.plan_item_id, pre_side_effect_check=context.pre_side_effect_check, rules_fingerprint=context.rules_fingerprint, plan_fingerprint=context.plan_fingerprint, config_fingerprint=context.config_fingerprint, hooks=context.hooks, correlation_id=context.correlation_id, pause_wait=self._wait_for_side_effect_boundary, memory_context=context.memory_context)
 
     def _wait_for_side_effect_boundary(self) -> None:
         """Synchronously honor an interactive pause after approval.
@@ -815,6 +815,7 @@ class AgentLoop:
                 tuple(definition.name for definition in self.registry.definitions(self.context.mode)),
                 approval_mode="interactive or explicit auto-approve",
                 mode=self.context.mode.value,
+                memory_context=redact_text(self.context.memory_context, self.context.secrets),
             ),
             Message(role="user", content=prompt),
         ]

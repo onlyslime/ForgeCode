@@ -48,7 +48,7 @@ class ContextBuilder:
         if self.max_chars < 1 or self.max_message_chars < 1:
             raise ValueError("context limits must be positive")
 
-    def system_message(self, workspace: Path, tool_names: Sequence[str], *, approval_mode: str, mode: str = "act") -> Message:
+    def system_message(self, workspace: Path, tool_names: Sequence[str], *, approval_mode: str, mode: str = "act", memory_context: str = "") -> Message:
         tools = ", ".join(tool_names) or "none"
         mode_rule = (
             "You are in PLAN mode. Explore and produce a concrete plan only; file changes, commands, and verification are forbidden."
@@ -69,6 +69,8 @@ class ContextBuilder:
             "changing strategy after an error; (3) when finished, explain what changed, verification performed, and any "
             "remaining limitation. Do not remain silent for a long sequence of tools."
         )
+        if memory_context:
+            content += "\n" + memory_context[:20_000]
         return Message(role="system", content=content)
 
     def fit(self, messages: Sequence[Message]) -> list[Message]:
