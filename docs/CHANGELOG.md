@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.7.27 — 2026-08-30
+
+- Extended bounded read-only batch parallelism to `git_worktrees` and
+  `symbol_hover`, preserving serial execution for mixed or side-effecting calls.
+- Added regression coverage for the new read-only batch members.
+
 ## v0.7.26 — 2026-08-30
 
 - Fixed `rpc.describe` request-id handling so capability discovery follows the

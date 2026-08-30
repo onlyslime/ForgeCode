@@ -32,6 +32,8 @@ _PARALLEL_READ_TOOLS = frozenset({
     "list_files",
     "workspace_summary",
     "repository_map",
+    "git_worktrees",
+    "symbol_hover",
 })
 
 

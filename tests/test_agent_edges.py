@@ -76,6 +76,25 @@ def test_read_only_tool_batch_runs_concurrently_and_keeps_result_order(tmp_path)
     assert any(kind == "tool_batch_parallel" for kind, _ in events)
 
 
+def test_new_read_only_tools_are_eligible_for_parallel_batches(tmp_path):
+    class FastRead:
+        definition = ToolDefinition("symbol_hover", "static hover", {"type": "object"})
+        def execute(self, arguments, context):
+            return ToolResult(True, "ok", {})
+    class Provider:
+        def __init__(self): self.calls = 0
+        async def complete(self, messages, tools):
+            self.calls += 1
+            if self.calls == 1:
+                return ModelResponse(Message("assistant", tool_calls=(ToolCall("a", "symbol_hover", {}), ToolCall("b", "symbol_hover", {}))))
+            return ModelResponse(Message("assistant", "done"))
+    registry = ToolRegistry(); registry.register(FastRead())
+    events = []; guard = WorkspaceGuard(tmp_path)
+    result = asyncio.run(AgentLoop(Provider(), registry, ToolContext(guard), on_event=lambda k,p: events.append((k,p))).run("hover"))
+    assert result.stopped_reason == "model_finished"
+    assert any(kind == "tool_batch_parallel" for kind, _ in events)
+
+
 def test_read_only_batch_cancellation_marks_queued_calls(tmp_path):
     token = CancellationToken()
 

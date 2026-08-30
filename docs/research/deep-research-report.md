@@ -692,7 +692,7 @@ CLI/TUI
 | 验证 | 测试 profile、有限修复、review/export、轨迹评估 | 缺少语言服务和调试器集成 | P1 |
 | 扩展发布 | Skills、hooks、SDK、JSONL RPC、工具收窄、uv/独立二进制布局 | 缺少 MCP、插件市场、跨平台一键安装 | P2 |
 
-截至当前 v0.7.26，正常交互工作流还提供 `/context`（有界索引健康度）和
+截至当前 v0.7.27，正常交互工作流还提供 `/context`（有界索引健康度）和
 `/events [limit] [kind]`（可筛选、带相对耗时和错误码的持久化事件尾部）。
 这些能力不改变工具权限，只把已有审计证据暴露给用户；对应交互、机器契约和
 provider 回归测试均已通过。
@@ -976,6 +976,14 @@ permissions/MCP 五个布尔域；ForgeCode 的 `[approval_scopes]` 仍是风险
 - `forgecode doctor`、`python -m compileall -q src`、`git diff --check` 均通过。
 - RPC/embedding/工具策略/后台任务/语义工具的定向测试均在完整回归中覆盖；未发现
   JSONL、审批或 WorkspaceGuard 回归。
+
+### 0.7.27 实施审计：只读批次覆盖补齐（2026-08-30）
+
+- **范围**：将 `git_worktrees` 与 `symbol_hover` 纳入 AgentLoop 的显式只读并行白名单，
+  结果仍按模型调用顺序回填。
+- **非目标**：不并行任何副作用工具；hooks 存在时仍强制串行；不改变取消、审批或
+  WorkspaceGuard 语义。
+- **验证**：AgentLoop 定向测试 24 passed，compileall 与 diff 检查通过。
 
 - OpenCode 官方 Tools 页面当前可访问（HTTP 200），明确列出 `read`、`write`、
   `edit`、`bash`、`grep`、`glob` 以及 experimental `lsp`；这验证了 ForgeCode
