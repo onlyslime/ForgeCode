@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.7.32 — 2026-08-30
+
+- Hardened managed worktree ownership persistence with atomic replacement and
+  process-local serialization, preventing partial JSON state during concurrent
+  or interrupted updates.
+
 ## v0.7.31 — 2026-08-30
 
 - Worktree ownership metadata is now updated with a bounded, same-directory
