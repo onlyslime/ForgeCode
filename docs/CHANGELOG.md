@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.189 — 2026-08-31
+
+- **Byte-accurate navigation limits:** range and symbol readers now enforce the 2 MiB limit on raw bytes before UTF-8 decoding, including CRLF and multibyte files.
+- **Verification:** command-boundary tests, compile checks, and manual CRLF-size inspection passed.
+
 ## v0.8.188 — 2026-08-31
 
 - **Navigation alias safety:** range reads and symbol listing now reject symlink/junction aliases, aligning all source-reading tools with the workspace path policy.

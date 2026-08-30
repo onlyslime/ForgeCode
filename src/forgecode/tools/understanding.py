@@ -27,9 +27,10 @@ class ReadRangeTool:
         if _is_ignored(path, context.guard) or not path.is_file(): raise ValueError("path is not a readable file")
         if path.stat().st_size > _MAX_FILE_BYTES:
             return ToolResult(False, f"file exceeds the {_MAX_FILE_BYTES}-byte safety limit", {"error": "file_too_large", "path": path_value})
-        lines = path.read_text(encoding="utf-8").splitlines()
-        if sum(len(line.encode("utf-8")) for line in lines) > _MAX_FILE_BYTES:
+        raw = path.read_bytes()
+        if len(raw) > _MAX_FILE_BYTES:
             return ToolResult(False, f"file exceeds the {_MAX_FILE_BYTES}-byte safety limit", {"error": "file_too_large", "path": path_value})
+        lines = raw.decode("utf-8").splitlines()
         shown = lines[start - 1:end]
         return ToolResult(True, "\n".join(f"{i} | {line}" for i, line in enumerate(shown, start)), {"path": context.guard.relative(path), "start_line": start, "end_line": min(end, len(lines)), "total_lines": len(lines)})
 
@@ -50,9 +51,10 @@ class ListSymbolsTool:
         if _is_ignored(path, context.guard) or not path.is_file(): raise ValueError("path is not a readable file")
         if path.stat().st_size > _MAX_FILE_BYTES:
             return ToolResult(False, f"file exceeds the {_MAX_FILE_BYTES}-byte safety limit", {"error": "file_too_large", "path": path_value})
-        text = path.read_text(encoding="utf-8")
-        if len(text.encode("utf-8")) > _MAX_FILE_BYTES:
+        raw = path.read_bytes()
+        if len(raw) > _MAX_FILE_BYTES:
             return ToolResult(False, f"file exceeds the {_MAX_FILE_BYTES}-byte safety limit", {"error": "file_too_large", "path": path_value})
+        text = raw.decode("utf-8")
         patterns = [r"^\s*(?:async\s+)?def\s+(\w+)", r"^\s*class\s+(\w+)", r"^\s*(?:export\s+)?(?:async\s+)?function\s+(\w+)", r"^\s*(?:export\s+)?class\s+(\w+)", r"^\s*export\s+(?:const|let|var)\s+(\w+)"]
         rows = []
         for number, line in enumerate(text.splitlines(), 1):
