@@ -58,6 +58,21 @@ class RunService:
         with self._active_lock:
             return self._active_loop
 
+    def status_snapshot(self) -> dict[str, Any]:
+        """Return a bounded diagnostic view of the service and active loop."""
+        with self._active_lock:
+            loop = self._active_loop
+            starting = self._starting
+            pending_pause = self._pending_pause
+            pending_cancel = self._pending_cancel is not None
+        snapshot = loop.status_snapshot() if loop is not None else {"active": False}
+        snapshot.update({
+            "service_starting": starting,
+            "pending_pause": pending_pause,
+            "pending_cancel": pending_cancel,
+        })
+        return snapshot
+
     def pause(self) -> dict[str, Any]:
         loop = self._current_loop()
         if loop is None:

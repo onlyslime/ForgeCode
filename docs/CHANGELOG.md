@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.8.6 — 2026-08-30
+
+- Exposed the bounded live run snapshot through `RunService`, including
+  startup and pending-control state for CLI/RPC clients.
+- Verification: service status unit test and manual startup/idle race review.
+
 ## v0.8.5 — 2026-08-30
 
 - Added a bounded AgentLoop status snapshot with lifecycle, step, timing,
