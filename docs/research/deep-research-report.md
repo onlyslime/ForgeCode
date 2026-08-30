@@ -969,6 +969,14 @@ SHA `1d605501b2a3164d9effca75a6940d67ae833abb`）。当前 schema 仍明确包�
 permissions/MCP 五个布尔域；ForgeCode 的 `[approval_scopes]` 仍是风险域近似，
 并不覆盖这些 Codex 专用维度。
 
+### 最新门禁证据（v0.7.26）
+
+- 完整回归：`512 passed, 8 skipped, 2 warnings`（3 分 21 秒）。skip 均为当前
+  Windows 账户无法创建 symlink；warnings 为既有 pytest collection warning。
+- `forgecode doctor`、`python -m compileall -q src`、`git diff --check` 均通过。
+- RPC/embedding/工具策略/后台任务/语义工具的定向测试均在完整回归中覆盖；未发现
+  JSONL、审批或 WorkspaceGuard 回归。
+
 - OpenCode 官方 Tools 页面当前可访问（HTTP 200），明确列出 `read`、`write`、
   `edit`、`bash`、`grep`、`glob` 以及 experimental `lsp`；这验证了 ForgeCode
   已有基础读写/搜索工具，但仍缺少真正语言服务器协议和更多编辑语义。
