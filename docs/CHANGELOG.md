@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.198 — 2026-08-31
+
+- **Background status boundaries:** process status, polling, and listing now honor cancellation and active deadlines while preserving the legacy context-free status API.
+- **Verification:** background-tool regression tests passed after correcting context-free compatibility, with compile and diff checks clean.
+
 ## v0.8.197 — 2026-08-31
 
 - **Command deadline finalization:** `run_command` now rejects successful-looking subprocess output when final result assembly crosses an active run deadline.

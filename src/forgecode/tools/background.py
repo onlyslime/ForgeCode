@@ -208,6 +208,10 @@ class RunBackgroundTool:
     def execute(self, arguments, context):
         if not isinstance(arguments, dict):
             raise ValueError("arguments must be an object")
+        if context is not None and context.cancelled:
+            return ToolResult(False, "process status cancelled before lookup", {"error": "cancelled"})
+        if context is not None and context.remaining_seconds(5.0) <= 0:
+            return ToolResult(False, "process status skipped because the run deadline has expired", {"error": "deadline_exceeded"})
         denied = context.deny_if_plan(self.definition.name)
         if denied: return denied
         command = arguments.get("command")
@@ -231,6 +235,10 @@ class ProcessStatusTool:
     def execute(self, arguments, context):
         if not isinstance(arguments, dict):
             raise ValueError("arguments must be an object")
+        if context is not None and context.cancelled:
+            return ToolResult(False, "process status cancelled before lookup", {"error": "cancelled"})
+        if context is not None and context.remaining_seconds(5.0) <= 0:
+            return ToolResult(False, "process status skipped because the run deadline has expired", {"error": "deadline_exceeded"})
         task_id = arguments.get("task_id")
         if not isinstance(task_id, str) or not task_id.strip() or any(ch in task_id for ch in "\r\n"):
             raise ValueError("task_id must be non-empty newline-safe text")
@@ -243,6 +251,10 @@ class ListProcessesTool:
     def execute(self, arguments, context):
         if not isinstance(arguments, dict):
             raise ValueError("arguments must be an object")
+        if context.cancelled:
+            return ToolResult(False, "process listing cancelled before lookup", {"error": "cancelled"})
+        if context.remaining_seconds(5.0) <= 0:
+            return ToolResult(False, "process listing skipped because the run deadline has expired", {"error": "deadline_exceeded"})
         rows = self.manager.list()
         def render(row: dict[str, Any]) -> str:
             pid = row.get("pid", "unknown")
@@ -255,6 +267,10 @@ class PollProcessTool(ProcessStatusTool):
     def execute(self, arguments, context):
         if not isinstance(arguments, dict):
             raise ValueError("arguments must be an object")
+        if context.cancelled:
+            return ToolResult(False, "process poll cancelled before lookup", {"error": "cancelled"})
+        if context.remaining_seconds(5.0) <= 0:
+            return ToolResult(False, "process poll skipped because the run deadline has expired", {"error": "deadline_exceeded"})
         cursor = arguments.get("cursor", 0)
         if isinstance(cursor, bool) or not isinstance(cursor, int) or cursor < 0: raise ValueError("cursor must be a non-negative integer")
         task_id = arguments.get("task_id")
