@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.7.21 — 2026-08-30
+
+- Added `symbol_hover`, a bounded static symbol definition/context tool that
+  safely degrades when no definition is found and explicitly reports
+  `precision = "static"`.
+- Included the tool in read-only policy and discovery surfaces.
+
 ## v0.7.20 — 2026-08-30
 
 - Added the read-only `git_worktrees` tool to inspect bounded worktree paths,

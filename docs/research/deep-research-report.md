@@ -691,7 +691,7 @@ CLI/TUI
 | 验证 | 测试 profile、有限修复、review/export、轨迹评估 | 缺少语言服务和调试器集成 | P1 |
 | 扩展发布 | Skills、hooks、SDK、JSONL RPC、工具收窄、uv/独立二进制布局 | 缺少 MCP、插件市场、跨平台一键安装 | P2 |
 
-截至当前 v0.7.20，正常交互工作流还提供 `/context`（有界索引健康度）和
+截至当前 v0.7.21，正常交互工作流还提供 `/context`（有界索引健康度）和
 `/events [limit] [kind]`（可筛选、带相对耗时和错误码的持久化事件尾部）。
 这些能力不改变工具权限，只把已有审计证据暴露给用户；对应交互、机器契约和
 provider 回归测试均已通过。
@@ -888,6 +888,13 @@ scope allow/deny 与 fallback 全局策略。该字段只描述策略路径，�
 - **验证**：工具策略定向测试、compileall 和 diff 检查通过。
 - **修补**：将 `git_worktrees` 纳入 read_only 风险组及配置 known-tools 校验，避免
   新工具在不同策略入口出现可见性不一致。
+
+### 0.7.21 实施审计：静态 symbol hover（2026-08-30）
+
+- **范围**：新增 `symbol_hover`，返回符号定义行及最多 10 行邻近上下文；结果明确
+  `precision=static`，不导入或执行项目代码。
+- **非目标**：不声称实现 LSP hover/type inference，不启动语言服务器，不修改文件。
+- **验证**：定向工具策略测试 17 passed，compileall 与 diff 检查通过。
 
 ### 当前差距复核（v0.7.19）
 

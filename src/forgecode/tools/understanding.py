@@ -88,6 +88,26 @@ class FindReferencesTool:
             if len(rows) >= 500: break
         return ToolResult(True, "\n".join(f"{item['path']}:{item['line']} {item['text']}" for item in rows) or "no references found", {"symbol": symbol, "matches": rows, "count": len(rows)})
 
+
+class SymbolHoverTool:
+    definition = ToolDefinition("symbol_hover", "Show a bounded static definition and nearby source context for a symbol.", {"type":"object","properties":{"symbol":{"type":"string"},"path":{"type":"string"},"context_lines":{"type":"integer"}},"required":["symbol"]})
+    def execute(self, arguments, context):
+        symbol = _required(arguments, "symbol")
+        if not isinstance(symbol, str) or not re.fullmatch(r"[A-Za-z_]\w{0,127}", symbol): raise ValueError("symbol must be a simple identifier")
+        radius = arguments.get("context_lines", 2)
+        if isinstance(radius, bool) or not isinstance(radius, int) or not 0 <= radius <= 10: raise ValueError("context_lines must be between 0 and 10")
+        pattern = re.compile(rf"^\s*(?:(?:async)\s+)?(?:def|class|function|export\s+(?:async\s+)?function|export\s+class)\s+{re.escape(symbol)}\b")
+        for path in _source_files(context, arguments.get("path")):
+            try: lines = path.read_text(encoding="utf-8").splitlines()
+            except (OSError, UnicodeError): continue
+            for number, line in enumerate(lines, 1):
+                if pattern.search(line):
+                    start, end = max(1, number-radius), min(len(lines), number+radius)
+                    snippet = "\n".join(f"{i} | {lines[i-1]}" for i in range(start, end+1))
+                    data = {"symbol": symbol, "path": context.guard.relative(path), "line": number, "context_lines": radius, "snippet": snippet, "precision": "static"}
+                    return ToolResult(True, snippet, data)
+        return ToolResult(True, "definition not found", {"symbol": symbol, "matches": [], "precision": "static"})
+
 class FileMetadataTool:
     definition = ToolDefinition("file_metadata", "Show bounded metadata including size, lines, encoding, modified time, and SHA-256.", {"type":"object","properties":{"path":{"type":"string"}},"required":["path"]})
     def __init__(self, guard): self.guard = guard

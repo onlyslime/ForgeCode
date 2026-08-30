@@ -83,6 +83,15 @@ def test_read_only_group_includes_worktree_inspection() -> None:
     assert policy.allow == ("git_worktrees",)
 
 
+def test_symbol_hover_returns_static_bounded_context(tmp_path) -> None:
+    from forgecode.tools import SymbolHoverTool
+    (tmp_path / "sample.py").write_text("x = 1\ndef answer():\n    return x\n", encoding="utf-8")
+    guard = WorkspaceGuard(tmp_path)
+    result = SymbolHoverTool().execute({"symbol": "answer", "path": "sample.py", "context_lines": 1}, ToolContext(guard))
+    assert result.ok and result.metadata["precision"] == "static"
+    assert "answer" in result.output and "return x" in result.output
+
+
 def test_registry_policy_intersection_preserves_stable_unavailable_result(tmp_path: Path) -> None:
     guard = WorkspaceGuard(tmp_path)
     base = build_default_registry(guard)
