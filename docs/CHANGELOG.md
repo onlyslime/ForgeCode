@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.7.42 — 2026-08-30
+
+- `session.events` now accepts an optional bounded `type` filter, making RPC
+  event polling cursor-friendly without streaming unbounded data.
+- Responses echo the filter and retain existing `after`, `limit`, and truncation
+  metadata for deterministic clients.
+
 ## v0.7.41 — 2026-08-30
 
 - `rpc.describe` now publishes an explicit approval capability catalog: supported

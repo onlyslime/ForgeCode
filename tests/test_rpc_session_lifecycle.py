@@ -435,6 +435,15 @@ def test_rpc_session_events_reports_cursor_is_current(tmp_path):
     assert data["truncated"] is False
 
 
+def test_rpc_session_events_can_filter_by_type(tmp_path):
+    handle = _call({"method": "session.open", "params": {"workspace": str(tmp_path)}})["data"]["session"]
+    _call({"method": "session.pause", "params": {"session": handle}})
+    _call({"method": "session.resume", "params": {"session": handle}})
+    data = _call({"method": "session.events", "params": {"session": handle, "type": "pause"}})["data"]
+    assert data["type"] == "pause"
+    assert data["events"] and all(item["type"] == "pause" for item in data["events"])
+
+
 def test_rpc_session_handle_can_be_recovered_from_workspace_metadata(tmp_path):
     opened = _call({"method": "session.open", "params": {"workspace": str(tmp_path)}})
     handle = opened["data"]["session"]

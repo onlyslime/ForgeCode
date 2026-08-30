@@ -547,7 +547,11 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                             raise ValueError("session.events.after must be a non-negative integer")
                         if isinstance(limit, bool) or not isinstance(limit, int) or limit < 1:
                             raise ValueError("session.events.limit must be a positive integer")
-                        events = [item for item in info.get("events", []) if int(item.get("sequence", 0)) > after]
+                        event_type = params.get("type")
+                        if event_type is not None and (not isinstance(event_type, str) or not event_type or len(event_type) > 64 or any(ch in event_type for ch in "\r\n")):
+                            raise ValueError("session.events.type must be bounded text")
+                        events = [item for item in info.get("events", []) if int(item.get("sequence", 0)) > after and (event_type is None or item.get("type") == event_type)]
+                        data["type"] = event_type
                         data["events"] = events[: min(limit, 100)]
                         data["next_sequence"] = int(data["events"][-1]["sequence"]) if data["events"] else after
                         retained = info.get("events", [])

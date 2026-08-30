@@ -675,7 +675,7 @@ CLI/TUI
 - [x] 每个 P0/P1 能力都有可执行验收标准或演示场景。
 - [x] 已明确竞品参考与本题自研实现的边界，避免误用现成 agent 框架。
 
-## ForgeCode 当前差距复核（2026-08-30，v0.7.41）
+## ForgeCode 当前差距复核（2026-08-30，v0.7.42）
 
 本节以当前仓库源码、定向测试和正常 `fcc` 工作流为准；竞品能力只作为产品
 形态基线，不把未能直接访问的页面当作已验证事实。OpenAI 官方 Codex 页面在
@@ -1209,3 +1209,7 @@ pytest collection warning。
 而不只是 CLI 文本。ForgeCode 当前 JSONL RPC 已有 session 事件、暂停/恢复/取消和
 能力描述，但尚未提供等价的 thread/turn 通知 schema。后续应先定义稳定事件类型和
 客户端订阅边界，再考虑长期 daemon，避免堆叠未经审计的后台功能。
+v0.7.42 在此基础上为 `session.events` 增加有界 `type` 过滤；客户端可以用
+`after + limit + type` 稳定轮询单类事件，并继续获得 `next_sequence`、
+`oldest_sequence` 与 `truncated` 游标信息。这是向 Codex thread/turn 通知模型
+迈出的兼容性步骤，但仍不是无限流式订阅或长期 daemon。
