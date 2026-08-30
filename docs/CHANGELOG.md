@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.91 — 2026-08-31
+
+- Serialized background state snapshots with the manager's re-entrant lock,
+  preventing inconsistent `_items`/`_stale` reads during concurrent persistence.
+- Verification: concurrent persistence regression, background tests,
+  compileall, and diff checks passed.
+
 ## v0.8.90 — 2026-08-31
 
 - Added consistent object-argument validation to all core filesystem tools,

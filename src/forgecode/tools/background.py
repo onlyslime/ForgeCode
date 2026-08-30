@@ -31,7 +31,7 @@ class ProcessManager:
         self.max_history = max_history
         self._items: dict[str, _Process] = {}
         self._stale: dict[str, dict[str, Any]] = {}
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
         if state_path is None:
             self._state_path = None
         else:
@@ -66,6 +66,11 @@ class ProcessManager:
     def _persist_state(self) -> None:
         if self._state_path is None:
             return
+        with self._lock:
+            self._persist_state_locked()
+
+    def _persist_state_locked(self) -> None:
+        """Persist a state snapshot; caller may already hold ``_lock``."""
         try:
             assert_no_path_alias(self._state_path.parent, message="background state directory is a symlink or junction alias")
             assert_no_path_alias(self._state_path, message="background state path is a symlink or junction alias")
