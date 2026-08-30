@@ -17,6 +17,9 @@ def test_rpc_describe_exposes_versioned_session_capabilities() -> None:
     assert payload["kind"] == "capabilities" and payload["data"]["version"] == 1
     assert "session.cancel" in payload["data"]["methods"]
     assert payload["data"]["safety"]["no_automatic_replay"] is True
+    tools = payload["data"]["tools"]
+    assert any(item["name"] == "git_worktree_create" and item["side_effecting"] for item in tools)
+    assert payload["data"]["tool_capabilities_scope"].startswith("built_in_catalog")
 
 
 def test_rpc_describe_honors_request_id_replay_contract() -> None:

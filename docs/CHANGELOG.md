@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.7.35 — 2026-08-30
+
+- `rpc.describe` now exposes a bounded built-in tool capability catalog with
+  risk groups and side-effect markers, while explicitly stating that active
+  policies may narrow the catalog and that discovery is not authorization.
+- Added machine-contract coverage for tool capability discovery.
+
 ## v0.7.34 — 2026-08-30
 
 - Added a 256 KiB bound and strict key/value validation when reading managed

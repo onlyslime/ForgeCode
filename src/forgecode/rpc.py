@@ -35,6 +35,31 @@ _MAX_SESSION_EVENTS = 512
 _MAX_REQUEST_LINE_BYTES = 1_048_576
 _MAX_SESSION_RESULT_BYTES = 262_144
 
+# Stable capability metadata for clients that cannot invoke the workspace-bound
+# ``tools`` command yet.  Keep this list declarative and bounded; it is not an
+# authorization grant and the active tool policy may still narrow it.
+_RPC_TOOL_CAPABILITIES = tuple(
+    {"name": name, "risk": risk, "side_effecting": side_effecting}
+    for name, risk, side_effecting in (
+        ("list_files", "read_only", False), ("read_file", "read_only", False),
+        ("search", "read_only", False), ("write_file", "changes", True),
+        ("apply_patch", "changes", True), ("run_command", "execution", True),
+        ("workspace_summary", "read_only", False), ("repository_map", "read_only", False),
+        ("git_status", "read_only", False), ("git_diff", "read_only", False),
+        ("git_log", "read_only", False), ("git_commit", "changes", True),
+        ("git_worktrees", "read_only", False), ("git_worktree_create", "changes", True),
+        ("git_worktree_remove", "changes", True), ("test", "evidence", True),
+        ("diagnostics", "evidence", True), ("find_files", "read_only", False),
+        ("read_range", "read_only", False), ("list_symbols", "read_only", False),
+        ("file_metadata", "read_only", False), ("find_definition", "read_only", False),
+        ("find_references", "read_only", False), ("symbol_hover", "read_only", False),
+        ("lsp_status", "read_only", False),
+        ("run_background", "execution", True), ("process_status", "execution", False),
+        ("poll_process", "execution", False), ("list_processes", "execution", False),
+        ("kill_process", "execution", True),
+    )
+)
+
 
 def _isolated_session_run(handle: str, argv: list[str]) -> None:
     """Execute a background request in a killable child process."""
@@ -261,7 +286,7 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                     raise ValueError("method must be bounded non-whitespace text")
                 method_map = {"trust.status": ["trust", "status"], "trust.grant": ["trust", "grant"], "trust.revoke": ["trust", "revoke"], "provider.list": ["provider", "list"], "provider.health": ["provider", "health"], "config.show": ["config", "show"], "config.profiles": ["config", "profiles"], "config.policy": ["config", "policy"], "doctor": ["doctor"], "login": ["login"], "run": ["run"], "session.open": ["session", "open"], "session.run": ["run"], "session.list": ["sessions"], "session.events": ["session", "events"], "session.cancel": ["session", "cancel"], "session.pause": ["session", "pause"], "session.resume": ["session", "resume"], "session.approval": ["session", "approval"], "session.close": ["session", "close"], "session.status": ["session", "status"], "session.result": ["session", "result"], "session.wait": ["session", "wait"], "session.inspect": ["session", "inspect"], "session.tree": ["session", "tree"], "session.export": ["session", "export"]}
                 if method == "rpc.describe":
-                    payload = {"schema_version": 1, "kind": "capabilities", "ok": True, "command": "rpc.describe", "data": {"protocol": "forgecode-jsonl-rpc", "version": 1, "methods": ["rpc.describe", *sorted(method_map)], "session_controls": ["open", "run", "status", "events", "result", "wait", "pause", "resume", "cancel", "approval", "close"], "safety": {"workspace_guard": True, "approval_required_for_side_effects": True, "no_automatic_replay": True}}, "exit_code": 0}
+                    payload = {"schema_version": 1, "kind": "capabilities", "ok": True, "command": "rpc.describe", "data": {"protocol": "forgecode-jsonl-rpc", "version": 1, "methods": ["rpc.describe", *sorted(method_map)], "tools": list(_RPC_TOOL_CAPABILITIES), "tool_capabilities_scope": "built_in_catalog; active policy may narrow", "session_controls": ["open", "run", "status", "events", "result", "wait", "pause", "resume", "cancel", "approval", "close"], "safety": {"workspace_guard": True, "approval_required_for_side_effects": True, "no_automatic_replay": True}}, "exit_code": 0}
                     encoded = json.dumps(payload, ensure_ascii=False, allow_nan=False)
                     if request_id is not None:
                         with _SESSION_LOCK:
