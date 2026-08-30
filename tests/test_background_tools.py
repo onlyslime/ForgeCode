@@ -127,6 +127,14 @@ def test_background_manager_validates_task_ids_at_public_api(tmp_path):
             manager.snapshot(value)
 
 
+def test_background_snapshot_unknown_task_is_safe_during_concurrent_reads(tmp_path):
+    manager = ProcessManager()
+    import concurrent.futures
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
+        rows = list(pool.map(lambda _: manager.snapshot("missing"), range(32)))
+    assert all(row["error"] == "unknown_task" for row in rows)
+
+
 def test_background_output_is_hard_bounded_and_completion_duration_stable(tmp_path):
     guard = WorkspaceGuard(tmp_path); context = ToolContext(guard, AllowAllApproval())
     manager = ProcessManager(max_output_chars=12)

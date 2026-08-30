@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.87 — 2026-08-31
+
+- Protected stale background-task lookups with the manager lock, preventing
+  races between snapshot reads and concurrent task cleanup.
+- Verification: concurrent unknown-task snapshot regression, manual stress
+  check, compileall, and diff checks passed.
+
 ## v0.8.86 — 2026-08-31
 
 - Enforced task-ID validation in public `ProcessManager.get()` and

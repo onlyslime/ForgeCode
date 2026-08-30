@@ -163,7 +163,8 @@ class ProcessManager:
             raise ValueError("cursor must be a non-negative integer")
         item = self.get(task_id)
         if item is None:
-            stale = self._stale.get(task_id)
+            with self._lock:
+                stale = self._stale.get(task_id)
             return {**stale, "task_id": task_id} if stale is not None else {"error": "unknown_task", "task_id": task_id}
         with item.lock: lines = item.output[cursor:]; total = len(item.output); truncated = item.truncated
         code = item.process.poll()
