@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.197 — 2026-08-31
+
+- **Command deadline finalization:** `run_command` now rejects successful-looking subprocess output when final result assembly crosses an active run deadline.
+- **Verification:** command-boundary and cancellation tests, compile, and diff checks passed.
+
 ## v0.8.196 — 2026-08-31
 
 - **Responsive file listing:** `list_files` now polls cancellation and deadlines while traversing dense directories, reducing control latency when a single directory contains many entries.

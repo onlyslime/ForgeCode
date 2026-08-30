@@ -277,6 +277,8 @@ class ShellTool:
         stdout, stdout_truncated = _bounded(_text(stdout_value))
         stderr, stderr_truncated = _bounded(_text(stderr_value))
         output = f"[stdout]\n{stdout}\n[stderr]\n{stderr}"
+        if context.deadline_monotonic is not None and context.remaining_seconds(0) <= 0:
+            return ToolResult(False, output + "\ncommand result discarded because the run deadline expired", {"error": "deadline_exceeded", "timed_out": True, "command": command, "exit_code": process.returncode, "approval": "approved", "stdout": stdout, "stderr": stderr, "duration_seconds": round(time.monotonic() - started, 3), "started_at": started_at, "ended_at": datetime.now(timezone.utc).isoformat(), "truncated": stdout_truncated or stderr_truncated, **risk_metadata})
         return ToolResult(process.returncode == 0, output, {"command": command, "exit_code": process.returncode, "approval": "approved", "mutated": risk != "normal", "stdout": stdout, "stderr": stderr, "duration_seconds": round(time.monotonic() - started, 3), "started_at": started_at, "ended_at": datetime.now(timezone.utc).isoformat(), "truncated": stdout_truncated or stderr_truncated, **risk_metadata})
 
 
