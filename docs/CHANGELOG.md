@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.135 — 2026-08-31
+
+- **Transport result validation:** normalize and bound status, body, and headers returned by custom transports, converting malformed values into clear `ValueError`s.
+- **Verification:** provider tests, compile checks, and manual malformed-transport inspection passed.
+
 ## v0.8.134 — 2026-08-31
 
 - **Ollama response validation:** reject non-object messages and malformed tool-call arrays before provider translation.

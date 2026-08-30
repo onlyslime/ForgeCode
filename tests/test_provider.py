@@ -5,7 +5,7 @@ import pytest
 
 from forgecode.models import Message, ModelResponse, OpenAICompatibleProvider, ProviderError, ToolCall, is_valid_response, parse_chat_completion, assemble_chat_stream
 from forgecode.models.openai_compatible import _tool_schema_to_payload
-from forgecode.models.factory import _ProtocolTransport
+from forgecode.models.factory import _ProtocolTransport, _json_result
 
 
 class RecordingTransport:
@@ -176,6 +176,11 @@ def test_ollama_transport_rejects_invalid_message():
     transport = _ProtocolTransport(object(), "ollama", "secret")
     with pytest.raises(ValueError, match="message must be an object"):
         transport._response(json.dumps({"message": []}).encode())
+
+
+def test_transport_result_rejects_invalid_status():
+    with pytest.raises(ValueError, match="invalid HTTP status"):
+        _json_result((True, b"{}"))
 
 
 def test_provider_neutral_response_validation_rejects_nonfinite_usage_and_bad_finish_reason():

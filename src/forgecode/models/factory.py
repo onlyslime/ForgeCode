@@ -16,7 +16,17 @@ from ..config import SUPPORTED_PROVIDERS
 def _json_result(result: Any) -> tuple[int, bytes, dict[str, str]]:
     if not isinstance(result, tuple) or len(result) not in (2, 3):
         raise ValueError("transport returned invalid tuple")
-    return int(result[0]), bytes(result[1]), dict(result[2]) if len(result) == 3 else {}
+    try:
+        status = int(result[0])
+        body = bytes(result[1])
+        headers = dict(result[2]) if len(result) == 3 else {}
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise ValueError("transport returned invalid result fields") from exc
+    if isinstance(result[0], bool) or status < 100 or status > 599:
+        raise ValueError("transport returned invalid HTTP status")
+    if not isinstance(headers, dict):
+        raise ValueError("transport returned invalid headers")
+    return status, body, headers
 
 
 class _ProtocolTransport:
