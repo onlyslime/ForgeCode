@@ -149,6 +149,8 @@ def is_valid_response(response: Any) -> bool:
         # adapters, so custom providers cannot poison run metrics.
         if value < 0:
             return False
+        if isinstance(value, int) and value.bit_length() >= 3_322:
+            return False
     if not isinstance(response.message.tool_calls, tuple):
         return False
     seen_ids: set[str] = set()

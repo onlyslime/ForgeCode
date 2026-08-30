@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.8.36 — 2026-08-30
+
+- Applied the oversized-integer bound to provider usage counters as well as
+  tool arguments, preventing custom providers from corrupting metrics with
+  extreme numeric values.
+- Verification: provider tests, compileall, diff checks, and manual usage
+  boundary validation passed.
+
 ## v0.8.35 — 2026-08-30
 
 - Hardened oversized-integer validation to use `bit_length()` instead of
