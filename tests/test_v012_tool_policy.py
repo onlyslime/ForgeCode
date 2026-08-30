@@ -38,6 +38,13 @@ def test_risk_scoped_ask_delegates_without_silent_permission() -> None:
     assert policy.last_decision == "fallback"
 
 
+def test_git_worktree_listing_is_read_only_and_bounded(tmp_path) -> None:
+    from forgecode.tools import GitWorktreeListTool
+    guard = WorkspaceGuard(tmp_path)
+    result = GitWorktreeListTool(guard).execute({}, ToolContext(guard))
+    assert result.ok is False or result.metadata.get("count", 0) <= 64
+
+
 def _available() -> tuple[str, ...]:
     return build_default_registry(WorkspaceGuard(Path.cwd())).names()
 

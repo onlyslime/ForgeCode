@@ -65,6 +65,41 @@ class GitLogTool:
         return ToolResult(True, result.stdout[:8_000] or "no commits", {"count": len(result.stdout.splitlines()), "exit_code": 0})
 
 
+class GitWorktreeListTool:
+    definition = ToolDefinition("git_worktrees", "List Git worktrees without creating, switching, or mutating them.", {"type": "object", "additionalProperties": False})
+
+    def __init__(self, guard):
+        self.guard = guard
+
+    def execute(self, arguments, context):
+        try:
+            result = subprocess.run(["git", "worktree", "list", "--porcelain"], cwd=context.guard.root, capture_output=True, text=True, timeout=min(15.0, context.remaining_seconds(15.0)), check=False)
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            return ToolResult(False, f"git worktree list failed: {type(exc).__name__}", {"error": "git_worktree_list_failed"})
+        if result.returncode != 0:
+            return ToolResult(False, result.stderr.strip()[:4_000] or "not a Git repository", {"exit_code": result.returncode})
+        rows = []
+        current = None
+        for line in result.stdout.splitlines():
+            if line.startswith("worktree "):
+                if current: rows.append(current)
+                raw = line[9:].strip()
+                try: path = context.guard.relative(context.guard.resolve(raw))
+                except Exception: path = "<outside-workspace>"
+                current = {"path": path}
+            elif current is not None and line.startswith("HEAD "):
+                current["head"] = line[5:].strip()[:80]
+            elif current is not None and line == "bare":
+                current["bare"] = True
+            elif current is not None and line == "detached":
+                current["detached"] = True
+            elif current is not None and line.startswith("branch "):
+                current["branch"] = line[7:].removeprefix("refs/heads/")[:160]
+        if current: rows.append(current)
+        rows = rows[:64]
+        return ToolResult(True, "\n".join(f"{row.get('path')} {row.get('branch', 'detached')}" for row in rows) or "no worktrees", {"worktrees": rows, "count": len(rows), "exit_code": 0})
+
+
 class GitCommitTool:
     definition = ToolDefinition("git_commit", "Create a Git commit for current changes after explicit approval.", {"type": "object", "properties": {"message": {"type": "string"}}, "required": ["message"], "additionalProperties": False}, side_effecting=True)
 

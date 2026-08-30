@@ -691,7 +691,7 @@ CLI/TUI
 | 验证 | 测试 profile、有限修复、review/export、轨迹评估 | 缺少语言服务和调试器集成 | P1 |
 | 扩展发布 | Skills、hooks、SDK、JSONL RPC、工具收窄、uv/独立二进制布局 | 缺少 MCP、插件市场、跨平台一键安装 | P2 |
 
-截至当前 v0.7.19，正常交互工作流还提供 `/context`（有界索引健康度）和
+截至当前 v0.7.20，正常交互工作流还提供 `/context`（有界索引健康度）和
 `/events [limit] [kind]`（可筛选、带相对耗时和错误码的持久化事件尾部）。
 这些能力不改变工具权限，只把已有审计证据暴露给用户；对应交互、机器契约和
 provider 回归测试均已通过。
@@ -878,6 +878,14 @@ Codex 官方页面或未实现的竞品特性当作本项目已完成能力。
 `RiskScopedApproval` 现在在审批事件中记录 `decision_source`，区分具体风险域的
 scope allow/deny 与 fallback 全局策略。该字段只描述策略路径，不包含命令、内容或
 凭据，便于 `/events` 和 JSONL 审计解释“为什么被允许或拒绝”。
+
+### 0.7.20 实施审计：只读 worktree 发现（2026-08-30）
+
+- **范围**：新增 `git_worktrees` 工具，调用 `git worktree list --porcelain`，返回
+  经 WorkspaceGuard 校验的路径、分支和 HEAD，最多 64 条。
+- **非目标**：不创建、切换、删除或合并 worktree，不提供并发隔离；这些仍是后续 P1/P2
+  设计项。
+- **验证**：工具策略定向测试、compileall 和 diff 检查通过。
 
 ### 当前差距复核（v0.7.19）
 

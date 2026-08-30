@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.7.20 — 2026-08-30
+
+- Added the read-only `git_worktrees` tool to inspect bounded worktree paths,
+  branches, and HEADs without creating, switching, or mutating worktrees.
+- The listing is workspace-validated and capped at 64 entries.
+
 ## v0.7.19 — 2026-08-30
 
 - Approval audit events now identify whether a scoped allow/deny or the global

@@ -4,7 +4,7 @@ from .patch import ApplyPatchTool, ChangeOperation, ChangePlan, ChangeResult, Pa
 from .summary import WorkspaceSummaryTool
 from .repository_map import RepositoryMapTool
 from .shell import AllowAllApproval, DenyAllApproval, InteractiveApproval, RiskScopedApproval, ShellTool
-from .git import GitCommitTool, GitDiffTool, GitLogTool, GitStatusTool
+from .git import GitCommitTool, GitDiffTool, GitLogTool, GitStatusTool, GitWorktreeListTool
 from .quality import DiagnosticsTool, FindFilesTool, TestTool
 from .understanding import FileMetadataTool, FindDefinitionTool, FindReferencesTool, ListSymbolsTool, ReadRangeTool
 from .background import KillProcessTool, ListProcessesTool, PollProcessTool, ProcessManager, ProcessStatusTool, RunBackgroundTool
@@ -25,6 +25,7 @@ def build_default_registry(guard) -> ToolRegistry:
     registry.register(GitStatusTool(guard))
     registry.register(GitDiffTool(guard))
     registry.register(GitLogTool(guard))
+    registry.register(GitWorktreeListTool(guard))
     registry.register(GitCommitTool(guard))
     registry.register(FindFilesTool(guard))
     registry.register(TestTool(guard))
@@ -68,6 +69,7 @@ __all__ = [
     "GitCommitTool",
     "GitLogTool",
     "GitStatusTool",
+    "GitWorktreeListTool",
     "DiagnosticsTool",
     "FindFilesTool",
     "TestTool",
