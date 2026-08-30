@@ -160,6 +160,12 @@ def test_provider_transport_rejects_non_object_response():
         transport._response(b"[]")
 
 
+def test_anthropic_transport_rejects_invalid_content_blocks():
+    transport = _ProtocolTransport(object(), "anthropic", "secret")
+    with pytest.raises(ValueError, match="content must be a list"):
+        transport._response(json.dumps({"content": {"type": "text"}}).encode())
+
+
 def test_provider_neutral_response_validation_rejects_nonfinite_usage_and_bad_finish_reason():
     assert not is_valid_response(ModelResponse(Message("assistant", "ok"), finish_reason="made_up"))
     assert not is_valid_response(ModelResponse(Message("assistant", "ok"), usage={"total_tokens": float("nan")}))

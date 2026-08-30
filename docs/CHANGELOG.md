@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.132 — 2026-08-31
+
+- **Anthropic response validation:** reject non-list or non-object content blocks before provider translation, avoiding leaked attribute errors on malformed responses.
+- **Verification:** provider tests, compile checks, and manual malformed-content inspection passed.
+
 ## v0.8.131 — 2026-08-31
 
 - **Transport response validation:** provider factory adapters now reject malformed or non-object response bodies before provider-specific field access.

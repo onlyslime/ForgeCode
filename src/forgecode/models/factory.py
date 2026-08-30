@@ -117,6 +117,8 @@ class _ProtocolTransport:
             raise ValueError("provider response body must be an object")
         if self.provider == "anthropic":
             blocks = data.get("content", [])
+            if not isinstance(blocks, list) or any(not isinstance(block, dict) for block in blocks):
+                raise ValueError("anthropic response content must be a list of objects")
             text = "".join(str(b.get("text", "")) for b in blocks if b.get("type") == "text")
             calls = [{"id": b.get("id", "call"), "type": "function", "function": {"name": b.get("name", ""), "arguments": json.dumps(b.get("input", {}))}} for b in blocks if b.get("type") == "tool_use"]
             data = {"choices": [{"message": {"role": "assistant", "content": text, "tool_calls": calls}, "finish_reason": "tool_calls" if calls else "stop"}], "usage": data.get("usage", {})}
