@@ -166,6 +166,12 @@ def test_provider_transport_rejects_invalid_request_headers():
         transport._request("https://example/v1/chat/completions", {"X-Test": 1}, b"{}")
 
 
+def test_provider_transport_rejects_control_character_url():
+    transport = _ProtocolTransport(object(), "anthropic", "secret")
+    with pytest.raises(ValueError, match="request URL is invalid"):
+        transport._request("https://example/\nchat/completions", {}, b"{}")
+
+
 def test_google_transport_rejects_non_object_tool_schema():
     transport = _ProtocolTransport(object(), "google", "secret")
     with pytest.raises(ValueError, match="tool schemas must be objects"):

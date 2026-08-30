@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.142 — 2026-08-31
+
+- **Transport URL safety:** reject control characters in custom transport URLs before provider-specific rewriting or network dispatch.
+- **Verification:** provider tests, compile checks, and manual malformed-URL inspection passed.
+
 ## v0.8.141 — 2026-08-31
 
 - **HTTP status strictness:** custom transport results now require an integer status code, rejecting floats and strings that could be silently coerced into valid codes.
