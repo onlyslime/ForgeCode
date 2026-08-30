@@ -84,6 +84,10 @@ Node/Python SDKs.
 - durable sessions, checkpoints, transaction undo, review, evaluation, and audit JSONL
 - skills, hooks, provider diagnostics, path completion, and machine-readable envelopes
 
+Integrations can call the read-only JSONL RPC method `rpc.describe` (or
+`forgecode.embed.rpc_describe()`) to discover the protocol version, session
+controls, and safety guarantees before opening a session.
+
 ## Interactive commands
 
 Type `/help` in `fcc` for the complete list. Useful starting points are

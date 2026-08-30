@@ -85,6 +85,9 @@ evidence = "allow"
 - skills、hooks、Node/Python SDK 和 JSONL RPC
 - 固定输入栏、多行粘贴、实时进度、事件筛选和 Esc 取消
 
+集成程序可以调用只读 JSONL RPC 方法 `rpc.describe`（或
+`forgecode.embed.rpc_describe()`），在创建会话前发现协议版本、会话控制方法和安全保证。
+
 ## 交互命令
 
 在 `fcc` 中输入 `/help` 查看全部命令。常用命令包括 `/mode`、`/tools`、`/files`、`/skills`、`/rules`、`/tree`、`/diff`、`/context`、`/events`、`/review`、`/compact`、`/cancel`、`/quit` 和 `/exit`。`/events 20 error` 可筛选最近的错误事件。
