@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.13 — 2026-08-30
+
+- Cached interactive `/status` aggregate metrics by the session event cursor,
+  avoiding repeated full JSONL scans when no new events exist.
+- Verification: CLI status tests passed; manual review confirmed cache
+  invalidation on append and unchanged malformed-stream diagnostics.
+
 ## v0.8.12 — 2026-08-30
 
 - Corrected live status semantics so recovery-required runs are reported as

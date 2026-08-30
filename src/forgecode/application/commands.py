@@ -1857,6 +1857,8 @@ def main(argv: list[str] | None = None) -> int:
         state = {"mode": args.mode, "last": None, "plan": None, "plan_targets": (), "reference_specs": (), "rules_fingerprint": "", "reference_fingerprint": "", "index_fingerprint": "", "last_message": "", "last_verification": None}
         active_service: RunService | None = None
         active_service_lock = threading.RLock()
+        status_metrics_cache: tuple[int, dict[str, Any]] | None = None
+        status_metrics_lock = threading.RLock()
         controller_holder: dict[str, InteractiveRunController | None] = {"value": None}
         shortcut_control: dict[str, Any] = {"token": None, "pause": None, "fingerprint": None}
         output_lock = threading.RLock()
@@ -2500,26 +2502,33 @@ def main(argv: list[str] | None = None) -> int:
             return {"cleared": True}
 
         def status() -> Any:
+            nonlocal status_metrics_cache
             manifests = transaction_store.list(limit=20)
             controller = controller_holder["value"]
             with active_service_lock:
                 service = active_service
-            metrics = {"provider_attempts": 0, "provider_retries": 0, "tool_calls": 0, "context_chars": 0}
-            try:
-                for event in session.read(strict=False):
-                    if event.kind == "model_request":
-                        metrics["provider_attempts"] += 1
-                        value = event.payload.get("context_chars", 0)
-                        if isinstance(value, int) and not isinstance(value, bool):
-                            metrics["context_chars"] += value
-                    elif event.kind == "provider_retry":
-                        metrics["provider_retries"] += 1
-                    elif event.kind == "tool_call":
-                        metrics["tool_calls"] += 1
-            except (OSError, ValueError):
-                # Status is diagnostic and must remain usable even when an
-                # older or partially written session stream has issues.
-                metrics["audit_read_error"] = True
+            sequence = session.last_sequence
+            with status_metrics_lock:
+                cached = status_metrics_cache if status_metrics_cache and status_metrics_cache[0] == sequence else None
+            if cached is not None:
+                metrics = dict(cached[1])
+            else:
+                metrics = {"provider_attempts": 0, "provider_retries": 0, "tool_calls": 0, "context_chars": 0}
+                try:
+                    for event in session.read(strict=False):
+                        if event.kind == "model_request":
+                            metrics["provider_attempts"] += 1
+                            value = event.payload.get("context_chars", 0)
+                            if isinstance(value, int) and not isinstance(value, bool):
+                                metrics["context_chars"] += value
+                        elif event.kind == "provider_retry":
+                            metrics["provider_retries"] += 1
+                        elif event.kind == "tool_call":
+                            metrics["tool_calls"] += 1
+                except (OSError, ValueError):
+                    metrics["audit_read_error"] = True
+                with status_metrics_lock:
+                    status_metrics_cache = (sequence, dict(metrics))
             worker = controller.snapshot() if controller is not None else {"active": False}
             if service is not None:
                 worker = {**worker, "loop": service.status_snapshot()}
