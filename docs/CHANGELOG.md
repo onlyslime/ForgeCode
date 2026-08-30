@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.163 — 2026-08-31
+
+- **Recovered task observability:** `list_processes` now safely renders stale tasks restored from disk even when runtime-only PID and duration fields are unavailable.
+- **Verification:** background-tool tests, compile checks, and manual stale-state inspection passed.
+
 ## v0.8.162 — 2026-08-31
 
 - **Workspace-summary deadlines:** summary scans now honor cancellation and run deadlines, including the nested Git status query, instead of using an unconditional five-second wait.

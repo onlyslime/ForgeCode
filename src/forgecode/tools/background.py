@@ -230,7 +230,11 @@ class ListProcessesTool:
         if not isinstance(arguments, dict):
             raise ValueError("arguments must be an object")
         rows = self.manager.list()
-        return ToolResult(True, "\n".join(f"{r['task_id']} {r['status']} pid={r['pid']} duration={r['duration_seconds']}s" for r in rows) or "no background tasks", {"tasks": rows, "count": len(rows)})
+        def render(row: dict[str, Any]) -> str:
+            pid = row.get("pid", "unknown")
+            duration = row.get("duration_seconds", "unknown")
+            return f"{row.get('task_id', '<unknown>')} {row.get('status', 'unknown')} pid={pid} duration={duration}s"
+        return ToolResult(True, "\n".join(render(row) for row in rows) or "no background tasks", {"tasks": rows, "count": len(rows)})
 
 class PollProcessTool(ProcessStatusTool):
     definition = ToolDefinition("poll_process", "Read new output from a background task using a cursor.", {"type":"object","properties":{"task_id":{"type":"string"},"cursor":{"type":"integer"}},"required":["task_id"]})

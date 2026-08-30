@@ -59,6 +59,15 @@ def test_persisted_failed_process_keeps_failed_status(tmp_path):
     assert restored.snapshot("failed-task")["status"] == "failed"
 
 
+def test_list_processes_renders_recovered_stale_task(tmp_path):
+    state = tmp_path / "background.json"
+    state.write_text('{"schema_version":1,"tasks":[{"task_id":"old-task","status":"running"}]}', encoding="utf-8")
+    manager = ProcessManager(state_path=state)
+    result = ListProcessesTool(WorkspaceGuard(tmp_path), manager).execute({}, ToolContext(WorkspaceGuard(tmp_path), AllowAllApproval()))
+    assert result.ok
+    assert "old-task stale pid=unknown duration=unknowns" in result.output
+
+
 def test_background_manager_rejects_duplicate_task_id(tmp_path):
     manager = ProcessManager()
     item = manager.start("python -c \"print('ok')\"", tmp_path, "same")
