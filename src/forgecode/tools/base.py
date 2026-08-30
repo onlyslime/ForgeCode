@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass, field
 import json
+import copy
 from enum import StrEnum
 from typing import Any, Callable, Protocol
 import time
@@ -210,7 +211,7 @@ class ToolRegistry:
                 "function": {
                     "name": self._definition_snapshots[name][0],
                     "description": self._definition_snapshots[name][1],
-                    "parameters": self._schema_snapshots[name],
+                    "parameters": copy.deepcopy(self._schema_snapshots[name]),
                 },
             }
             for name, tool in self._tools.items()
