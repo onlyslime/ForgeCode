@@ -146,8 +146,11 @@ class AgentLoop:
             if tool_name == "run_command" and isinstance(arguments, dict):
                 self._record("command_start", {"command": self._bounded_arguments(arguments.get("command", "")), "risk": arguments.get("_risk"), "risk_reasons": arguments.get("_risk_reasons", [])})
             safe_arguments = self._bounded_arguments(arguments)
-            self._record("approval_request", {"tool": tool_name, "arguments": safe_arguments})
-            self._record("approval", {"tool": tool_name, "arguments": safe_arguments, "approved": approved})
+            scope = "changes" if tool_name in {"write_file", "apply_patch", "git_commit", "git_worktree_create", "git_worktree_remove"} else ("execution" if tool_name in {"run_command", "run_background", "kill_process"} else ("evidence" if tool_name in {"test", "diagnostics"} else "other"))
+            policy_decision = getattr(context.approval, "last_decision", None) or getattr(getattr(self.context, "approval", None), "last_decision", None)
+            approval_metadata = {"tool": tool_name, "scope": scope, "arguments": safe_arguments}
+            self._record("approval_request", approval_metadata)
+            self._record("approval", {**approval_metadata, "approved": approved, "decision": "allow" if approved else "deny", "policy_decision": policy_decision or "fallback"})
             self._approvals.append({"tool": tool_name, "approved": approved})
 
         now = time.monotonic()

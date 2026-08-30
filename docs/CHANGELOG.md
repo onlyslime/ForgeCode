@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.7.47 — 2026-08-30
+
+- Approval audit events now carry a stable risk `scope`, normalized `decision`,
+  and the policy decision source alongside the existing bounded arguments.
+- This is additive observability only; approval, plan, trust, and WorkspaceGuard
+  enforcement remain unchanged.
+
 ## v0.7.46 — 2026-08-30
 
 - `session.events` now reports `has_more`, allowing clients to distinguish an

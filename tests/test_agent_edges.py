@@ -186,6 +186,8 @@ def test_approval_decision_is_recorded_in_session(tmp_path):
     events = list(session.read())
     approvals = [event for event in events if event.kind == "approval"]
     assert approvals and approvals[0].payload["approved"] is False
+    assert approvals[0].payload["decision"] == "deny"
+    assert approvals[0].payload["scope"] in {"changes", "execution", "evidence", "other"}
 
 
 def test_empty_response_and_max_steps_have_clear_stop_reasons(tmp_path):
