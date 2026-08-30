@@ -87,7 +87,7 @@ Completed · Verification passed · Worked for 18.4s · 4 tool steps
 | Understand | list and read files, search text/regex, repository map, symbols, definitions, references, metadata |
 | Modify | create files, atomic writes, unified patches, red/green previews, transaction records |
 | Verify | tests, diagnostics, bounded shell commands, stdout/stderr, exit codes, repair attempts |
-| Control | Plan, Act, Bypass, pause, resume, cancel/Esc, safe-boundary steering, follow-up queue |
+| Control | Plan, Act, Bypass, pause, resume, cancel/Esc, safe-boundary steering, follow-up queue, live lifecycle/timing status |
 | Context | `AGENTS.md` rules, explicit references, bounded user memory, incremental index, context search, compaction, health diagnostics |
 | Git | status, diff, log, worktrees, review, undo and recovery inspection |
 | Processes | background commands, status polling, output limits, safe termination |

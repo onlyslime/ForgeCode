@@ -27,6 +27,20 @@ def test_agent_loop_executes_tool_then_stops(tmp_path: Path):
     assert (tmp_path / "answer.txt").read_text(encoding="utf-8") == "done"
 
 
+def test_agent_loop_status_snapshot_is_bounded_and_tracks_run(tmp_path: Path):
+    guard = WorkspaceGuard(tmp_path)
+    loop = AgentLoop(FakeProvider(), build_default_registry(guard), ToolContext(guard, AllowAllApproval()))
+    before = loop.status_snapshot()
+    assert before["active"] is False
+    asyncio.run(loop.run("create an answer file"))
+    after = loop.status_snapshot()
+    assert after["active"] is False
+    assert after["state"] == "completed"
+    assert after["step"] == 2
+    assert after["run_id"] is None
+    assert set(after) == {"active", "state", "run_id", "step", "elapsed_seconds", "remaining_seconds", "steering_items", "steering_chars", "cancelled", "audit_complete"}
+
+
 def test_agent_loop_labels_first_progress_as_initial_analysis(tmp_path: Path):
     events = []
     guard = WorkspaceGuard(tmp_path)

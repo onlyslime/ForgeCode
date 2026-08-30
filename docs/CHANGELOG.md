@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.8.5 — 2026-08-30
+
+- Added a bounded AgentLoop status snapshot with lifecycle, step, timing,
+  steering, cancellation, and audit fields for live diagnostics.
+- Verification: targeted `tests/test_loop.py -k status_snapshot` passed;
+  manual review confirmed no prompts, tool arguments, paths, or secrets are
+  exposed by the snapshot.
+
 ## v0.8.4 — 2026-08-30
 
 - Added interactive `/memory` management so users can inspect, add, remove, or clear workspace memory without leaving `fcc` or involving the model.

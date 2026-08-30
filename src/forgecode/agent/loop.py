@@ -127,6 +127,8 @@ class AgentLoop:
         self._recorded_provider_retries: set[tuple[str, str]] = set()
         self._provider_event_counter = 0
         self._last_provider_unresolved = False
+        self._started_monotonic: float | None = None
+        self._current_step = 0
         integer_limits = (self.config.max_repeated_calls, self.config.max_verification_attempts, self.config.max_tool_calls_per_turn, self.config.max_tool_calls_total, self.config.max_auto_compactions, self.config.rolling_window_messages)
         if self.config.max_steps is not None and (isinstance(self.config.max_steps, bool) or not isinstance(self.config.max_steps, int) or self.config.max_steps < 1):
             raise ValueError("max_steps must be positive when set")
@@ -227,6 +229,28 @@ class AgentLoop:
             self._steering_chars += len(text)
             position = len(self._steering_queue)
         return {"accepted": True, "steering": True, "position": position}
+
+    def status_snapshot(self) -> dict[str, Any]:
+        """Return bounded, read-only diagnostics safe for status clients."""
+        with self._steering_lock:
+            steering_items = len(self._steering_queue)
+            steering_chars = self._steering_chars
+        now = time.monotonic()
+        elapsed = None if self._started_monotonic is None else max(0.0, now - self._started_monotonic)
+        deadline = self.context.deadline_monotonic
+        remaining = None if deadline is None else max(0.0, deadline - now)
+        return {
+            "active": not self.lifecycle.terminal and self._started_monotonic is not None,
+            "state": self.lifecycle.state.value,
+            "run_id": self.run_id,
+            "step": self._current_step,
+            "elapsed_seconds": round(elapsed, 3) if elapsed is not None else None,
+            "remaining_seconds": round(remaining, 3) if remaining is not None else None,
+            "steering_items": steering_items,
+            "steering_chars": steering_chars,
+            "cancelled": bool(self.context.cancelled),
+            "audit_complete": self.audit_complete,
+        }
 
     def _consume_steering(self, messages: list[Message]) -> int:
         with self._steering_lock:
@@ -808,6 +832,7 @@ class AgentLoop:
     async def run(self, prompt: str) -> LoopResult:
         if not prompt.strip():
             raise ValueError("prompt must not be empty")
+        self._started_monotonic = time.monotonic()
         prompt = redact_text(prompt, self.context.secrets)
         messages: list[Message] = [
             self.context_builder.system_message(
@@ -847,6 +872,7 @@ class AgentLoop:
         step = 0
         while self.config.max_steps is None or step < self.config.max_steps:
             step += 1
+            self._current_step = step
             if self.context.cancelled:
                 return self._cancelled_result(messages, verification_ok, explored, reason=self.context.cancellation_reason)
             if self.context.deadline_monotonic is not None and self.context.deadline_monotonic <= time.monotonic():
