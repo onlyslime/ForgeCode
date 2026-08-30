@@ -10,6 +10,7 @@ from forgecode.tools.filesystem import ListFilesTool, ReadFileTool, SearchTool, 
 from forgecode.tools.repository_map import RepositoryMapTool
 from forgecode.tools.understanding import ReadRangeTool, ListSymbolsTool, FindDefinitionTool, FindReferencesTool, SymbolHoverTool, FileMetadataTool
 from forgecode.tools.lsp import LspStatusTool
+from forgecode.tools.summary import WorkspaceSummaryTool
 import pytest
 
 
@@ -139,3 +140,9 @@ def test_understanding_path_must_be_string(tmp_path: Path):
 def test_lsp_status_rejects_non_object_arguments(tmp_path: Path):
     with pytest.raises(ValueError, match="arguments must be an object"):
         LspStatusTool().execute(None, None)
+
+
+def test_workspace_summary_rejects_non_object_arguments(tmp_path: Path):
+    guard = WorkspaceGuard(tmp_path)
+    with pytest.raises(ValueError, match="arguments must be an object"):
+        WorkspaceSummaryTool(guard).execute(None, None)

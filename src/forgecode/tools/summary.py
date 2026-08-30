@@ -53,6 +53,8 @@ class WorkspaceSummaryTool:
         self.guard = guard
 
     def execute(self, arguments: dict[str, Any], context: ToolContext) -> ToolResult:
+        if not isinstance(arguments, dict):
+            raise ValueError("arguments must be an object")
         root = context.guard.root
         top_level = []
         language_counts: dict[str, int] = {}

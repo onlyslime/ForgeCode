@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.108 — 2026-08-31
+
+- Added object-argument validation to `workspace_summary`, aligning the
+  read-only workspace inspection tool with the common input contract.
+- Verification: invalid-input regression, manual API check, compileall, and
+  diff checks passed.
+
 ## v0.8.107 — 2026-08-31
 
 - Added object-argument validation to `lsp_status`, aligning the read-only
