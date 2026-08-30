@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.8.209 — 2026-08-31
+
+- **Session identity hardening:** durable session reads now compare device and
+  inode identity in addition to size and timestamps, detecting regular-file
+  replacement during inspection.
+- **Verification:** targeted lifecycle regression, compile, diff checks, and
+  manual replacement-identity simulation passed.
+
 ## v0.8.208 — 2026-08-31
 
 - **Shell result resilience:** normalize non-string or unrenderable subprocess

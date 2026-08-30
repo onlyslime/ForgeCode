@@ -459,7 +459,20 @@ class SessionStore:
             if strict:
                 raise SessionFormatError(issue.message)
             return SessionReadResult((), (issue,))
-        if (before_stat.st_size, before_stat.st_mtime_ns) != (after_stat.st_size, after_stat.st_mtime_ns):
+        # Size/mtime alone are insufficient: a replacement regular file can
+        # preserve both values during a read. Include device/inode identity
+        # so replacement streams become an explicit observation issue.
+        if (
+            before_stat.st_size,
+            before_stat.st_mtime_ns,
+            getattr(before_stat, "st_dev", 0),
+            getattr(before_stat, "st_ino", 0),
+        ) != (
+            after_stat.st_size,
+            after_stat.st_mtime_ns,
+            getattr(after_stat, "st_dev", 0),
+            getattr(after_stat, "st_ino", 0),
+        ):
             issues.append(SessionReadIssue(0, "session changed while it was read"))
         try:
             text = raw_bytes.decode("utf-8")

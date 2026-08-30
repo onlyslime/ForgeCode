@@ -1,4 +1,5 @@
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -46,6 +47,29 @@ def test_session_safe_partial_read_reports_corrupt_line(tmp_path: Path):
         store.read_with_issues(strict=True)
     with pytest.raises(SessionFormatError, match="cannot append"):
         store.append("would_be_unsafe", {})
+
+
+def test_session_read_detects_regular_file_replacement_by_identity(monkeypatch, tmp_path: Path):
+    """A same-size/timestamp replacement must not cross the audit boundary."""
+    path = tmp_path / "replacement.jsonl"
+    store = SessionStore(path, run_id="run-1")
+    store.append("ok", {})
+    original_stat = Path.stat
+    calls = {"target": 0}
+
+    def replacement_stat(self, *args, **kwargs):
+        result = original_stat(self, *args, **kwargs)
+        if self == path:
+            calls["target"] += 1
+            if calls["target"] == 2:
+                values = list(result)
+                values[1] = values[1] + 1  # st_ino on supported platforms
+                return os.stat_result(values)
+        return result
+
+    monkeypatch.setattr(Path, "stat", replacement_stat)
+    result = store.read_with_issues()
+    assert any("changed while it was read" in issue.message for issue in result.issues)
 
 
 def test_session_append_rejects_mixed_run_identity(tmp_path: Path):
