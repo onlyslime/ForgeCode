@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.105 — 2026-08-31
+
+- Stopped code-understanding source scans immediately at the 500-file bound,
+  avoiding needless traversal of the remainder of large workspaces.
+- Verification: 510-file bounded-scan regression, manual traversal check,
+  compileall, and diff checks passed.
+
 ## v0.8.104 — 2026-08-31
 
 - Centralized object-argument validation in the shared filesystem helper,

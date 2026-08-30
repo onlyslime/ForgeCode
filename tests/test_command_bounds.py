@@ -117,3 +117,12 @@ def test_understanding_tools_reject_non_object_arguments(tmp_path: Path):
     for tool in tools:
         with pytest.raises(ValueError, match="arguments must be an object"):
             tool.execute(None, context)
+
+
+def test_source_file_scan_stops_at_bounded_limit(tmp_path: Path):
+    from forgecode.tools.understanding import _source_files
+    guard = WorkspaceGuard(tmp_path); context = ToolContext(guard, AllowAllApproval())
+    for index in range(510):
+        (tmp_path / f"file_{index:03d}.py").write_text("x = 1\n", encoding="utf-8")
+    files = list(_source_files(context))
+    assert len(files) == 500

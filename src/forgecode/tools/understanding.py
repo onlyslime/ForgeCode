@@ -46,7 +46,9 @@ def _source_files(context: ToolContext, path_value: str | None = None):
         return
     count = 0
     for candidate in context.guard.root.rglob("*"):
-        if count >= 500 or not candidate.is_file() or _is_ignored(candidate, context.guard):
+        if count >= 500:
+            break
+        if not candidate.is_file() or _is_ignored(candidate, context.guard):
             continue
         if candidate.suffix.lower() in {".py", ".js", ".ts", ".tsx", ".jsx", ".java", ".go", ".rs", ".c", ".h", ".cpp", ".cs"}:
             count += 1
