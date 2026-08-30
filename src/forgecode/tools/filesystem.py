@@ -58,6 +58,8 @@ class ListFilesTool:
         self.guard = guard
 
     def execute(self, arguments, context):
+        if not isinstance(arguments, dict):
+            raise ValueError("arguments must be an object")
         pattern = _required(arguments, "pattern")
         normalized_pattern = pattern.replace("\\", "/")
         if pattern.startswith(("/", "\\")) or (len(pattern) >= 2 and pattern[1] == ":") or any(part == ".." for part in normalized_pattern.split("/")):
@@ -112,6 +114,8 @@ class ReadFileTool:
         self.guard = guard
 
     def execute(self, arguments, context):
+        if not isinstance(arguments, dict):
+            raise ValueError("arguments must be an object")
         path_value = _required(arguments, "path")
         path = context.guard.resolve(path_value, must_exist=True)
         lexical = Path(path_value)
@@ -151,6 +155,8 @@ class SearchTool:
         self.guard = guard
 
     def execute(self, arguments, context):
+        if not isinstance(arguments, dict):
+            raise ValueError("arguments must be an object")
         query = _required(arguments, "query")
         path_value = arguments.get("path", ".")
         root = context.guard.resolve(path_value, must_exist=True)
@@ -215,6 +221,8 @@ class WriteFileTool:
         self.guard = guard
 
     def execute(self, arguments, context):
+        if not isinstance(arguments, dict):
+            raise ValueError("arguments must be an object")
         denied = context.deny_if_plan(self.definition.name)
         if denied:
             return denied

@@ -6,6 +6,7 @@ from forgecode.security import WorkspaceGuard
 from forgecode.tools import AllowAllApproval, ToolContext, build_default_registry
 from forgecode.tools.shell import classify_command
 from forgecode.tools.quality import DiagnosticsTool, TestTool as QualityCheckTool
+from forgecode.tools.filesystem import ListFilesTool, ReadFileTool, SearchTool, WriteFileTool
 import pytest
 
 
@@ -90,3 +91,11 @@ def test_quality_tool_denials_preserve_risk_metadata(tmp_path: Path):
     assert result.metadata["error"] == "approval_denied"
     assert result.metadata["risk"] == "normal"
     assert result.metadata["hard_blocked"] is False
+
+
+def test_filesystem_tools_reject_non_object_arguments(tmp_path: Path):
+    guard = WorkspaceGuard(tmp_path); context = ToolContext(guard, AllowAllApproval())
+    tools = [ListFilesTool(guard), ReadFileTool(guard), SearchTool(guard), WriteFileTool(guard)]
+    for tool in tools:
+        with pytest.raises(ValueError, match="arguments must be an object"):
+            tool.execute(None, context)

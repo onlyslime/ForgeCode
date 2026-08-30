@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.90 — 2026-08-31
+
+- Added consistent object-argument validation to all core filesystem tools,
+  preventing leaked attribute errors on malformed direct calls.
+- Verification: four-tool invalid-input regression, manual API checks,
+  compileall, and diff checks passed.
+
 ## v0.8.89 — 2026-08-31
 
 - Converted background process startup failures into structured tool results,
