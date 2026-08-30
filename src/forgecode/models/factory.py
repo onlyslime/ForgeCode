@@ -29,7 +29,25 @@ class _ProtocolTransport:
         if self.provider == "anthropic":
             messages = payload.pop("messages", [])
             payload["max_tokens"] = payload.get("max_tokens", 4096)
-            payload["messages"] = [{"role": m.get("role"), "content": m.get("content", "")} for m in messages]
+            anthropic_messages = []
+            for message in messages:
+                role = message.get("role")
+                if role == "tool":
+                    anthropic_messages.append({"role": "user", "content": [{"type": "tool_result", "tool_use_id": message.get("tool_call_id", ""), "content": str(message.get("content", ""))}]})
+                    continue
+                content: list[dict[str, Any]] = []
+                if message.get("content"):
+                    content.append({"type": "text", "text": str(message.get("content", ""))})
+                for call in message.get("tool_calls", []) if isinstance(message.get("tool_calls"), list) else []:
+                    function = call.get("function", {}) if isinstance(call, dict) else {}
+                    if isinstance(function, dict) and function.get("name"):
+                        try:
+                            arguments = json.loads(function.get("arguments", "{}"))
+                        except (TypeError, ValueError):
+                            arguments = {}
+                        content.append({"type": "tool_use", "id": str(call.get("id", "")), "name": function["name"], "input": arguments})
+                anthropic_messages.append({"role": "assistant" if role == "assistant" else "user", "content": content or str(message.get("content", ""))})
+            payload["messages"] = anthropic_messages
             tools = payload.get("tools", [])
             payload["tools"] = [{"name": t.get("function", {}).get("name"), "description": t.get("function", {}).get("description", ""), "input_schema": t.get("function", {}).get("parameters", {})} for t in tools]
             headers = {k: v for k, v in headers.items() if k.lower() != "authorization"} | {"x-api-key": self.api_key, "anthropic-version": "2023-06-01"}
@@ -42,7 +60,29 @@ class _ProtocolTransport:
                 function = tool.get("function", {}) if isinstance(tool, dict) else {}
                 if isinstance(function, dict) and function.get("name"):
                     declarations.append({"name": function["name"], "description": str(function.get("description", "")), "parameters": function.get("parameters", {"type": "object"})})
-            payload = {"contents": [{"role": "user" if m.get("role") == "user" else "model", "parts": [{"text": str(m.get("content", ""))}]} for m in messages]}
+            google_contents = []
+            call_names: dict[str, str] = {}
+            for message in messages:
+                role = message.get("role")
+                if role == "tool":
+                    call_id = str(message.get("tool_call_id", ""))
+                    google_contents.append({"role": "user", "parts": [{"functionResponse": {"name": call_names.get(call_id, call_id), "response": {"content": str(message.get("content", ""))}}}]})
+                    continue
+                parts: list[dict[str, Any]] = []
+                if message.get("content"):
+                    parts.append({"text": str(message.get("content", ""))})
+                for call in message.get("tool_calls", []) if isinstance(message.get("tool_calls"), list) else []:
+                    function = call.get("function", {}) if isinstance(call, dict) else {}
+                    if isinstance(function, dict) and function.get("name"):
+                        call_id = str(call.get("id", ""))
+                        call_names[call_id] = function["name"]
+                        try:
+                            arguments = json.loads(function.get("arguments", "{}"))
+                        except (TypeError, ValueError):
+                            arguments = {}
+                        parts.append({"functionCall": {"name": function["name"], "args": arguments}})
+                google_contents.append({"role": "user" if role == "user" else "model", "parts": parts or [{"text": ""}]})
+            payload = {"contents": google_contents}
             if declarations:
                 payload["tools"] = [{"functionDeclarations": declarations}]
             url = url.rsplit("/chat/completions", 1)[0] + ":generateContent"

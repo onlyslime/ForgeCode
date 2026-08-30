@@ -2,7 +2,7 @@ import asyncio
 import json
 
 import pytest
-from forgecode.models import AnthropicProvider, GoogleProvider, Message, OllamaProvider, ProviderError
+from forgecode.models import AnthropicProvider, GoogleProvider, Message, OllamaProvider, ProviderError, ToolCall
 
 
 class Transport:
@@ -48,6 +48,19 @@ def test_google_tool_schema_and_function_call_translation():
     assert result.finish_reason == "tool_calls"
     assert result.message.tool_calls[0].name == "read_file"
     assert result.message.tool_calls[0].arguments == {"path": "README.md"}
+
+
+def test_google_tool_result_history_uses_function_response():
+    google_t = Transport({"candidates": [{"content": {"parts": [{"text": "done"}]}}]})
+    google = GoogleProvider(api_key="k", base_url="https://g.test/v1", model="m", transport=google_t)
+    history = [
+        Message("user", "read"),
+        Message("assistant", tool_calls=(ToolCall("call-1", "read_file", {"path": "README.md"}),)),
+        Message("tool", "contents", tool_call_id="call-1"),
+    ]
+    asyncio.run(google.complete(history, []))
+    contents = google_t.calls[0][2]["contents"]
+    assert contents[-1]["parts"][0]["functionResponse"]["name"] == "read_file"
 
 
 def test_google_stream_function_call_is_normalized():

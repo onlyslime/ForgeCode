@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.7.57 — 2026-08-30
+
+- Provider adapters now translate prior assistant tool calls and tool results
+  into Anthropic content blocks and Google `functionCall`/`functionResponse`
+  parts, preserving multi-turn tool conversations.
+
 ## v0.7.56 — 2026-08-30
 
 - Google streaming responses now normalize Gemini `functionCall` parts into
