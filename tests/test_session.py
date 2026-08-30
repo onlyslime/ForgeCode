@@ -81,3 +81,8 @@ def test_redaction_walker_bounds_oversized_integers():
     value = redact_value({"small": 10 ** 10, "large": 10 ** 5_000})
     assert value["small"] == 10 ** 10
     assert value["large"] == "[oversized number omitted]"
+
+
+def test_redaction_walker_bounds_oversized_floats():
+    value = redact_value({"large": 1e308})
+    assert value["large"] == "[non-finite or oversized number omitted]"

@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.51 — 2026-08-31
+
+- Normalized finite but oversized floats in recursive redaction, preventing
+  pathological metadata values such as `1e308` from reaching JSON output.
+- Verification: session/redaction tests, manual JSON serialization checks,
+  compileall, and diff checks passed.
+
 ## v0.8.50 — 2026-08-31
 
 - Aligned provider-neutral usage validation with concrete adapters by
