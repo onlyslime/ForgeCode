@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.42 — 2026-08-31
+
+- Extended force-push hard-block detection across Git `-c key=value` global
+  options, including force refspecs.
+- Verification: command classifier tests, manual `git -c` variants,
+  compileall, and diff checks passed.
+
 ## v0.8.41 — 2026-08-30
 
 - Extended force-push hard-block detection across Git `--git-dir` and
