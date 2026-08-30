@@ -290,7 +290,7 @@ class ToolRegistry:
                 return ToolResult(False, "tool returned a non-boolean success flag", {"error": "invalid_tool_result"})
             if not isinstance(result.output, str):
                 return ToolResult(False, "tool returned non-text output", {"error": "invalid_tool_result"})
-            if not isinstance(result.metadata, dict):
+            if not isinstance(result.metadata, dict) or any(not isinstance(key, str) for key in result.metadata):
                 return ToolResult(False, "tool returned invalid metadata", {"error": "invalid_tool_result"})
             safe_output = redact_text(result.output, context.secrets)
             safe_metadata = redact_value(result.metadata, context.secrets)

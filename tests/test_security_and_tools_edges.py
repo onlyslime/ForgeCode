@@ -206,6 +206,16 @@ def test_registry_rejects_non_boolean_tool_result_flag(tmp_path):
     assert not result.ok and result.metadata["error"] == "invalid_tool_result"
 
 
+def test_registry_rejects_non_string_metadata_keys(tmp_path):
+    class BadTool:
+        definition = type("Definition", (), {"name": "bad_metadata_key", "description": "", "parameters": {}})()
+        def execute(self, arguments, context):
+            return ToolResult(True, "ok", {1: "value"})
+    registry = ToolRegistry(); registry.register(BadTool())
+    result = registry.execute("bad_metadata_key", {}, ToolContext(WorkspaceGuard(tmp_path), DenyAllApproval()))
+    assert not result.ok and result.metadata["error"] == "invalid_tool_result"
+
+
 def test_registry_validates_extension_definition_fields():
     class Bad:
         definition = type("D", (), {"name": "bad\nname", "description": "", "parameters": {}})()

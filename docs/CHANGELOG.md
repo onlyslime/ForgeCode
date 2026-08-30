@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.153 — 2026-08-31
+
+- **Metadata key contract:** extension tool results now require string metadata keys, preventing JSON key coercion from changing event/context field identity.
+- **Verification:** security-edge tests, compile checks, and manual malformed-metadata inspection passed.
+
 ## v0.8.152 — 2026-08-31
 
 - **Tool message serialization:** reject non-JSON-safe metadata instead of coercing arbitrary objects with `default=str`; emit a bounded safe marker for model context.
