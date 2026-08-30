@@ -723,7 +723,7 @@ provider 回归测试均已通过。
 - **P1 工程上下文：部分完成**。仓库 map、增量索引、符号列表和 bounded 诊断可用；
   LSP 级 definition/reference/hover 仍是后续工作。
 
-本审计以 `uv run pytest -rs` 的完整门禁（当前 520 passed、9 个 Windows symlink
+本审计以 `uv run pytest -rs` 的完整门禁（当前 525 passed、9 个 Windows symlink
 条件 skip、2 warnings；早期 v0.7.0 记录为 485 passed）及 `uv run forgecode doctor`
 输出为证据，不把未能访问的
 Codex 官方页面或未实现的竞品特性当作本项目已完成能力。
@@ -996,7 +996,8 @@ worktree 并行能力仍属于 ForgeCode 的已知 P2/P1 差距，本轮未改�
 - **非目标**：不猜测未知状态含义、不自动执行恢复、不改变合法状态的 TTL/replay/取消语义。
 - **完成条件**：前向不兼容记录不会获得 active 权限；合法旧记录继续恢复。
 - **验证**：RPC session lifecycle 定向测试 `52 passed`，compileall 与 diff 检查通过；
-  发布门禁将补充完整回归。
+  完整发布门禁：`525 passed, 9 skipped, 2 warnings`（约 5 分 02 秒）；
+  `uv run forgecode doctor`、compileall 与 `git diff --check` 均通过。
 
 ### v0.7.39 实施审计：pause/resume synchronization（2026-08-30）
 
