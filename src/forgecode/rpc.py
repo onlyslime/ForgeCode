@@ -339,10 +339,10 @@ def _refresh_session_from_disk(handle: str, info: dict[str, Any]) -> dict[str, A
     if restored is None:
         return info
     # A completed in-process run may have its result only in memory until the
-    # worker finalizer persists it.  Never let an older disk snapshot erase
-    # that durable-to-be-written result during a read request.
+    # worker finalizer persists it.  Merge that value into a newer durable
+    # snapshot instead of letting an empty disk field erase it.
     if info.get("result") is not None and restored.get("result") is None:
-        return info
+        restored["result"] = info["result"]
     newer_sequence = int(restored.get("sequence", 0)) > int(info.get("sequence", 0))
     changed_same_sequence = any(
         restored.get(key) != info.get(key)

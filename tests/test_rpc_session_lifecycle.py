@@ -489,6 +489,25 @@ def test_rpc_wait_refreshes_execution_after_durable_update(tmp_path):
     assert waited["state"] == "completed" and waited["execution"] == "process"
 
 
+def test_rpc_refresh_merges_memory_result_with_newer_durable_state(tmp_path):
+    handle = _call({"method": "session.open", "params": {"workspace": str(tmp_path)}})["data"]["session"]
+    from forgecode import rpc
+    info = rpc._RPC_SESSIONS[handle]
+    info["state"] = "completed"
+    info["result"] = [{"ok": True}]
+    rpc._persist_session(handle, info)
+    external = dict(info)
+    external["state"] = "failed"
+    external["sequence"] = 2
+    external["events"] = [{"sequence": 2, "type": "run_failed"}]
+    external["result"] = None
+    rpc._persist_session(handle, external)
+    status = _call({"method": "session.status", "params": {"session": handle}})["data"]
+    assert status["state"] == "failed" and status["sequence"] == 2
+    result = _call({"method": "session.result", "params": {"session": handle}})["data"]
+    assert result["result"] == [{"ok": True}]
+
+
 def test_rpc_cancel_exposes_auditable_cancel_request(tmp_path):
     handle = _call({"method": "session.open", "params": {"workspace": str(tmp_path)}})["data"]["session"]
     cancelled = _call({"method": "session.cancel", "params": {"session": handle}})
