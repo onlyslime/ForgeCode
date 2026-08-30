@@ -1,7 +1,7 @@
 import time
 import pytest
 from forgecode.security import WorkspaceGuard
-from forgecode.tools import AllowAllApproval, KillProcessTool, ListProcessesTool, ProcessManager, PollProcessTool, RunBackgroundTool, ToolContext
+from forgecode.tools import AllowAllApproval, KillProcessTool, ListProcessesTool, ProcessManager, PollProcessTool, ProcessStatusTool, RunBackgroundTool, ToolContext
 
 def test_background_task_can_be_started_and_polled(tmp_path):
     guard = WorkspaceGuard(tmp_path); context = ToolContext(guard, AllowAllApproval())
