@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.190 — 2026-08-31
+
+- **Responsive code navigation cancellation:** symbol, definition, reference, and hover scans now poll cancellation and deadlines while traversing large files, bounding response latency after content loading.
+- **Verification:** focused understanding-tool tests passed; full regression gate remains green at 667 passed and 14 platform-conditional skips.
+
 ## v0.8.189 — 2026-08-31
 
 - **Byte-accurate navigation limits:** range and symbol readers now enforce the 2 MiB limit on raw bytes before UTF-8 decoding, including CRLF and multibyte files.

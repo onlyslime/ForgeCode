@@ -58,6 +58,11 @@ class ListSymbolsTool:
         patterns = [r"^\s*(?:async\s+)?def\s+(\w+)", r"^\s*class\s+(\w+)", r"^\s*(?:export\s+)?(?:async\s+)?function\s+(\w+)", r"^\s*(?:export\s+)?class\s+(\w+)", r"^\s*export\s+(?:const|let|var)\s+(\w+)"]
         rows = []
         for number, line in enumerate(text.splitlines(), 1):
+            if number % 256 == 0:
+                if context.cancelled:
+                    return ToolResult(False, "symbol listing cancelled during scan", {"error": "cancelled"})
+                if context.remaining_seconds(10.0) <= 0:
+                    return ToolResult(False, "symbol listing stopped because the run deadline has expired", {"error": "deadline_exceeded"})
             for pattern in patterns:
                 match = re.search(pattern, line)
                 if match:
@@ -115,6 +120,11 @@ class FindDefinitionTool:
             try: lines = path.read_text(encoding="utf-8").splitlines()
             except (OSError, UnicodeError): continue
             for number, line in enumerate(lines, 1):
+                if number % 256 == 0:
+                    if context.cancelled:
+                        return ToolResult(False, "definition search cancelled during file scan", {"error": "cancelled"})
+                    if context.remaining_seconds(20.0) <= 0:
+                        return ToolResult(False, "definition search stopped because the run deadline has expired", {"error": "deadline_exceeded"})
                 if pattern.search(line): rows.append({"path": context.guard.relative(path), "line": number, "symbol": symbol, "text": line.strip()[:300]})
                 if len(rows) >= 200: break
             if len(rows) >= 200: break
@@ -141,6 +151,11 @@ class FindReferencesTool:
             try: lines = path.read_text(encoding="utf-8").splitlines()
             except (OSError, UnicodeError): continue
             for number, line in enumerate(lines, 1):
+                if number % 256 == 0:
+                    if context.cancelled:
+                        return ToolResult(False, "reference search cancelled during file scan", {"error": "cancelled"})
+                    if context.remaining_seconds(20.0) <= 0:
+                        return ToolResult(False, "reference search stopped because the run deadline has expired", {"error": "deadline_exceeded"})
                 if pattern.search(line): rows.append({"path": context.guard.relative(path), "line": number, "text": line.strip()[:300]})
                 if len(rows) >= 500: break
             if len(rows) >= 500: break
@@ -167,6 +182,11 @@ class SymbolHoverTool:
             try: lines = path.read_text(encoding="utf-8").splitlines()
             except (OSError, UnicodeError): continue
             for number, line in enumerate(lines, 1):
+                if number % 256 == 0:
+                    if context.cancelled:
+                        return ToolResult(False, "symbol hover cancelled during file scan", {"error": "cancelled"})
+                    if context.remaining_seconds(20.0) <= 0:
+                        return ToolResult(False, "symbol hover stopped because the run deadline has expired", {"error": "deadline_exceeded"})
                 if pattern.search(line):
                     start, end = max(1, number-radius), min(len(lines), number+radius)
                     snippet = "\n".join(f"{i} | {lines[i-1]}" for i in range(start, end+1))
