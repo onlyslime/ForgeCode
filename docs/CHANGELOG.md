@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.7.48 — 2026-08-30
+
+- Added `/queue`, a read-only interactive view of pending follow-up capacity and
+  worker activity; queued message contents are intentionally not exposed.
+
 ## v0.7.47 — 2026-08-30
 
 - Approval audit events now carry a stable risk `scope`, normalized `decision`,

@@ -95,6 +95,11 @@ def test_human_status_renders_completed_run_metrics():
     assert "last run: 4.2s · 4 tool steps" in rendered
 
 
+def test_human_queue_status_renders_bounded_capacity():
+    rendered = _human_result({"queue_status": True, "active": True, "items": 2, "chars": 40, "max_items": 32, "max_chars": 32000})
+    assert "pending: 2 / 32 items" in rendered and "characters: 40 / 32000" in rendered
+
+
 def test_human_diff_result_renders_clean_state_and_content():
     assert "Working tree is clean" in _human_result({"diff_status": True, "diff": ""})
     assert "Git diff" in _human_result({"diff_status": True, "diff": "+ added line"})

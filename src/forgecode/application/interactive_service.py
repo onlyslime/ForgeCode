@@ -39,6 +39,12 @@ def _human_result(value: object) -> str | None:
         return f"Connected: {value.get('model') or 'model'} @ {value.get('base_url') or 'endpoint'}"
     if value.get("model_status") is True:
         return f"Model: {value.get('model') or 'not configured'}\nProvider: {value.get('provider') or 'unknown'}\nEndpoint: {value.get('base_url') or 'not configured'}\nProfile: {value.get('profile') or 'default'}"
+    if value.get("queue_status") is True:
+        return "Queue\n─────\n" + "\n".join((
+            f"worker: {'active' if value.get('active') else 'idle'}",
+            f"pending: {value.get('items', 0)} / {value.get('max_items', 0)} items",
+            f"characters: {value.get('chars', 0)} / {value.get('max_chars', 0)}",
+        ))
     if "run_id" in value and "mode" in value and "worker" in value:
         worker = value.get("worker") if isinstance(value.get("worker"), dict) else {}
         verification = value.get("latest_verification")
@@ -605,7 +611,7 @@ class InteractiveSession:
     stopped: bool = False
     controller: InteractiveRunController | None = None
 
-    COMMANDS = ("help", "status", "tools", "plan", "mode", "model", "connect", "login", "rules", "files", "skills", "skill", "tree", "diff", "context", "events", "review", "test", "compact", "undo", "cancel", "pause", "resume", "clear", "quit", "exit")
+    COMMANDS = ("help", "status", "queue", "tools", "plan", "mode", "model", "connect", "login", "rules", "files", "skills", "skill", "tree", "diff", "context", "events", "review", "test", "compact", "undo", "cancel", "pause", "resume", "clear", "quit", "exit")
 
     def header(self, *, run_id: str = "", mode: str = "plan", profile: str = "default", rules_count: int = 0, budget: int = 60_000) -> str:
         return f"ForgeCode session run={run_id or '<new>'} workspace=. mode={mode} profile={profile} rules={rules_count} budget={budget}"
@@ -616,6 +622,7 @@ class InteractiveSession:
             "────────\n"
             "/help                 show this command guide\n"
             "/status               show live worker, phase, and timing\n"
+            "/queue                show pending follow-up queue capacity\n"
             "/tools                list available tools and safety categories\n"
             "/model [show|list]    inspect the active model configuration\n"
             "/mode plan|act|bypass switch planning, approved edits, or trusted mode\n"
@@ -666,6 +673,13 @@ class InteractiveSession:
         if command == "status":
             if args: raise SlashCommandError("usage: /status")
             return self.status()
+        if command == "queue":
+            if args: raise SlashCommandError("usage: /queue")
+            value = self.status()
+            if isinstance(value, dict):
+                worker = value.get("worker") if isinstance(value.get("worker"), dict) else {}
+                return {"queue_status": True, "active": bool(worker.get("active")), "items": worker.get("queue_items", 0), "chars": worker.get("queue_chars", 0), "max_items": self.max_queue_items, "max_chars": self.max_queue_chars}
+            return {"queue_status": True, "active": False, "items": 0, "chars": 0, "max_items": self.max_queue_items, "max_chars": self.max_queue_chars}
         if command == "tools":
             if args: raise SlashCommandError("usage: /tools")
             return self.tools()
