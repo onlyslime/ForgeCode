@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from .openai_compatible import OpenAICompatibleProvider
+from .openai_compatible import OpenAICompatibleProvider, UrllibTransport
 from ..config import SUPPORTED_PROVIDERS
 
 
@@ -115,9 +115,11 @@ class AnthropicProvider(OpenAICompatibleProvider):
     provider_name = "anthropic"
 
     def __init__(self, **kwargs: Any):
-        transport = kwargs.get("transport")
-        if transport is not None:
-            kwargs["transport"] = _ProtocolTransport(transport, "anthropic", kwargs.get("api_key", ""))
+        # The production provider creates its own UrllibTransport when none is
+        # supplied. Wrap that default too; otherwise only injected test
+        # transports receive Anthropic's /messages wire translation.
+        transport = kwargs.get("transport") or UrllibTransport()
+        kwargs["transport"] = _ProtocolTransport(transport, "anthropic", kwargs.get("api_key", ""))
         super().__init__(**kwargs)
 
 
@@ -125,9 +127,8 @@ class GoogleProvider(OpenAICompatibleProvider):
     provider_name = "google"
 
     def __init__(self, **kwargs: Any):
-        transport = kwargs.get("transport")
-        if transport is not None:
-            kwargs["transport"] = _ProtocolTransport(transport, "google", kwargs.get("api_key", ""))
+        transport = kwargs.get("transport") or UrllibTransport()
+        kwargs["transport"] = _ProtocolTransport(transport, "google", kwargs.get("api_key", ""))
         super().__init__(**kwargs)
 
 
@@ -137,9 +138,8 @@ class OllamaProvider(OpenAICompatibleProvider):
     def __init__(self, **kwargs: Any):
         if not kwargs.get("api_key"):
             kwargs["api_key"] = "local"
-        transport = kwargs.get("transport")
-        if transport is not None:
-            kwargs["transport"] = _ProtocolTransport(transport, "ollama", kwargs.get("api_key", "local"))
+        transport = kwargs.get("transport") or UrllibTransport()
+        kwargs["transport"] = _ProtocolTransport(transport, "ollama", kwargs.get("api_key", "local"))
         super().__init__(**kwargs)
 
 

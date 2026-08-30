@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.7.53 — 2026-08-30
+
+- Fixed named provider adapters so their default production transport also
+  applies Anthropic, Google, and Ollama wire-format translation.
+- Custom transports remain supported and continue to receive the same
+  provider-specific normalization.
+
 ## v0.7.52 — 2026-08-30
 
 - `rpc.describe` now advertises the complete bounded session event catalogue,
