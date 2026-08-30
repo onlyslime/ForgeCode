@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.7.2 — 2026-08-30
+
+- Restricted read-only parallel scheduling to an explicit audited allowlist.
+- Bounded in-flight work now honors cancellation for queued calls and returns
+  a paired `cancelled_before_start` result for every interrupted tool call.
+- Added regression coverage for cancellation and protocol-safe tool pairing.
+
 ## v0.7.1 — 2026-08-30
 
 - Same-turn batches made entirely of read-only tools now run with bounded

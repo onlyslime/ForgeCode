@@ -18,12 +18,21 @@ from ..models import CancellationToken, Message, ModelProvider, ProviderContext,
 from ..context import RepositoryMapBuilder
 from ..security.redaction import redact_text
 from ..storage import Checkpoint, CheckpointStore, FileFingerprint, SessionStore, bounded
-from ..tools import AgentMode, ToolContext, ToolRegistry
+from ..tools import AgentMode, ToolContext, ToolRegistry, ToolResult
 from ..tools import PauseRequested
 from .context import ContextBuilder
 from .lifecycle import LifecycleError, RunLifecycle, RunState
 from .recovery import ContextCompactor
 from .verification import VerificationResult
+
+
+_PARALLEL_READ_TOOLS = frozenset({
+    "read_file",
+    "search",
+    "list_files",
+    "workspace_summary",
+    "repository_map",
+})
 
 
 @dataclass(frozen=True)
@@ -1016,27 +1025,47 @@ class AgentLoop:
             # unchanged.  Futures are consumed in model order below.
             parallel_results: dict[str, Any] = {}
             batch_calls = response.message.tool_calls
-            definitions = {definition.name: definition for definition in self.registry.definitions()}
             if len(batch_calls) > 1 and all(
-                call.name in definitions and not definitions[call.name].side_effecting
+                call.name in _PARALLEL_READ_TOOLS
                 for call in batch_calls
             ):
                 executor = concurrent.futures.ThreadPoolExecutor(
                     max_workers=min(4, len(batch_calls)),
                     thread_name_prefix="forgecode-read",
                 )
-                futures = {
-                    call.id: executor.submit(self.registry.execute, call.name, call.arguments, self.context)
-                    for call in batch_calls
-                }
-                # Wait for the bounded batch to finish before entering the
-                # normal event/checkpoint path.  This keeps lifecycle updates
-                # deterministic while the actual I/O overlaps.
-                parallel_results = {call_id: future.result() for call_id, future in futures.items()}
+                # Keep at most ``max_workers`` calls in flight.  A cancellation
+                # observed while the batch is running therefore prevents
+                # queued calls from starting and leaves an explicit result for
+                # every call id.
+                pending_calls = iter(batch_calls)
+                futures: dict[concurrent.futures.Future, Any] = {}
+                for _ in range(min(4, len(batch_calls))):
+                    try:
+                        call = next(pending_calls)
+                    except StopIteration:
+                        break
+                    futures[executor.submit(self.registry.execute, call.name, call.arguments, self.context)] = call
+                while futures:
+                    done, _ = concurrent.futures.wait(futures, return_when=concurrent.futures.FIRST_COMPLETED)
+                    for future in done:
+                        call = futures.pop(future)
+                        parallel_results[call.id] = future.result()
+                        if not self.context.cancelled:
+                            try:
+                                next_call = next(pending_calls)
+                            except StopIteration:
+                                continue
+                            futures[executor.submit(self.registry.execute, next_call.name, next_call.arguments, self.context)] = next_call
+                for call in pending_calls:
+                    parallel_results[call.id] = ToolResult(
+                        False,
+                        f"{call.name} cancelled before execution",
+                        {"error": "cancelled_before_start", "tool": call.name},
+                    )
                 executor.shutdown(wait=True)
                 self._record("tool_batch_parallel", {"count": len(batch_calls), "max_workers": min(4, len(batch_calls))})
 
-            for call in response.message.tool_calls:
+            for call_index, call in enumerate(response.message.tool_calls):
                 paused_result = await self._pause_at_boundary(messages, verification_ok, explored)
                 if paused_result is not None:
                     return paused_result
@@ -1164,6 +1193,18 @@ class AgentLoop:
                     self._record("final", {"stopped_reason": result.stopped_reason, "error": result.error, "state": result.state, "pending_actions": list(self._pending_actions)})
                     return result
                 if self.context.cancelled:
+                    # Preserve one tool message for every model call even
+                    # when cancellation interrupts a read-only batch. This
+                    # keeps provider protocol pairing valid and makes queued
+                    # calls visibly ``cancelled_before_start``.
+                    if parallel_results:
+                        for remaining in response.message.tool_calls[call_index + 1:]:
+                            remaining_result = parallel_results.get(remaining.id) or ToolResult(
+                                False,
+                                f"{remaining.name} cancelled before execution",
+                                {"error": "cancelled_before_start", "tool": remaining.name},
+                            )
+                            messages.append(Message(role="tool", content=self._tool_message_content(remaining_result), tool_call_id=remaining.id))
                     return self._cancelled_result(messages, verification_ok, explored, reason=self.context.cancellation_reason)
                 if side_effecting and self.lifecycle.state is RunState.ACTING:
                     self._transition(RunState.DISCOVERING, reason="tool result recorded")

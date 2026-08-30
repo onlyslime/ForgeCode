@@ -3,7 +3,7 @@ import time
 from pathlib import Path
 
 from forgecode.agent import AgentConfig, AgentLoop
-from forgecode.models import Message, ModelResponse, ToolCall
+from forgecode.models import CancellationToken, Message, ModelResponse, ToolCall
 from forgecode.security import WorkspaceGuard
 from forgecode.storage import SessionStore
 from forgecode.tools import AgentMode, AllowAllApproval, DenyAllApproval, ToolContext, build_default_registry
@@ -40,7 +40,7 @@ def test_multiple_tool_calls_preserve_ids_and_results(tmp_path):
 
 def test_read_only_tool_batch_runs_concurrently_and_keeps_result_order(tmp_path):
     class SlowRead:
-        definition = ToolDefinition("slow_read", "slow read", {"type": "object"})
+        definition = ToolDefinition("read_file", "slow read", {"type": "object"})
 
         def execute(self, arguments, context):
             time.sleep(0.08)
@@ -54,8 +54,8 @@ def test_read_only_tool_batch_runs_concurrently_and_keeps_result_order(tmp_path)
             self.calls += 1
             if self.calls == 1:
                 return ModelResponse(Message("assistant", tool_calls=(
-                    ToolCall("a", "slow_read", {"value": "first"}),
-                    ToolCall("b", "slow_read", {"value": "second"}),
+                    ToolCall("a", "read_file", {"value": "first"}),
+                    ToolCall("b", "read_file", {"value": "second"}),
                 )))
             return ModelResponse(Message("assistant", "done"))
 
@@ -71,6 +71,40 @@ def test_read_only_tool_batch_runs_concurrently_and_keeps_result_order(tmp_path)
     assert elapsed < 0.14
     assert [m.tool_call_id for m in result.messages if m.role == "tool"] == ["a", "b"]
     assert any(kind == "tool_batch_parallel" for kind, _ in events)
+
+
+def test_read_only_batch_cancellation_marks_queued_calls(tmp_path):
+    token = CancellationToken()
+
+    class CancelRead:
+        definition = ToolDefinition("read_file", "cancellable read", {"type": "object"})
+
+        def execute(self, arguments, context):
+            time.sleep(0.03 if arguments["value"] == 0 else 0.2)
+            if arguments["value"] == 0:
+                token.cancel("test cancellation")
+            return ToolResult(True, str(arguments["value"]), {})
+
+    class Provider:
+        def __init__(self):
+            self.calls = 0
+
+        async def complete(self, messages, tools):
+            self.calls += 1
+            if self.calls == 1:
+                return ModelResponse(Message("assistant", tool_calls=tuple(
+                    ToolCall(str(i), "read_file", {"value": i}) for i in range(6)
+                )))
+            return ModelResponse(Message("assistant", "done"))
+
+    registry = ToolRegistry()
+    registry.register(CancelRead())
+    guard = WorkspaceGuard(tmp_path)
+    loop = AgentLoop(Provider(), registry, ToolContext(guard, cancellation_token=token))
+    result = asyncio.run(loop.run("read many"))
+    tool_messages = [m for m in result.messages if m.role == "tool"]
+    assert len(tool_messages) == 6
+    assert any("cancelled before execution" in m.content for m in tool_messages)
 
 
 def test_unknown_tool_is_returned_to_model(tmp_path):
