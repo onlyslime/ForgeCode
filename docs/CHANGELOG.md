@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.44 — 2026-08-31
+
+- Extended destructive Git push hard-blocking to short `-f`, `-d`, and
+  combined `-fd` options, while preserving ordinary `-u` pushes.
+- Verification: command classifier tests, manual short-option variants,
+  compileall, and diff checks passed.
+
 ## v0.8.43 — 2026-08-31
 
 - Hardened destructive Git push detection to hard-block `--mirror` and
