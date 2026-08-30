@@ -50,6 +50,15 @@ def test_command_honors_run_deadline(tmp_path: Path):
     assert not result.ok and result.metadata["timed_out"] is True
 
 
+def test_git_inspection_reports_expired_deadline(tmp_path: Path):
+    registry = build_default_registry(WorkspaceGuard(tmp_path))
+    context = ToolContext(WorkspaceGuard(tmp_path), AllowAllApproval(), deadline_monotonic=time.monotonic() - 1)
+    for name in ("git_status", "git_diff", "git_log"):
+        result = registry.execute(name, {}, context)
+        assert result.ok is False
+        assert result.metadata["error"] == "deadline_exceeded"
+
+
 def test_command_cancellation_terminates_process(tmp_path: Path):
     registry = build_default_registry(WorkspaceGuard(tmp_path))
     cancelled = False

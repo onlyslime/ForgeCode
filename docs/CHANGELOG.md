@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.157 — 2026-08-31
+
+- **Git deadline diagnostics:** read-only Git status, diff, and log tools now fail fast with an explicit `deadline_exceeded` result when the run budget is exhausted.
+- **Verification:** command-boundary tests, compile checks, and manual expired-deadline inspection passed.
+
 ## v0.8.156 — 2026-08-31
 
 - **Conservative command mutation audit:** command results now mark classified filesystem/repository/system-risk commands as potentially mutating, and expose a bounded `mutation_possible` signal instead of reporting every successful command as unchanged.

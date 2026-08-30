@@ -87,6 +87,8 @@ class GitStatusTool:
         if not isinstance(porcelain, bool):
             raise ValueError("porcelain must be a boolean")
         command = ["git", "status", "--short"] if porcelain else ["git", "status"]
+        if context.remaining_seconds(15.0) <= 0:
+            return ToolResult(False, "git status skipped because the run deadline has expired", {"error": "deadline_exceeded"})
         try:
             result = subprocess.run(command, cwd=context.guard.root, capture_output=True, text=True, timeout=min(15.0, context.remaining_seconds(15.0)), check=False)
         except (OSError, subprocess.TimeoutExpired) as exc:
@@ -116,6 +118,8 @@ class GitDiffTool:
             if not isinstance(path, str):
                 raise ValueError("path must be a string")
             command.extend(["--", str(context.guard.relative(context.guard.resolve(path)))])
+        if context.remaining_seconds(20.0) <= 0:
+            return ToolResult(False, "git diff skipped because the run deadline has expired", {"error": "deadline_exceeded"})
         try:
             result = subprocess.run(command, cwd=context.guard.root, capture_output=True, text=True, timeout=min(20.0, context.remaining_seconds(20.0)), check=False)
         except (OSError, subprocess.TimeoutExpired) as exc:
@@ -137,6 +141,8 @@ class GitLogTool:
         limit = arguments.get("limit", 10)
         if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 50:
             raise ValueError("limit must be between 1 and 50")
+        if context.remaining_seconds(15.0) <= 0:
+            return ToolResult(False, "git log skipped because the run deadline has expired", {"error": "deadline_exceeded"})
         try:
             result = subprocess.run(["git", "log", f"-{limit}", "--date=short", "--pretty=format:%h %ad %an %s"], cwd=context.guard.root, capture_output=True, text=True, timeout=min(15.0, context.remaining_seconds(15.0)), check=False)
         except (OSError, subprocess.TimeoutExpired) as exc:
