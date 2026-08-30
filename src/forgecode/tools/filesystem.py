@@ -72,6 +72,10 @@ class ListFilesTool:
         # unbounded recursive result supplied by an untrusted model.
         visited = 0
         for directory, names, filenames in os.walk(context.guard.root, topdown=True, followlinks=False):
+            if context.cancelled:
+                return ToolResult(False, "file listing cancelled during scan", {"error": "cancelled"})
+            if context.remaining_seconds(10.0) <= 0:
+                return ToolResult(False, "file listing stopped because the run deadline has expired", {"error": "deadline_exceeded"})
             directory_path = Path(directory)
             names[:] = [name for name in sorted(names, key=str.lower) if not _is_skipped(directory_path / name, context.guard)]
             for name in sorted(filenames, key=str.lower):
@@ -179,6 +183,10 @@ class SearchTool:
         omitted = 0
         files = [root] if root.is_file() else root.rglob("*")
         for path in sorted(files, key=lambda candidate: candidate.as_posix()):
+            if context.cancelled:
+                return ToolResult(False, "search cancelled during scan", {"error": "cancelled"})
+            if context.remaining_seconds(10.0) <= 0:
+                return ToolResult(False, "search stopped because the run deadline has expired", {"error": "deadline_exceeded"})
             if _is_skipped(path, context.guard):
                 continue
             try:

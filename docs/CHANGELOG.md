@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.165 — 2026-08-31
+
+- **Filesystem scan deadlines:** `list_files` and `search` now observe cancellation and run deadlines during traversal, stopping safely instead of continuing unbounded scans after a run ends.
+- **Verification:** command-boundary tests, compile checks, and manual expired-scan inspection passed.
+
 ## v0.8.164 — 2026-08-31
 
 - **Write deadline boundary:** `write_file` now checks the run deadline after approval and immediately before mutation, failing and closing any prepared transaction when the budget expires.
