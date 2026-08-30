@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.18 — 2026-08-30
+
+- Corrected `session.wait` responses so lifecycle `active_flags` are refreshed
+  after a run transitions to a terminal state.
+- Verification: targeted RPC regression, manual lifecycle simulation,
+  compileall, and diff checks passed.
+
 ## v0.8.17 — 2026-08-30
 
 - Hardened RPC session recovery by restoring execution metadata and filtering

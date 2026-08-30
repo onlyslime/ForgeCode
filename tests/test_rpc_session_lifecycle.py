@@ -427,6 +427,21 @@ def test_rpc_recovery_restores_execution_and_filters_malformed_events(tmp_path):
     assert [event["sequence"] for event in events] == [2, 4]
 
 
+def test_rpc_session_wait_refreshes_active_flags_after_completion(tmp_path, monkeypatch):
+    handle = _call({"method": "session.open", "params": {"workspace": str(tmp_path)}})["data"]["session"]
+    from forgecode import rpc
+    info = rpc._RPC_SESSIONS[handle]
+    info["state"] = "running"
+    info["worker"] = type("FinishedWorker", (), {"is_alive": lambda self: False})()
+    result = _call({"method": "session.wait", "params": {"session": handle, "timeout": 0}})
+    assert result["data"]["state"] == "running"
+    assert result["data"]["active_flags"] == ["turn_in_progress"]
+    info["state"] = "completed"
+    result = _call({"method": "session.wait", "params": {"session": handle, "timeout": 0}})
+    assert result["data"]["state"] == "completed"
+    assert result["data"]["active_flags"] == []
+
+
 def test_rpc_cancel_exposes_auditable_cancel_request(tmp_path):
     handle = _call({"method": "session.open", "params": {"workspace": str(tmp_path)}})["data"]["session"]
     cancelled = _call({"method": "session.cancel", "params": {"session": handle}})
