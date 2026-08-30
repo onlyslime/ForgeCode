@@ -14,7 +14,9 @@ ForgeCode 是一个自建、可审计的 coding agent，面向真实的软件开
 
 ## 一分钟开始
 
-在 Windows PowerShell 中安装 `uv`，然后将 ForgeCode 安装为全局工具：
+在 Windows PowerShell 中任选一种安装方式。
+
+### 方法 1：从 GitHub 安装
 
 ```powershell
 irm https://astral.sh/uv/install.ps1 | iex
@@ -22,6 +24,20 @@ uv tool install "git+https://github.com/onlyslime/ForgeCode.git"
 uv tool update-shell
 fcc
 ```
+
+### 方法 2：下载 GitHub ZIP 安装
+
+在 GitHub 点击 **Code → Download ZIP**，解压后进入解压出的 `ForgeCode` 目录，打开 PowerShell：
+
+```powershell
+irm https://astral.sh/uv/install.ps1 | iex
+uv sync
+uv run forgecode doctor
+uv run forgecode
+```
+
+如需在任意目录使用 `fcc`，执行 `uv tool install --editable .`，再执行
+`uv tool update-shell` 并重新打开 PowerShell。
 
 在聊天中使用 `/login` 输入服务商 URL、模型 ID 和 API key。凭据只保存在本地，不会进入仓库。
 

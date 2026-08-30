@@ -18,7 +18,9 @@ this repository instead of behind an agent SDK.
 
 ## Start in one minute
 
-On Windows PowerShell, install `uv`, then install ForgeCode as a global tool:
+Choose either installation method on Windows PowerShell.
+
+### Method 1: Install from GitHub
 
 ```powershell
 irm https://astral.sh/uv/install.ps1 | iex
@@ -26,6 +28,21 @@ uv tool install "git+https://github.com/onlyslime/ForgeCode.git"
 uv tool update-shell
 fcc
 ```
+
+### Method 2: Install from a GitHub ZIP
+
+Download **Code → Download ZIP** from GitHub, extract it, and open PowerShell
+in the extracted `ForgeCode` directory:
+
+```powershell
+irm https://astral.sh/uv/install.ps1 | iex
+uv sync
+uv run forgecode doctor
+uv run forgecode
+```
+
+To make `fcc` available from any directory, run `uv tool install --editable .`,
+then `uv tool update-shell` and reopen PowerShell.
 
 Inside the chat, use `/login` to enter your provider URL, model ID, and API
 key. Credentials are stored locally and are never part of the repository.
