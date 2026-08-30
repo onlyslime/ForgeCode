@@ -883,6 +883,13 @@ Tools/Permissions 文档和 Cline 工具/Plan 文档，ForgeCode 的优势是边
 命令；随后再设计按工具/风险域的 granular approval。每个切片都必须保留当前
 工具调用、审批、取消和 WorkspaceGuard 的安全契约。
 
+### 审批策略原型（v0.7.17）
+
+新增 `RiskScopedApproval` 策略对象作为 Codex granular approval 的安全适配层原型：
+它可对 `changes`、`execution`、`evidence` 风险域分别指定 `allow`、`ask` 或 `deny`，
+未命中的工具始终委托给既有策略。该原型目前不改变默认 CLI 配置，避免未经用户
+选择就扩大权限；下一切片将评估其配置入口、审计展示和与 Bypass/Plan 的组合语义。
+
 ### 外部资料复核（2026-08-30）
 
 - OpenCode 官方 Tools 页面当前可访问（HTTP 200），明确列出 `read`、`write`、

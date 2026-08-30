@@ -114,6 +114,29 @@ class AllowAllApproval:
         return True
 
 
+class RiskScopedApproval:
+    """Apply per-risk-domain decisions before delegating to a fallback policy."""
+    GROUPS = {
+        "changes": frozenset({"write_file", "apply_patch", "git_commit"}),
+        "execution": frozenset({"run_command", "run_background", "kill_process"}),
+        "evidence": frozenset({"test", "diagnostics"}),
+    }
+
+    def __init__(self, fallback: ApprovalPolicy, decisions: dict[str, str] | None = None):
+        self.fallback = fallback
+        self.decisions = dict(decisions or {})
+        if set(self.decisions) - set(self.GROUPS) or any(v not in {"allow", "ask", "deny"} for v in self.decisions.values()):
+            raise ValueError("approval decisions must map groups to allow, ask, or deny")
+
+    def approve(self, tool_name: str, arguments: dict[str, Any]) -> bool:
+        for group, tools in self.GROUPS.items():
+            if tool_name in tools and group in self.decisions:
+                decision = self.decisions[group]
+                if decision == "allow": return True
+                if decision == "deny": return False
+        return self.fallback.approve(tool_name, arguments)
+
+
 class ShellTool:
     definition = ToolDefinition(
         "run_command",

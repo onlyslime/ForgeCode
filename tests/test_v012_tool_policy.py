@@ -12,7 +12,19 @@ from forgecode.application import commands as command_module
 from forgecode.config import ConfigError, ToolPolicy, parse_tool_policy_options
 from forgecode.models import Message, ModelResponse
 from forgecode.security.workspace import WorkspaceGuard
-from forgecode.tools import ToolContext, build_default_registry
+from forgecode.tools import AllowAllApproval, DenyAllApproval, RiskScopedApproval, ToolContext, build_default_registry
+
+
+def test_risk_scoped_approval_overrides_groups_and_delegates() -> None:
+    policy = RiskScopedApproval(DenyAllApproval(), {"changes": "allow", "execution": "deny"})
+    assert policy.approve("write_file", {}) is True
+    assert policy.approve("run_command", {}) is False
+    assert policy.approve("git_status", {}) is False
+
+
+def test_risk_scoped_approval_rejects_invalid_decisions() -> None:
+    with pytest.raises(ValueError):
+        RiskScopedApproval(AllowAllApproval(), {"execution": "maybe"})
 
 
 def _available() -> tuple[str, ...]:

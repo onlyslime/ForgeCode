@@ -3,7 +3,7 @@ from .filesystem import ListFilesTool, ReadFileTool, SearchTool, WriteFileTool
 from .patch import ApplyPatchTool, ChangeOperation, ChangePlan, ChangeResult, PatchFormatError, parse_patch
 from .summary import WorkspaceSummaryTool
 from .repository_map import RepositoryMapTool
-from .shell import AllowAllApproval, DenyAllApproval, InteractiveApproval, ShellTool
+from .shell import AllowAllApproval, DenyAllApproval, InteractiveApproval, RiskScopedApproval, ShellTool
 from .git import GitCommitTool, GitDiffTool, GitLogTool, GitStatusTool
 from .quality import DiagnosticsTool, FindFilesTool, TestTool
 from .understanding import FileMetadataTool, FindDefinitionTool, FindReferencesTool, ListSymbolsTool, ReadRangeTool
@@ -56,6 +56,7 @@ __all__ = [
     "PauseRequested",
     "DenyAllApproval",
     "InteractiveApproval",
+    "RiskScopedApproval",
     "ToolContext",
     "ToolDefinition",
     "ToolRegistry",
