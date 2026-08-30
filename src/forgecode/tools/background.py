@@ -176,7 +176,9 @@ class RunBackgroundTool:
 class ProcessStatusTool:
     definition = ToolDefinition("process_status", "Get the status of a ForgeCode background task.", {"type":"object","properties":{"task_id":{"type":"string"}},"required":["task_id"]})
     def __init__(self, guard, manager): self.manager = manager
-    def execute(self, arguments, context): return ToolResult(True, str(self.manager.snapshot(str(arguments.get("task_id", "")))), self.manager.snapshot(str(arguments.get("task_id", ""))))
+    def execute(self, arguments, context):
+        data = self.manager.snapshot(str(arguments.get("task_id", "")))
+        return ToolResult(True, str(data), data)
 
 class ListProcessesTool:
     definition = ToolDefinition("list_processes", "List bounded ForgeCode background task summaries.", {"type":"object"})

@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.72 — 2026-08-31
+
+- Made `process_status` derive its message and metadata from one snapshot,
+  preventing contradictory results when a task exits between reads.
+- Verification: background tests, manual completion-race inspection,
+  compileall, and diff checks passed.
+
 ## v0.8.71 — 2026-08-31
 
 - Validated direct background `snapshot()` cursors as non-negative integers,
