@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.171 — 2026-08-31
+
+- **Mid-scan cancellation:** symbol definition, reference, and hover searches now recheck cancellation and deadlines for every source file, stopping long scans promptly.
+- **Verification:** command-boundary tests, compile checks, and manual navigation-boundary inspection passed.
+
 ## v0.8.170 — 2026-08-31
 
 - **Worktree inspection deadlines:** Git worktree listing now honors cancellation and expired run budgets before reading ownership metadata or starting Git.

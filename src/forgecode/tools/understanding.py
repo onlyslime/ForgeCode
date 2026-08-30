@@ -88,6 +88,10 @@ class FindDefinitionTool:
         pattern = re.compile(rf"^\s*(?:(?:async)\s+)?(?:def|class|function|export\s+(?:async\s+)?function|export\s+class)\s+{re.escape(symbol)}\b|^\s*(?:export\s+)?(?:const|let|var)\s+{re.escape(symbol)}\s*=.*=>")
         rows = []
         for path in _source_files(context, arguments.get("path")):
+            if context.cancelled:
+                return ToolResult(False, "definition search cancelled during scan", {"error": "cancelled"})
+            if context.remaining_seconds(20.0) <= 0:
+                return ToolResult(False, "definition search stopped because the run deadline has expired", {"error": "deadline_exceeded"})
             try: lines = path.read_text(encoding="utf-8").splitlines()
             except (OSError, UnicodeError): continue
             for number, line in enumerate(lines, 1):
@@ -110,6 +114,10 @@ class FindReferencesTool:
         pattern = re.compile(rf"\b{re.escape(symbol)}\b")
         rows = []
         for path in _source_files(context, arguments.get("path")):
+            if context.cancelled:
+                return ToolResult(False, "reference search cancelled during scan", {"error": "cancelled"})
+            if context.remaining_seconds(20.0) <= 0:
+                return ToolResult(False, "reference search stopped because the run deadline has expired", {"error": "deadline_exceeded"})
             try: lines = path.read_text(encoding="utf-8").splitlines()
             except (OSError, UnicodeError): continue
             for number, line in enumerate(lines, 1):
@@ -132,6 +140,10 @@ class SymbolHoverTool:
         if isinstance(radius, bool) or not isinstance(radius, int) or not 0 <= radius <= 10: raise ValueError("context_lines must be between 0 and 10")
         pattern = re.compile(rf"^\s*(?:(?:async)\s+)?(?:def|class|function|export\s+(?:async\s+)?function|export\s+class)\s+{re.escape(symbol)}\b|^\s*(?:export\s+)?(?:const|let|var)\s+{re.escape(symbol)}\s*=.*=>")
         for path in _source_files(context, arguments.get("path")):
+            if context.cancelled:
+                return ToolResult(False, "symbol hover cancelled during scan", {"error": "cancelled"})
+            if context.remaining_seconds(20.0) <= 0:
+                return ToolResult(False, "symbol hover stopped because the run deadline has expired", {"error": "deadline_exceeded"})
             try: lines = path.read_text(encoding="utf-8").splitlines()
             except (OSError, UnicodeError): continue
             for number, line in enumerate(lines, 1):
