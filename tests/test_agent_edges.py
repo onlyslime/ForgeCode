@@ -110,6 +110,31 @@ def test_read_only_batch_cancellation_marks_queued_calls(tmp_path):
     assert any("cancelled before execution" in m.content for m in tool_messages)
 
 
+def test_read_only_batch_with_hooks_remains_serial(tmp_path):
+    active = 0; maximum = 0
+    class HookedRead:
+        definition = ToolDefinition("read_file", "hooked read", {"type": "object"})
+        def execute(self, arguments, context):
+            nonlocal active, maximum
+            active += 1; maximum = max(maximum, active)
+            time.sleep(0.01)
+            active -= 1
+            return ToolResult(True, "ok", {})
+    class Hooks:
+        def emit(self, *args, **kwargs): return ()
+    class Provider:
+        def __init__(self): self.calls = 0
+        async def complete(self, messages, tools):
+            self.calls += 1
+            if self.calls == 1:
+                return ModelResponse(Message("assistant", tool_calls=(ToolCall("a", "read_file", {"value": 1}), ToolCall("b", "read_file", {"value": 2}))))
+            return ModelResponse(Message("assistant", "done"))
+    registry = ToolRegistry(); registry.register(HookedRead())
+    context = ToolContext(WorkspaceGuard(tmp_path), hooks=Hooks())
+    result = asyncio.run(AgentLoop(Provider(), registry, context).run("read"))
+    assert result.stopped_reason == "model_finished" and maximum == 1
+
+
 def test_semantic_navigation_tools_are_bounded_and_guarded(tmp_path):
     (tmp_path / "mod.py").write_text("def target():\n    return target()\n", encoding="utf-8")
     context = ToolContext(WorkspaceGuard(tmp_path))

@@ -691,7 +691,7 @@ CLI/TUI
 | 验证 | 测试 profile、有限修复、review/export、轨迹评估 | 缺少语言服务和调试器集成 | P1 |
 | 扩展发布 | Skills、hooks、SDK、JSONL RPC、工具收窄、uv/独立二进制布局 | 缺少 MCP、插件市场、跨平台一键安装 | P2 |
 
-截至当前 v0.7.14，正常交互工作流还提供 `/context`（有界索引健康度）和
+截至当前 v0.7.15，正常交互工作流还提供 `/context`（有界索引健康度）和
 `/events [limit] [kind]`（可筛选、带相对耗时和错误码的持久化事件尾部）。
 这些能力不改变工具权限，只把已有审计证据暴露给用户；对应交互、机器契约和
 provider 回归测试均已通过。
@@ -832,6 +832,14 @@ Codex 官方页面或未实现的竞品特性当作本项目已完成能力。
   回退到 JSON completion，并记录 fallback attempt；`stream_required` 仍直接失败。
 - **非目标**：不对任意 4xx/5xx 静默回退，不重复有副作用请求，不改变协议错误重试策略。
 - **验证**：provider 定向测试覆盖 405→JSON 成功及 required streaming 严格失败。
+
+### 0.7.15 实施审计：hooks 并行安全边界（2026-08-30）
+
+- **范围**：当 ToolContext 配置 lifecycle hooks 时，AgentLoop 禁止同轮只读并行，
+  回退到串行，以保证 before/after hook 顺序和共享状态一致。
+- **非目标**：不改变无 hooks 场景的只读并行，不并行任何副作用工具，不引入锁来
+  掩盖 hook 本身的非线程安全实现。
+- **验证**：定向测试通过并发计数确认 hook-enabled 批次最大同时执行数为 1。
 
 ### 外部资料复核（2026-08-30）
 

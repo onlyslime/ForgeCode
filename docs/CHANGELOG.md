@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.7.15 — 2026-08-30
+
+- Read-only batch scheduling now stays serial whenever lifecycle hooks are
+  configured, preserving hook ordering and avoiding concurrent hook state.
+- Added regression coverage for the hook-enabled safety fallback.
+
 ## v0.7.14 — 2026-08-30
 
 - Optional streaming now falls back to JSON when a gateway returns HTTP 404,

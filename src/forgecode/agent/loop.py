@@ -1043,7 +1043,7 @@ class AgentLoop:
             # unchanged.  Futures are consumed in model order below.
             parallel_results: dict[str, Any] = {}
             batch_calls = response.message.tool_calls
-            if len(batch_calls) > 1 and all(
+            if len(batch_calls) > 1 and self.context.hooks is None and all(
                 call.name in _PARALLEL_READ_TOOLS
                 for call in batch_calls
             ):
