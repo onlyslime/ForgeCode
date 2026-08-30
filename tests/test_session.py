@@ -4,7 +4,7 @@ from dataclasses import dataclass
 import pytest
 
 from forgecode.storage import SessionStore
-from forgecode.security.redaction import redact_value
+from forgecode.security.redaction import redact_text, redact_value
 
 
 def test_session_store_appends_jsonl(tmp_path: Path):
@@ -68,3 +68,10 @@ def test_redaction_walker_normalizes_nonfinite_numbers():
     assert redacted["nan"] == "[non-finite number omitted]"
     assert redacted["inf"] == "[non-finite number omitted]"
     assert redacted["ok"] == 1.5
+
+
+def test_redaction_secret_limits_apply_to_direct_helpers():
+    with pytest.raises(ValueError):
+        redact_value("x", secrets=["s"] * 65)
+    with pytest.raises(ValueError):
+        redact_text("x", secrets=["s" * 4_097])

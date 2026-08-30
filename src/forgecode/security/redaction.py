@@ -19,10 +19,20 @@ _NAMED_SECRET_RE = re.compile(
     r"(?:\"[^\"]*\"|'[^']*'|\[[^\]]*\]|[^\s,;}]+)"
 )
 _SENSITIVE_KEY_PARTS = ("api_key", "api-key", "apikey", "authorization", "token", "password", "secret", "cookie", "credential")
+_MAX_SECRETS = 64
+_MAX_SECRET_CHARS = 4_096
+
+
+def _normalize_secrets(secrets: Iterable[str]) -> tuple[str, ...]:
+    values = tuple(secret for secret in secrets if isinstance(secret, str) and secret)
+    if len(values) > _MAX_SECRETS or any(len(secret) > _MAX_SECRET_CHARS for secret in values):
+        raise ValueError("secrets exceed redaction limits")
+    return values
 
 
 def redact_text(value: object, secrets: Iterable[str] = ()) -> str:
     """Redact configured values and common credential-shaped text."""
+    secret_values = _normalize_secrets(secrets)
     rendered = str(value)
     # Use a private sentinel while applying the bearer rule. This prevents a
     # bearer token following ``authorization=`` from being consumed as the
@@ -31,7 +41,7 @@ def redact_text(value: object, secrets: Iterable[str] = ()) -> str:
     rendered = _BEARER_RE.sub(bearer_sentinel, rendered)
     rendered = _NAMED_SECRET_RE.sub(lambda match: f"{match.group(1)}{match.group(2)}[REDACTED]", rendered)
     rendered = rendered.replace(bearer_sentinel, "Bearer [REDACTED]")
-    for secret in sorted((secret for secret in secrets if secret), key=len, reverse=True):
+    for secret in sorted(secret_values, key=len, reverse=True):
         rendered = rendered.replace(secret, "[REDACTED]")
     return rendered
 
@@ -44,7 +54,7 @@ def redact_value(value: Any, secrets: Iterable[str] = ()) -> Any:
     provider/tool implementation.  It always returns JSON-compatible values
     and never follows an object graph indefinitely.
     """
-    secret_values = tuple(secret for secret in secrets if isinstance(secret, str) and secret)
+    secret_values = _normalize_secrets(secrets)
     active: set[int] = set()
 
     def walk(item: Any, depth: int = 0) -> Any:

@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.48 — 2026-08-31
+
+- Applied bounded secret-list validation directly inside `redact_text()` and
+  `redact_value()`, covering callers outside `ToolContext`.
+- Verification: session/redaction tests, manual direct-helper checks,
+  compileall, and diff checks passed.
+
 ## v0.8.47 — 2026-08-31
 
 - Normalized non-finite floats in recursive redaction to a safe placeholder,
