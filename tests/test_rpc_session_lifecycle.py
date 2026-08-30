@@ -508,6 +508,21 @@ def test_rpc_refresh_merges_memory_result_with_newer_durable_state(tmp_path):
     assert result["result"] == [{"ok": True}]
 
 
+def test_rpc_events_refreshes_top_level_state_after_wait(tmp_path):
+    handle = _call({"method": "session.open", "params": {"workspace": str(tmp_path)}})["data"]["session"]
+    from forgecode import rpc
+    info = rpc._RPC_SESSIONS[handle]
+    info["state"] = "running"
+    rpc._persist_session(handle, info)
+    external = dict(info)
+    external["state"] = "completed"
+    external["sequence"] = 1
+    external["events"] = [{"sequence": 1, "type": "run_finished", "state": "completed"}]
+    rpc._persist_session(handle, external)
+    data = _call({"method": "session.events", "params": {"session": handle, "after": 0, "wait": 0}})["data"]
+    assert data["state"] == "completed" and data["sequence"] == 1 and data["active_flags"] == []
+
+
 def test_rpc_cancel_exposes_auditable_cancel_request(tmp_path):
     handle = _call({"method": "session.open", "params": {"workspace": str(tmp_path)}})["data"]["session"]
     cancelled = _call({"method": "session.cancel", "params": {"session": handle}})

@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.23 — 2026-08-30
+
+- Refreshed top-level lifecycle metadata in `session.events` after long-poll
+  updates so state, sequence, execution, and active flags match returned events.
+- Verification: targeted RPC regression, manual durable update simulation,
+  compileall, and diff checks passed.
+
 ## v0.8.22 — 2026-08-30
 
 - Refreshed `execution` metadata in `session.wait` responses after durable
