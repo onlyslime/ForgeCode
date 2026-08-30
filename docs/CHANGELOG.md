@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.7.5 — 2026-08-30
+
+- Hardened background task observability with a 64-task active limit, strict
+  output accounting, bounded line truncation, process IDs, and stable elapsed
+  duration after completion.
+- Added regression coverage for hard output bounds and stable completion state.
+
 ## v0.7.4 — 2026-08-30
 
 - Provider capability declarations are now enforced before a tool-enabled

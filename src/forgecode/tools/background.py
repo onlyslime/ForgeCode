@@ -14,14 +14,21 @@ class _Process:
     output: list[str] = field(default_factory=list)
     lock: threading.Lock = field(default_factory=threading.Lock)
     truncated: bool = False
+    output_chars: int = 0
+    finished: float | None = None
 
 class ProcessManager:
-    def __init__(self, max_output_chars: int = 100_000):
+    def __init__(self, max_output_chars: int = 100_000, max_tasks: int = 64):
         self.max_output_chars = max_output_chars
+        self.max_tasks = max_tasks
         self._items: dict[str, _Process] = {}
         self._lock = threading.Lock()
 
     def start(self, command: str, root, task_id: str) -> _Process:
+        with self._lock:
+            active = sum(item.process.poll() is None for item in self._items.values())
+            if active >= self.max_tasks:
+                raise RuntimeError("background task limit exceeded")
         process = subprocess.Popen(command, cwd=root, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
         item = _Process(process, command, time.monotonic())
         with self._lock: self._items[task_id] = item
@@ -29,10 +36,15 @@ class ProcessManager:
             assert process.stdout is not None
             for line in process.stdout:
                 with item.lock:
-                    if sum(len(x) for x in item.output) < self.max_output_chars:
-                        item.output.append(line.rstrip("\r\n"))
-                    else: item.truncated = True
+                    clean = line.rstrip("\r\n")
+                    remaining = self.max_output_chars - item.output_chars
+                    if remaining > 0:
+                        item.output.append(clean[:remaining])
+                        item.output_chars += min(len(clean), remaining)
+                    if len(clean) > remaining:
+                        item.truncated = True
             process.wait()
+            with item.lock: item.finished = time.monotonic()
         threading.Thread(target=drain, name=f"forgecode-bg-{task_id[:8]}", daemon=True).start()
         return item
 
@@ -44,7 +56,8 @@ class ProcessManager:
         if item is None: return {"error": "unknown_task", "task_id": task_id}
         with item.lock: lines = item.output[cursor:]; total = len(item.output); truncated = item.truncated
         code = item.process.poll()
-        return {"task_id": task_id, "status": "running" if code is None else ("completed" if code == 0 else "failed"), "exit_code": code, "output": "\n".join(lines), "cursor": total, "truncated": truncated, "duration_seconds": round(time.monotonic() - item.started, 3)}
+        ended = item.finished if item.finished is not None else time.monotonic()
+        return {"task_id": task_id, "status": "running" if code is None else ("completed" if code == 0 else "failed"), "exit_code": code, "output": "\n".join(lines), "cursor": total, "truncated": truncated, "duration_seconds": round(ended - item.started, 3), "pid": item.process.pid}
 
 class RunBackgroundTool:
     definition = ToolDefinition("run_background", "Start a bounded approved background command and return its task ID.", {"type":"object","properties":{"command":{"type":"string"}},"required":["command"]}, side_effecting=True)
