@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.7.25 — 2026-08-30
+
+- Static `symbol_hover` now recognizes common JavaScript/TypeScript arrow
+  function and exported variable definitions.
+- Results remain bounded and explicitly marked as static precision.
+
 ## v0.7.24 — 2026-08-30
 
 - Exposed `rpc_describe()` through the Python embedding API and package-level

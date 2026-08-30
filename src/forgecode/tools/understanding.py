@@ -59,7 +59,7 @@ class FindDefinitionTool:
         symbol = _required(arguments, "symbol")
         if not isinstance(symbol, str) or not re.fullmatch(r"[A-Za-z_]\w{0,127}", symbol):
             raise ValueError("symbol must be a simple identifier")
-        pattern = re.compile(rf"^\s*(?:(?:async)\s+)?(?:def|class|function|export\s+(?:async\s+)?function|export\s+class)\s+{re.escape(symbol)}\b")
+        pattern = re.compile(rf"^\s*(?:(?:async)\s+)?(?:def|class|function|export\s+(?:async\s+)?function|export\s+class)\s+{re.escape(symbol)}\b|^\s*(?:export\s+)?(?:const|let|var)\s+{re.escape(symbol)}\s*=.*=>")
         rows = []
         for path in _source_files(context, arguments.get("path")):
             try: lines = path.read_text(encoding="utf-8").splitlines()
@@ -96,7 +96,7 @@ class SymbolHoverTool:
         if not isinstance(symbol, str) or not re.fullmatch(r"[A-Za-z_]\w{0,127}", symbol): raise ValueError("symbol must be a simple identifier")
         radius = arguments.get("context_lines", 2)
         if isinstance(radius, bool) or not isinstance(radius, int) or not 0 <= radius <= 10: raise ValueError("context_lines must be between 0 and 10")
-        pattern = re.compile(rf"^\s*(?:(?:async)\s+)?(?:def|class|function|export\s+(?:async\s+)?function|export\s+class)\s+{re.escape(symbol)}\b")
+        pattern = re.compile(rf"^\s*(?:(?:async)\s+)?(?:def|class|function|export\s+(?:async\s+)?function|export\s+class)\s+{re.escape(symbol)}\b|^\s*(?:export\s+)?(?:const|let|var)\s+{re.escape(symbol)}\s*=.*=>")
         for path in _source_files(context, arguments.get("path")):
             try: lines = path.read_text(encoding="utf-8").splitlines()
             except (OSError, UnicodeError): continue

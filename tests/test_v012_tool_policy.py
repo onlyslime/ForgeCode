@@ -92,6 +92,15 @@ def test_symbol_hover_returns_static_bounded_context(tmp_path) -> None:
     assert "answer" in result.output and "return x" in result.output
 
 
+def test_symbol_hover_recognizes_typescript_arrow_exports(tmp_path) -> None:
+    from forgecode.tools import SymbolHoverTool
+    (tmp_path / "sample.ts").write_text("export const greet = (name: string) => {\n  return name\n}\n", encoding="utf-8")
+    guard = WorkspaceGuard(tmp_path)
+    result = SymbolHoverTool().execute({"symbol": "greet", "path": "sample.ts"}, ToolContext(guard))
+    assert result.ok and result.metadata["line"] == 1
+    assert result.metadata["precision"] == "static"
+
+
 def test_registry_policy_intersection_preserves_stable_unavailable_result(tmp_path: Path) -> None:
     guard = WorkspaceGuard(tmp_path)
     base = build_default_registry(guard)
