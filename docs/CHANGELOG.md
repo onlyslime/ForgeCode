@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.52 — 2026-08-31
+
+- Preserved the existing non-finite redaction marker while using a distinct
+  marker for finite oversized floats, maintaining compatibility for clients.
+- Verification: session/redaction tests, manual serialization checks,
+  compileall, and diff checks passed.
+
 ## v0.8.51 — 2026-08-31
 
 - Normalized finite but oversized floats in recursive redaction, preventing
