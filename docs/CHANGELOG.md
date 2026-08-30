@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.206 — 2026-08-31
+
+- **Cancellation audit hardening:** cancellation reasons are normalized to a
+  single line before being retained in diagnostics and session metadata.
+- **Verification:** provider protocol tests, compile, diff checks, and a
+  manual newline/tab normalization check passed.
+
 ## v0.8.205 — 2026-08-31
 
 - **Request correlation hardening:** provider request IDs now reject control

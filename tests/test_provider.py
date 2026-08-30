@@ -14,6 +14,13 @@ def test_provider_context_rejects_control_character_request_id():
         ProviderContext(request_id="req\nforged")
 
 
+def test_cancellation_reason_is_normalized_to_one_line():
+    from forgecode.models import CancellationToken
+    token = CancellationToken()
+    token.cancel("user\nforged\tclaim")
+    assert "\n" not in token.reason and "\t" not in token.reason
+
+
 class RecordingTransport:
     def __init__(self, status=200, payload=None):
         self.status = status

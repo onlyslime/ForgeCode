@@ -28,6 +28,10 @@ class CancellationToken:
             first = not self._event.is_set()
             if first:
                 safe_reason = str(reason or "cancelled")[:256]
+                # Cancellation reasons are copied into session/audit metadata;
+                # keep them single-line so untrusted callers cannot forge log
+                # records or corrupt line-oriented displays.
+                safe_reason = "".join(ch if ord(ch) >= 32 and ord(ch) != 127 else " " for ch in safe_reason)
                 self._reason = safe_reason
                 self._event.set()
             return first
