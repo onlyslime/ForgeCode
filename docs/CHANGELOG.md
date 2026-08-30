@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.144 — 2026-08-31
+
+- **Request header safety:** custom transport request headers now enforce bounded, non-empty string keys and values without control characters.
+- **Verification:** provider tests, compile checks, and manual malformed-header inspection passed.
+
 ## v0.8.143 — 2026-08-31
 
 - **Response body strictness:** provider factory response translation now requires bytes-like bodies, matching request transport contracts.

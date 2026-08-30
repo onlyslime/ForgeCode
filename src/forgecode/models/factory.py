@@ -43,7 +43,7 @@ class _ProtocolTransport:
     def _request(self, url: str, headers: dict[str, str], body: bytes) -> tuple[str, dict[str, str], bytes]:
         if not isinstance(url, str) or not url or len(url) > 2_048 or any(ord(ch) < 32 for ch in url):
             raise ValueError("provider request URL is invalid")
-        if not isinstance(headers, dict) or any(not isinstance(key, str) or not isinstance(value, str) for key, value in headers.items()):
+        if not isinstance(headers, dict) or len(headers) > 128 or any(not isinstance(key, str) or not isinstance(value, str) or not key or len(key) > 256 or len(value) > 8_000 or any(ord(ch) < 32 for ch in key + value) for key, value in headers.items()):
             raise ValueError("provider request headers are invalid")
         if not isinstance(body, (bytes, bytearray)):
             raise ValueError("provider request body must be bytes")
