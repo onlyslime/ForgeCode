@@ -635,7 +635,7 @@ CLI/TUI
 | F23 | MCP/外部工具 | Claude、Cursor、Cline、Continue、Cascade | P2 | 预留 ToolRegistry 接口，不作为 MVP 依赖 |
 | F24 | 浏览器/截图 | Cursor、Claude、Cascade、Devin | P2 | 后续以独立 BrowserTool 接入，不能绕过审批 |
 | F25 | 子代理 | Claude、Cursor、OpenCode、Cline、Devin | P2 | 后续限制独立上下文、权限和输出大小 |
-| F26 | Worktree/并行 | Codex、Cursor、Cline、Zed、Devin | P2 | 后续增加冲突检测和合并策略 |
+| F26 | Worktree/并行 | Codex、Cursor、Cline、Zed、Devin | P1/P2 | 已有 workspace-local 创建/清理与 session owner；后续增加并行调度、冲突检测和合并策略 |
 | F27 | CI/PR/云端交付 | Copilot、Codex cloud、Devin、Replit Agent | P2 | 本题仅保留可复制的 headless CLI 输出 |
 | F28 | 日志/可观测性 | Devin Progress、Cline checkpoint、Codex logs | P0 | 每轮记录模型、工具、耗时、参数摘要、结果和错误 |
 
@@ -645,7 +645,7 @@ CLI/TUI
 
 **建议做（P1）**：F16、F17、F19-F22。它们分别解决长上下文、先计划后执行、失败恢复、可审查交付、项目约束和演示复现问题，代码量有限但显著提高可信度。
 
-**明确后置（P2）**：F23-F27。MCP、浏览器、子代理、worktree、云端和企业治理在市场上重要，但会引入新的协议、并发、凭据、网络和部署风险；在截止日前只保留接口或写入路线图，不让它们阻塞本地闭环。
+**明确后置（P2）**：F23-F25、F27。MCP、浏览器、子代理、云端和企业治理在市场上重要，但会引入新的协议、并发、凭据、网络和部署风险；worktree 已有安全的本地生命周期原型，自动并行调度仍后置，不让这些能力阻塞本地闭环。
 
 ## 10.2 需求到验收场景映射
 
@@ -718,12 +718,12 @@ provider 回归测试均已通过。
   拒绝结果、取消和 unresolved recovery 均有源码入口及回归测试；边界仍不是 OS
   sandbox，README 和交互说明已明确这一点。
 - **P1 长任务可靠性：部分完成**。checkpoint、事件 JSONL、上下文压缩和流式协议
-   重试已验证；同轮全只读工具已实现受控并行，worktree 已有受控生命周期但尚未自动
-   绑定会话，后台多任务界面仍未实现。
+   重试已验证；同轮全只读工具已实现受控并行，worktree 已有受控生命周期和 session
+   owner 记录，后台多任务界面与自动恢复仍未实现。
 - **P1 工程上下文：部分完成**。仓库 map、增量索引、符号列表和 bounded 诊断可用；
   LSP 级 definition/reference/hover 仍是后续工作。
 
-本审计以 `uv run pytest -rs` 的完整门禁（当前 496 passed、8 个 Windows symlink
+本审计以 `uv run pytest -rs` 的完整门禁（当前 520 passed、9 个 Windows symlink
 条件 skip、2 warnings；早期 v0.7.0 记录为 485 passed）及 `uv run forgecode doctor`
 输出为证据，不把未能访问的
 Codex 官方页面或未实现的竞品特性当作本项目已完成能力。
@@ -948,7 +948,7 @@ Tools/Permissions 文档和 Cline 工具/Plan 文档，ForgeCode 的优势是边
 | 隔离执行 | WorkspaceGuard、审批边界和 workspace-local worktree 生命周期；不是 OS sandbox | P1 |
 | 扩展生态 | skills/hooks 可用；无插件市场、MCP（按当前版本非目标） | P2 |
 
-下一切片应优先评估真正 LSP 的安全适配、worktree 与会话绑定和长期 daemon；每个切片都必须
+下一切片应优先评估真正 LSP 的安全适配、worktree 并行调度和长期 daemon；每个切片都必须
 保留当前工具调用、审批、取消和 WorkspaceGuard 的安全契约。
 
 ### 审批策略实现（v0.7.18–v0.7.19）
