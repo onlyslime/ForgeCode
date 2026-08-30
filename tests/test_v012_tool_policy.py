@@ -42,6 +42,12 @@ def test_cli_tool_policy_supports_audited_risk_groups() -> None:
     assert parse_tool_policy_options(None, "execution", available=available) == ToolPolicy(deny=("run_command",))
 
 
+def test_execution_group_includes_background_lifecycle_tools() -> None:
+    available = ("run_background", "process_status", "poll_process", "list_processes", "kill_process")
+    policy = parse_tool_policy_options("execution", available=available)
+    assert set(policy.allow) == set(available)
+
+
 def test_registry_policy_intersection_preserves_stable_unavailable_result(tmp_path: Path) -> None:
     guard = WorkspaceGuard(tmp_path)
     base = build_default_registry(guard)

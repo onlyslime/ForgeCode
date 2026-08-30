@@ -145,9 +145,9 @@ def parse_tool_policy_options(
     known = tuple(str(name) for name in available)
     known_set = set(known)
     groups = {
-        "read_only": {name for name in known if name in {"list_files", "read_file", "search", "workspace_summary", "repository_map", "find_files", "diagnostics", "read_range", "list_symbols", "file_metadata", "find_definition", "find_references", "process_status", "poll_process", "list_processes", "git_status", "git_diff", "git_log"}},
+        "read_only": {name for name in known if name in {"list_files", "read_file", "search", "workspace_summary", "repository_map", "find_files", "read_range", "list_symbols", "file_metadata", "find_definition", "find_references", "git_status", "git_diff", "git_log"}},
         "changes": {name for name in known if name in {"write_file", "apply_patch", "git_commit"}},
-        "execution": {name for name in known if name in {"run_command", "run_background", "kill_process"}},
+        "execution": {name for name in known if name in {"run_command", "run_background", "process_status", "poll_process", "list_processes", "kill_process"}},
         "evidence": {name for name in known if name in {"review", "test", "diagnostics", "git_status", "git_diff", "git_log"}},
     }
 

@@ -318,11 +318,11 @@ def _add_tool_policy_arguments(parser: argparse.ArgumentParser) -> None:
     """Add Pi-inspired runtime tool narrowing options to a command parser."""
     parser.add_argument(
         "--tools",
-        help="comma-separated allowlist of built-in tools (can only narrow configured policy)",
+        help="comma-separated tools or audited groups (read_only, changes, execution, evidence); can only narrow policy",
     )
     parser.add_argument(
         "--exclude-tools",
-        help="comma-separated built-in tools to disable (can only narrow configured policy)",
+        help="comma-separated tools or audited groups to disable (can only narrow policy)",
     )
     parser.add_argument(
         "--no-tools",
