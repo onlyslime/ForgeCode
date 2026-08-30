@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.38 — 2026-08-30
+
+- Hardened force-push detection to cover `git -C <repo> push` and `+refspec`
+  forms, keeping irreversible repository operations at the hard-block level.
+- Verification: command-classifier tests, manual variant checks, compileall,
+  and diff checks passed.
+
 ## v0.8.37 — 2026-08-30
 
 - Added a realistic bounded range for provider usage counters, rejecting

@@ -22,7 +22,9 @@ _HARD_BLOCK_PATTERNS = (
     (re.compile(r"\bformat(?:\.com)?\b", re.I), "disk format command", "privilege_or_system"),
     (re.compile(r"\bgit\s+reset\s+--hard\b", re.I), "irreversible git reset", "repository_irreversible"),
     (re.compile(r"\bgit\s+clean\s+-[a-z]*f[a-z]*\b", re.I), "irreversible git clean", "repository_irreversible"),
-    (re.compile(r"\bgit\s+push\s+[^\n]*--force(?:-with-lease)?\b", re.I), "force push", "repository_irreversible"),
+    # Permit harmless global git options (for example ``git -C repo push``)
+    # and force refspecs (``+main``), both of which are irreversible pushes.
+    (re.compile(r"\bgit(?:\s+-C\s+[^\s]+)*\s+push\s+[^\n]*(?:--force(?:-with-lease)?\b|(?:^|\s)\+[^\s]+)", re.I), "force push", "repository_irreversible"),
     (
         re.compile(
             r"(?:rm\s+(?:-[a-z]*r[a-z]*f\s+|--\s+)/(?=\s|$)|"
