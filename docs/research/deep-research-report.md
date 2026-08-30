@@ -675,17 +675,18 @@ CLI/TUI
 - [x] 每个 P0/P1 能力都有可执行验收标准或演示场景。
 - [x] 已明确竞品参考与本题自研实现的边界，避免误用现成 agent 框架。
 
-## ForgeCode 当前差距复核（2026-08-29）
+## ForgeCode 当前差距复核（2026-08-30，v0.7.25）
 
 本节以当前仓库源码、定向测试和正常 `fcc` 工作流为准；竞品能力只作为产品
 形态基线，不把未能直接访问的页面当作已验证事实。OpenAI 官方 Codex 页面在
-本轮环境返回 HTTP 403，因此以下结论不声称读取了 Codex 源码。
+本轮环境返回 HTTP 403，因此不扩展 Codex 产品页面结论；Codex GitHub Contents API
+可访问，审批 schema 证据已在下文单独记录。
 
 | 领域 | ForgeCode 现状 | 主要差距 | 优先级 |
 |---|---|---|---|
 | 交互反馈 | 阶段标题、工具时间线、耗时、文件预览、红绿 diff、文本 delta、结果卡 | 仍可加强长任务状态聚合 | P0 |
 | 工具协议 | 自研 schema、完整 JSON 校验、SSE 防重复/不完整调用，流中断有界重试；同轮全只读调用受控并行 | 更完整 capability negotiation/fallback | P1 |
-| 上下文 | 仓库 map、引用解析、增量索引、压缩、有界历史；新增静态 definition/reference 导航 | 仍缺少 LSP 语义 hover、跨语言精确解析和长期记忆 | P1 |
+| 上下文 | 仓库 map、引用解析、增量索引、压缩、有界历史；静态 definition/reference/hover 导航 | 仍缺少真正 LSP、跨语言精确解析和长期记忆 | P1 |
 | 会话恢复 | JSONL、checkpoint、transaction、undo、tree/import、冲突检测 | 缺少 worktree 隔离和后台多任务界面 | P1 |
 | 安全 | Plan/Act/Bypass、启动信任、风险分类、审批、硬拦截、脱敏 | 不是操作系统级沙箱，需持续明确边界 | P0 |
 | 验证 | 测试 profile、有限修复、review/export、轨迹评估 | 缺少语言服务和调试器集成 | P1 |
