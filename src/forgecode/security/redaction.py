@@ -65,7 +65,9 @@ def redact_value(value: Any, secrets: Iterable[str] = ()) -> Any:
         if isinstance(item, int):
             return item if item.bit_length() < 3_322 else "[oversized number omitted]"
         if isinstance(item, float):
-            return item if math.isfinite(item) and abs(item) <= 1_000_000_000_000_000 else "[non-finite or oversized number omitted]"
+            if not math.isfinite(item):
+                return "[non-finite number omitted]"
+            return item if abs(item) <= 1_000_000_000_000_000 else "[oversized number omitted]"
         if isinstance(item, str):
             return redact_text(item, secret_values)
         if isinstance(item, (bytes, bytearray, memoryview)):

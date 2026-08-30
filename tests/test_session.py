@@ -85,4 +85,4 @@ def test_redaction_walker_bounds_oversized_integers():
 
 def test_redaction_walker_bounds_oversized_floats():
     value = redact_value({"large": 1e308})
-    assert value["large"] == "[non-finite or oversized number omitted]"
+    assert value["large"] == "[oversized number omitted]"
