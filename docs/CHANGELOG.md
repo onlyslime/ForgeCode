@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.175 — 2026-08-31
+
+- **Quality process cancellation:** `test` and `diagnostics` now run in an isolated process group with polling-based cancellation and bounded process-tree cleanup instead of blocking in `subprocess.run`.
+- **Verification:** quality/cancellation tests, compile checks, and manual mid-run cancellation inspection passed.
+
 ## v0.8.174 — 2026-08-31
 
 - **Background process-tree cleanup:** background commands now run in an isolated process group/session and kill requests terminate the owned process tree with bounded cleanup and race-safe exit handling.

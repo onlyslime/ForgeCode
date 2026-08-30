@@ -2,10 +2,11 @@
 from __future__ import annotations
 import subprocess
 import os
+import time
 from typing import Any
 from .base import ToolContext, ToolDefinition, ToolResult
 from .filesystem import ListFilesTool
-from .shell import classify_command
+from .shell import classify_command, _terminate_process_tree
 
 class FindFilesTool:
     definition = ToolDefinition("find_files", "Find workspace files by glob pattern.", {"type":"object","properties":{"pattern":{"type":"string"},"max_files":{"type":"integer"}},"required":["pattern"]})
@@ -36,13 +37,30 @@ class _CheckTool:
                 for name, value in os.environ.items()
                 if not any(marker in name.upper() for marker in ("API_KEY", "APIKEY", "TOKEN", "SECRET", "PASSWORD", "COOKIE"))
             }
-            p = subprocess.run(command, cwd=context.guard.root, shell=True, env=environment, capture_output=True, text=True, timeout=min(60.0, context.remaining_seconds(60.0)), check=False)
+            options = {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if os.name == "nt" else {"start_new_session": True}
+            p = subprocess.Popen(command, cwd=context.guard.root, shell=True, env=environment, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, **options)
+            deadline = time.monotonic() + context.remaining_seconds(60.0)
+            while p.poll() is None:
+                if context.cancelled:
+                    terminated = _terminate_process_tree(p)
+                    stdout, stderr = p.communicate(timeout=5)
+                    return ToolResult(False, "check cancelled", {"error": "cancelled", "termination_result": "confirmed" if terminated else "unresolved", **risk_metadata})
+                if time.monotonic() >= deadline:
+                    raise subprocess.TimeoutExpired(command, 60.0)
+                time.sleep(0.05)
+            stdout, stderr = p.communicate()
         except subprocess.TimeoutExpired:
+            if 'p' in locals() and p.poll() is None:
+                _terminate_process_tree(p)
+                try:
+                    stdout, stderr = p.communicate(timeout=5)
+                except subprocess.TimeoutExpired:
+                    stdout, stderr = "", ""
             error = "deadline_exceeded" if context.remaining_seconds(0) <= 0 else "check_timeout"
             return ToolResult(False, f"{self.definition.name} timed out", {"error": error, **risk_metadata})
         except OSError as exc:
             return ToolResult(False, f"check failed: {type(exc).__name__}", {"error": "check_failed"})
-        output = (p.stdout + ("\n" + p.stderr if p.stderr else "")).strip()[:20_000]
+        output = (stdout + ("\n" + stderr if stderr else "")).strip()[:20_000]
         return ToolResult(p.returncode == 0, output or ("passed" if p.returncode == 0 else "failed"), {"exit_code": p.returncode, **risk_metadata})
 
 class TestTool(_CheckTool):
