@@ -684,14 +684,14 @@ CLI/TUI
 | 领域 | ForgeCode 现状 | 主要差距 | 优先级 |
 |---|---|---|---|
 | 交互反馈 | 阶段标题、工具时间线、耗时、文件预览、红绿 diff、文本 delta、结果卡 | 仍可加强长任务状态聚合 | P0 |
-| 工具协议 | 自研 schema、完整 JSON 校验、SSE 防重复/不完整调用，流中断有界重试 | 同轮工具顺序执行，尚无安全并行调度 | P1 |
+| 工具协议 | 自研 schema、完整 JSON 校验、SSE 防重复/不完整调用，流中断有界重试；同轮全只读调用受控并行 | 更完整 capability negotiation/fallback | P1 |
 | 上下文 | 仓库 map、引用解析、增量索引、压缩、有界历史 | 缺少 LSP 符号/诊断和长期记忆 | P1 |
 | 会话恢复 | JSONL、checkpoint、transaction、undo、tree/import、冲突检测 | 缺少 worktree 隔离和后台多任务界面 | P1 |
 | 安全 | Plan/Act/Bypass、启动信任、风险分类、审批、硬拦截、脱敏 | 不是操作系统级沙箱，需持续明确边界 | P0 |
 | 验证 | 测试 profile、有限修复、review/export、轨迹评估 | 缺少语言服务和调试器集成 | P1 |
 | 扩展发布 | Skills、hooks、SDK、JSONL RPC、工具收窄、uv/独立二进制布局 | 缺少 MCP、插件市场、跨平台一键安装 | P2 |
 
-截至当前 v0.7.0，正常交互工作流还提供 `/context`（有界索引健康度）和
+截至当前 v0.7.1，正常交互工作流还提供 `/context`（有界索引健康度）和
 `/events [limit] [kind]`（可筛选、带相对耗时和错误码的持久化事件尾部）。
 这些能力不改变工具权限，只把已有审计证据暴露给用户；对应交互、机器契约和
 provider 回归测试均已通过。
@@ -709,7 +709,7 @@ provider 回归测试均已通过。
 5. **P2 生态能力**：worktree、多代理、MCP、浏览器/视觉、远程分享和一键安装
    后置，不挤占需求→修改→验证闭环。
 
-### 0.7.0 实施审计（2026-08-30）
+### 0.7.1 实施审计（2026-08-30）
 
 - **P0 可见闭环：已验证**。普通 `fcc` 已具备阶段、文本增量、工具时间线、
   真实改动文件、验证结果、耗时、会话指标、`/context` 和可筛选 `/events`。
@@ -717,8 +717,7 @@ provider 回归测试均已通过。
   拒绝结果、取消和 unresolved recovery 均有源码入口及回归测试；边界仍不是 OS
   sandbox，README 和交互说明已明确这一点。
 - **P1 长任务可靠性：部分完成**。checkpoint、事件 JSONL、上下文压缩和流式协议
-  重试已验证；同轮只读工具并行、worktree 隔离和后台多任务仍未实现，不能在路线图
-  中标记为完成。
+   重试已验证；同轮全只读工具已实现受控并行，worktree 隔离和后台多任务仍未实现。
 - **P1 工程上下文：部分完成**。仓库 map、增量索引、符号列表和 bounded 诊断可用；
   LSP 级 definition/reference/hover 仍是后续工作。
 
@@ -726,16 +725,23 @@ provider 回归测试均已通过。
 条件 skip、2 warnings）及 `uv run forgecode doctor` 输出为证据，不把未能访问的
 Codex 官方页面或未实现的竞品特性当作本项目已完成能力。
 
-### 下一阶段 P1 设计契约：只读工具并行
+### 0.7.1 实施审计：只读工具受控并行（2026-08-30）
 
-该能力仍未实现，以下契约先作为实现前置条件：
+- 同一模型响应中的调用仅在全部为无副作用工具时并行，线程上限为 4。
+- `write_file`、`apply_patch`、`run_command`、测试、事务及混合批次保持串行，
+  不绕过审批、WorkspaceGuard、取消或 checkpoint。
+- 结果按原始 tool-call 顺序回填，事件由主循环顺序写入，并记录
+  `tool_batch_parallel` 证据事件。
+- 定向回归覆盖并发耗时、call id 顺序和事件记录；完整门禁在发布前执行。
+
+### 只读工具并行契约（现行）
 
 - **范围**：仅允许 `read_file`、`search`、`list_files`、`workspace_summary` 和
   `repository_map`；每个调用必须通过现有 WorkspaceGuard、输出上限和取消令牌。
 - **非目标**：不并行 `write_file`、`apply_patch`、`run_command`、测试、事务、hooks
   或任何 side-effecting tool；不改变 Plan/Act/Bypass 权限模型；不引入线程池以外的
   agent SDK 或外部调度服务。
-- **完成条件**：同一模型响应中的只读调用可受控并行；结果按原始 tool-call 顺序
+- **完成条件**：同一模型响应中的全只读调用可受控并行；结果按原始 tool-call 顺序
   回填；每个调用仍有独立错误、超时和取消结果；总调用数、总输出和线程数有硬上限；
   session audit 事件保持单调序列。
 - **失败语义**：单个只读调用失败不丢弃其它结果；聚合结果必须保留每个 call id；

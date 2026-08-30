@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.7.1 — 2026-08-30
+
+- Same-turn batches made entirely of read-only tools now run with bounded
+  concurrency (up to four workers), while mixed or side-effecting batches stay
+  serial. Results, call IDs, checkpoints, and audit events retain model order.
+- Added regression coverage for concurrent execution and deterministic result
+  ordering.
+
 ## v0.7.0 — 2026-08-29
 
 - Full regression gate now passes: 485 tests passed, with 8 Windows

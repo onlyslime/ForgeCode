@@ -1010,6 +1010,32 @@ class AgentLoop:
                 result = self._with_current_audit(result)
                 return result
 
+            # Read-only calls can safely overlap when the model emits a batch.
+            # Keep every mixed or side-effecting batch strictly serial so a
+            # read cannot race a write/command and approval/checkpoint order is
+            # unchanged.  Futures are consumed in model order below.
+            parallel_results: dict[str, Any] = {}
+            batch_calls = response.message.tool_calls
+            definitions = {definition.name: definition for definition in self.registry.definitions()}
+            if len(batch_calls) > 1 and all(
+                call.name in definitions and not definitions[call.name].side_effecting
+                for call in batch_calls
+            ):
+                executor = concurrent.futures.ThreadPoolExecutor(
+                    max_workers=min(4, len(batch_calls)),
+                    thread_name_prefix="forgecode-read",
+                )
+                futures = {
+                    call.id: executor.submit(self.registry.execute, call.name, call.arguments, self.context)
+                    for call in batch_calls
+                }
+                # Wait for the bounded batch to finish before entering the
+                # normal event/checkpoint path.  This keeps lifecycle updates
+                # deterministic while the actual I/O overlaps.
+                parallel_results = {call_id: future.result() for call_id, future in futures.items()}
+                executor.shutdown(wait=True)
+                self._record("tool_batch_parallel", {"count": len(batch_calls), "max_workers": min(4, len(batch_calls))})
+
             for call in response.message.tool_calls:
                 paused_result = await self._pause_at_boundary(messages, verification_ok, explored)
                 if paused_result is not None:
@@ -1050,7 +1076,7 @@ class AgentLoop:
                     if self.context.cancelled:
                         return self._cancelled_result(messages, verification_ok, explored, reason=self.context.cancellation_reason)
                 tool_started = time.monotonic()
-                tool_result = self.registry.execute(call.name, call.arguments, self.context)
+                tool_result = parallel_results.get(call.id) or self.registry.execute(call.name, call.arguments, self.context)
                 tool_duration = round(time.monotonic() - tool_started, 3)
                 if isinstance(tool_result.metadata, dict) and tool_result.metadata.get("error") == "paused" and not self._interactive_pause:
                     # The non-interactive API keeps its historical terminal
@@ -1141,6 +1167,7 @@ class AgentLoop:
                     return self._cancelled_result(messages, verification_ok, explored, reason=self.context.cancellation_reason)
                 if side_effecting and self.lifecycle.state is RunState.ACTING:
                     self._transition(RunState.DISCOVERING, reason="tool result recorded")
+
 
         error_text = f"maximum agent steps reached ({self.config.max_steps})"
         self._fail_state("step budget exhausted")

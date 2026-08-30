@@ -1,4 +1,5 @@
 import asyncio
+import time
 from pathlib import Path
 
 from forgecode.agent import AgentConfig, AgentLoop
@@ -6,6 +7,7 @@ from forgecode.models import Message, ModelResponse, ToolCall
 from forgecode.security import WorkspaceGuard
 from forgecode.storage import SessionStore
 from forgecode.tools import AgentMode, AllowAllApproval, DenyAllApproval, ToolContext, build_default_registry
+from forgecode.tools.base import ToolDefinition, ToolRegistry, ToolResult
 
 
 class ScriptedProvider:
@@ -34,6 +36,41 @@ def test_multiple_tool_calls_preserve_ids_and_results(tmp_path):
     assert (tmp_path / "b.txt").read_text() == "b"
     tool_messages = [message for message in provider.requests[1][0] if message.role == "tool"]
     assert [message.tool_call_id for message in tool_messages] == ["one", "two"]
+
+
+def test_read_only_tool_batch_runs_concurrently_and_keeps_result_order(tmp_path):
+    class SlowRead:
+        definition = ToolDefinition("slow_read", "slow read", {"type": "object"})
+
+        def execute(self, arguments, context):
+            time.sleep(0.08)
+            return ToolResult(True, str(arguments["value"]), {"value": arguments["value"]})
+
+    class Provider:
+        def __init__(self):
+            self.calls = 0
+
+        async def complete(self, messages, tools):
+            self.calls += 1
+            if self.calls == 1:
+                return ModelResponse(Message("assistant", tool_calls=(
+                    ToolCall("a", "slow_read", {"value": "first"}),
+                    ToolCall("b", "slow_read", {"value": "second"}),
+                )))
+            return ModelResponse(Message("assistant", "done"))
+
+    registry = ToolRegistry()
+    registry.register(SlowRead())
+    events = []
+    guard = WorkspaceGuard(tmp_path)
+    loop = AgentLoop(Provider(), registry, ToolContext(guard), on_event=lambda k, p: events.append((k, p)))
+    started = time.monotonic()
+    result = asyncio.run(loop.run("read both"))
+    elapsed = time.monotonic() - started
+    assert result.stopped_reason == "model_finished"
+    assert elapsed < 0.14
+    assert [m.tool_call_id for m in result.messages if m.role == "tool"] == ["a", "b"]
+    assert any(kind == "tool_batch_parallel" for kind, _ in events)
 
 
 def test_unknown_tool_is_returned_to_model(tmp_path):
