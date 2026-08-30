@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.166 — 2026-08-31
+
+- **Read deadline boundary:** `read_file` now checks cancellation and run deadlines before resolving or reading a workspace file.
+- **Verification:** command-boundary tests, compile checks, and manual expired-read inspection passed.
+
 ## v0.8.165 — 2026-08-31
 
 - **Filesystem scan deadlines:** `list_files` and `search` now observe cancellation and run deadlines during traversal, stopping safely instead of continuing unbounded scans after a run ends.

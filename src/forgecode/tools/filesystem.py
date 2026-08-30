@@ -122,6 +122,10 @@ class ReadFileTool:
     def execute(self, arguments, context):
         if not isinstance(arguments, dict):
             raise ValueError("arguments must be an object")
+        if context.cancelled:
+            return ToolResult(False, "file read cancelled before access", {"error": "cancelled"})
+        if context.remaining_seconds(10.0) <= 0:
+            return ToolResult(False, "file read skipped because the run deadline has expired", {"error": "deadline_exceeded"})
         path_value = _required(arguments, "path")
         path = context.guard.resolve(path_value, must_exist=True)
         lexical = Path(path_value)
