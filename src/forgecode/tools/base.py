@@ -139,8 +139,8 @@ class ToolRegistry:
     def __init__(self, *, max_output_chars: int = 20_000):
         self._tools: dict[str, Tool] = {}
         self._unavailable_tools: set[str] = set()
-        if max_output_chars < 1:
-            raise ValueError("max_output_chars must be positive")
+        if isinstance(max_output_chars, bool) or not isinstance(max_output_chars, int) or not 1 <= max_output_chars <= 1_000_000:
+            raise ValueError("max_output_chars must be an integer between 1 and 1000000")
         self.max_output_chars = max_output_chars
 
     def register(self, tool: Tool) -> None:

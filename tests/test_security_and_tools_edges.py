@@ -157,3 +157,13 @@ def test_registry_truncates_tool_output():
     result = registry.execute("huge", {}, context)
     assert result.metadata["truncated"] is True
     assert len(result.output) < 100
+
+
+def test_registry_output_limit_is_bounded_and_rejects_bool():
+    for value in (True, 0, 1_000_001):
+        try:
+            ToolRegistry(max_output_chars=value)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("expected bounded output limit validation")

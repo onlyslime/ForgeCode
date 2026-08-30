@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.39 — 2026-08-30
+
+- Bounded `ToolRegistry` output limits to integer values from 1 through
+  1,000,000, rejecting booleans and unbounded memory settings.
+- Verification: tool registry tests, compileall, diff checks, and manual
+  constructor-boundary validation passed.
+
 ## v0.8.38 — 2026-08-30
 
 - Hardened force-push detection to cover `git -C <repo> push` and `+refspec`
