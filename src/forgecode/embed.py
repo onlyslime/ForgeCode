@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import math
 import subprocess
 import threading
 import sys
@@ -75,7 +76,7 @@ def session_result(session: str, *, workspace: str | None = None, request_id: st
 def session_wait(session: str, *, workspace: str | None = None, timeout: float = 30.0, request_id: str | int | None = None, raise_for_status: bool = False) -> list[dict[str, Any]]:
     if not isinstance(session, str) or not session or len(session) > 512 or any(ch in session for ch in "\r\n"):
         raise ValueError("session must be bounded newline-safe text")
-    if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or timeout < 0 or timeout > 60:
+    if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or not math.isfinite(timeout) or timeout < 0 or timeout > 60:
         raise ValueError("timeout must be between 0 and 60 seconds")
     params: dict[str, Any] = {"session": session, "timeout": timeout}
     if workspace is not None:
@@ -188,7 +189,7 @@ def session_events(session: str, *, workspace: str | None = None, after: int = 0
     if not isinstance(session, str) or not session or len(session) > 512 or any(ch in session for ch in "\r\n"): raise ValueError("session must be bounded newline-safe text")
     if isinstance(after, bool) or not isinstance(after, int) or after < 0: raise ValueError("after must be a non-negative integer")
     if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 100: raise ValueError("limit must be between 1 and 100")
-    if isinstance(wait, bool) or not isinstance(wait, (int, float)) or wait < 0 or wait > 30: raise ValueError("wait must be between 0 and 30 seconds")
+    if isinstance(wait, bool) or not isinstance(wait, (int, float)) or not math.isfinite(wait) or wait < 0 or wait > 30: raise ValueError("wait must be between 0 and 30 seconds")
     if event_type is not None and (not isinstance(event_type, str) or not event_type or len(event_type) > 64 or any(ch in event_type for ch in "\r\n")): raise ValueError("event_type must be bounded newline-safe text")
     params: dict[str, Any] = {"session": session, "after": after, "limit": limit, "wait": wait}
     if event_type is not None: params["type"] = event_type

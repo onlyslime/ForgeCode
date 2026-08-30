@@ -106,6 +106,10 @@ def test_embed_session_result_validates_handle():
     with pytest.raises(ValueError):
         session_wait("x", timeout=61)
     with pytest.raises(ValueError):
+        session_wait("x", timeout=float("nan"))
+    with pytest.raises(ValueError):
+        session_events("x", wait=float("nan"))
+    with pytest.raises(ValueError):
         session_wait("x", workspace="bad\npath")
     with pytest.raises(ValueError):
         session_tree(limit=201)

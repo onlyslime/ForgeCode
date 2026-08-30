@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.8.27 — 2026-08-30
+
+- Rejected non-finite timeout values in Python embedding `session_wait` and
+  `session_events`, aligning SDK validation with Node and RPC behavior.
+- Verification: Python embed contract tests and compileall passed.
+
 ## v0.8.26 — 2026-08-30
 
 - Added the missing Python `session_status()` embedding helper and package-level
