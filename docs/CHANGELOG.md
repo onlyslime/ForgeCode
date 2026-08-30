@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.7.43 — 2026-08-30
+
+- `session.events` supports bounded long-polling with `wait` (0–30 seconds),
+  waking when a new event is persisted while preserving cursor semantics.
+- Completion and failure paths now notify event waiters without changing worker
+  isolation or side-effect approval behavior.
+
 ## v0.7.42 — 2026-08-30
 
 - `session.events` now accepts an optional bounded `type` filter, making RPC

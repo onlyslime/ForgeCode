@@ -1200,6 +1200,13 @@ pytest collection warning。
 每项实现都需要源码入口、定向测试、CLI 可观察证据和 changelog 条目；不以
 “功能数量”替代可靠性、安全边界或可解释的失败结果。
 
+### v0.7.43 实施审计：bounded RPC event long-poll（2026-08-30）
+
+- **范围**：`session.events` 增加 0–30 秒 `wait` 参数，与 `after`、`type`、`limit`
+  组合进行有界 long-poll；事件完成/失败持久化后唤醒等待者。
+- **非目标**：不提供无限订阅、推送 socket、跨进程 daemon 或绕过现有 session 权限。
+- **验证**：RPC session lifecycle 定向测试和完整发布门禁覆盖；空批次仍返回游标与截断信息。
+
 ### Codex app-server schema 复核（2026-08-30）
 
 本轮通过 GitHub Contents API（HTTP 200）枚举 Codex app-server v2 的公开 schema
