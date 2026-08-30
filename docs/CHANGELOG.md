@@ -1133,7 +1133,9 @@
   skills, repository context, and auditable CLI contracts.
 # v0.8.0 — 2026-08-30
 
-- Refined the interactive terminal presentation with persistent command hints,
-  visible tool cards, clearer error guidance, and phase-aware progress output.
+- Added a full-screen prompt-toolkit TUI with a scrolling transcript, fixed
+  status bar, multiline input, command completion, and Esc/Ctrl-C controls.
+- Tool cards, persistent command hints, clearer error guidance, and phase-aware
+  progress output are rendered inside the TUI instead of appended to the shell.
 - Long-running model waits are explicitly distinguished from active tool work.
 - Verification: targeted interactive UI tests, compileall, and forgecode doctor.
