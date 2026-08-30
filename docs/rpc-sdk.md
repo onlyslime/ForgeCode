@@ -31,6 +31,13 @@ The read-only `session.wait` method is likewise allowed after revocation and
 returns the terminal/recovery state without resuming execution.
 The persisted record includes only the bounded recent event window and its
 sequence, allowing cursor-based event recovery after daemon restart.
+Read-only `session.status`, `session.result`, `session.wait`, and
+`session.events` refresh a newer durable record when another daemon advances
+the handle. A state/execution change is noticed even when its sequence is
+unchanged. If the local process has a result that is not yet persisted, a
+durable snapshot with an empty result is merged without erasing that value.
+Active in-process workers remain authoritative and are never replaced by a
+stale disk snapshot.
 Each handle retains only the most recent 512 control/run events. Clients must
 use `next_sequence` and treat cursors older than the retained window as a
 resynchronization point.
