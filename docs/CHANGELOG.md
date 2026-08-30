@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.8.1 — 2026-08-30
+
+- Version synchronization release for the assessment submission build.
+- Verified the interactive CLI, machine-readable output modes, and local
+  provider-independent startup path.
+
 ## v0.7.61 — 2026-08-30
 
 - Google `generateContent` requests now preserve the selected model field when
