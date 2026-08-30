@@ -7,7 +7,7 @@ from forgecode.tools.shell import classify_command
 
 
 def test_command_classifier_handles_shell_and_git_variants():
-    blocked = ["GIT  RESET   --HARD HEAD", "git clean -xfd", "git push origin main --force-with-lease", "git -C repo push origin +main", "git --git-dir=.git push origin +main", "git -c core.sshCommand=ssh push origin +main", "shutdown /s", "sudo reboot"]
+    blocked = ["GIT  RESET   --HARD HEAD", "git clean -xfd", "git push origin main --force-with-lease", "git push origin --mirror", "git push origin --delete main", "git -C repo push origin +main", "git --git-dir=.git push origin +main", "git -c core.sshCommand=ssh push origin +main", "shutdown /s", "sudo reboot"]
     for command in blocked:
         risk, reasons, hard = classify_command(command)
         assert hard and reasons and risk in {"privilege_or_system", "repository_irreversible"}

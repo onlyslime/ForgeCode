@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.43 — 2026-08-31
+
+- Hardened destructive Git push detection to hard-block `--mirror` and
+  `--delete` operations alongside force pushes and force refspecs.
+- Verification: command classifier tests, manual destructive-push variants,
+  compileall, and diff checks passed.
+
 ## v0.8.42 — 2026-08-31
 
 - Extended force-push hard-block detection across Git `-c key=value` global

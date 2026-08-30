@@ -24,7 +24,7 @@ _HARD_BLOCK_PATTERNS = (
     (re.compile(r"\bgit\s+clean\s+-[a-z]*f[a-z]*\b", re.I), "irreversible git clean", "repository_irreversible"),
     # Permit harmless global git options (for example ``git -C repo push``)
     # and force refspecs (``+main``), both of which are irreversible pushes.
-    (re.compile(r"\bgit(?:\s+(?:-C\s+[^\s]+|-c\s+[^\s]+|--(?:git-dir|work-tree)=[^\s]+))*\s+push\s+[^\n]*(?:--force(?:-with-lease)?\b|(?:^|\s)\+[^\s]+)", re.I), "force push", "repository_irreversible"),
+    (re.compile(r"\bgit(?:\s+(?:-C\s+[^\s]+|-c\s+[^\s]+|--(?:git-dir|work-tree)=[^\s]+))*\s+push\s+[^\n]*(?:--(?:force(?:-with-lease)?|mirror|delete)\b|(?:^|\s)\+[^\s]+)", re.I), "irreversible push", "repository_irreversible"),
     (
         re.compile(
             r"(?:rm\s+(?:-[a-z]*r[a-z]*f\s+|--\s+)/(?=\s|$)|"
