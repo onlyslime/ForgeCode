@@ -27,6 +27,9 @@ def test_rpc_describe_exposes_versioned_session_capabilities() -> None:
     assert "mcp_elicitations" in approval["unsupported_granular_scopes"]
     assert payload["data"]["event_schema"]["version"] == 1
     assert "run_finished" in payload["data"]["event_schema"]["types"]
+    assert {"model_progress", "model_request", "tool_call", "tool_result", "verification_result"}.issubset(
+        payload["data"]["event_schema"]["types"]
+    )
     tools = payload["data"]["tools"]
     assert len(tools) == 31
     assert any(item["name"] == "git_worktree_create" and item["side_effecting"] for item in tools)

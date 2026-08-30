@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.7.52 — 2026-08-30
+
+- `rpc.describe` now advertises the complete bounded session event catalogue,
+  including model, tool, verification, context, transaction, and recovery
+  events already returned by `session.events`.
+- The catalogue is observational metadata only and does not grant permissions.
+
 ## v0.7.51 — 2026-08-30
 
 - Model progress, request, and response events now share a stable bounded

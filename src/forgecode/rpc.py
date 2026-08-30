@@ -48,7 +48,21 @@ _RPC_APPROVAL_CAPABILITIES = {
     "unsupported_granular_scopes": ("sandbox_approval", "rules", "skill_approval", "request_permissions", "mcp_elicitations"),
     "scope_decisions": ("allow", "ask", "deny"),
 }
-_RPC_EVENT_TYPES = ("pause", "resume", "cancel", "approval", "run_finished", "run_failed")
+# Event names exposed by ``session.events``.  This is an observability
+# catalogue, not an authorization grant; keeping it complete lets SDK clients
+# discover model/tool/verification progress without scraping a live session.
+_RPC_EVENT_TYPES = tuple(sorted({
+    "approval", "approval_request", "cancel", "cancellation", "checkpoint",
+    "command_start", "context_compacted", "context_compaction_error",
+    "context_compaction_skipped", "error", "final", "mode", "model_delta",
+    "model_message", "model_progress", "model_request", "pause",
+    "patch_preview", "pending_action_unresolved", "plan_summary",
+    "provider_attempt", "provider_retry", "recovery_conflict", "repository_snapshot",
+    "repository_snapshot_error", "resume", "run_created", "run_started",
+    "run_finished", "run_failed", "tool_batch_parallel", "tool_call", "tool_result",
+    "transaction_committed", "transaction_error", "transaction_verification",
+    "user_message", "verification_result", "verification_skipped", "verification_start",
+}))
 
 # Stable capability metadata for clients that cannot invoke the workspace-bound
 # ``tools`` command yet.  Keep this list declarative and bounded; it is not an
