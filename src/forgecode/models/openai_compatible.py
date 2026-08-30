@@ -232,8 +232,8 @@ def _normalize_usage(raw: Any, *, stream: bool = False) -> dict[str, int | float
             raise ProviderError("model response usage contains a non-finite number", category="protocol_error")
         if isinstance(value, bool) or not isinstance(value, (int, float)):
             raise ProviderError("model response usage fields must be finite numbers", category="protocol_error")
-        if value < 0:
-            raise ProviderError("model response usage cannot be negative", category="protocol_error")
+        if value < 0 or value > 1_000_000_000_000_000:
+            raise ProviderError("model response usage is outside the bounded range", category="protocol_error")
         if isinstance(value, int) and value.bit_length() >= 3_322:
             raise ProviderError("model response usage contains an oversized integer", category="response_limit")
         safe[key] = value

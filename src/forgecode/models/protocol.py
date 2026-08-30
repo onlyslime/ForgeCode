@@ -147,7 +147,7 @@ def is_valid_response(response: Any) -> bool:
         # Usage counters represent consumed resources.  Reject negative
         # values at the provider-neutral boundary as well as in concrete
         # adapters, so custom providers cannot poison run metrics.
-        if value < 0:
+        if value < 0 or value > 1_000_000_000_000_000:
             return False
         if isinstance(value, int) and value.bit_length() >= 3_322:
             return False

@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.37 — 2026-08-30
+
+- Added a realistic bounded range for provider usage counters, rejecting
+  finite but pathological values such as `1e308` before metrics aggregation.
+- Verification: provider tests, compileall, diff checks, and manual extreme
+  finite-float validation passed.
+
 ## v0.8.36 — 2026-08-30
 
 - Applied the oversized-integer bound to provider usage counters as well as
