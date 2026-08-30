@@ -253,7 +253,20 @@ class EffectiveConfig:
         if self.verification_command is not None:
             _bounded_text(self.verification_command, "verification_command", 4_000)
         self.tool_policy.validate()
-        known_tools = {"list_files", "read_file", "search", "write_file", "apply_patch", "workspace_summary", "repository_map", "run_command", "find_definition", "find_references", "symbol_hover", "lsp_status", "list_processes", "git_worktrees", "git_worktree_reconcile", "git_worktree_create", "git_worktree_remove"}
+        # Keep this allow-list in sync with ``build_tool_registry``.  Config
+        # validation happens before the registry is constructed, so omitting
+        # a registered tool here makes an otherwise valid policy unusable
+        # (notably the background, quality, and metadata tools).
+        known_tools = {
+            "list_files", "read_file", "search", "write_file", "apply_patch",
+            "workspace_summary", "repository_map", "run_command", "test",
+            "diagnostics", "find_files", "read_range", "list_symbols",
+            "file_metadata", "find_definition", "find_references", "symbol_hover",
+            "lsp_status", "git_status", "git_diff", "git_log", "git_worktrees",
+            "git_worktree_reconcile", "git_worktree_create", "git_worktree_remove",
+            "git_commit", "run_background", "process_status", "list_processes",
+            "poll_process", "kill_process",
+        }
         unknown_tools = (set(self.tool_policy.allow) | set(self.tool_policy.deny)) - known_tools
         if unknown_tools:
             raise ConfigError("tool_policy contains unknown tools: " + ", ".join(sorted(unknown_tools)))

@@ -19,6 +19,17 @@ def test_config_precedence_cli_over_file_over_environment(monkeypatch, tmp_path:
     assert config.to_dict()["api_key"] == "<environment-only>"
 
 
+def test_config_accepts_every_registered_tool_in_policy(tmp_path: Path):
+    config_dir = tmp_path / ".forgecode"
+    config_dir.mkdir()
+    (config_dir / "config.toml").write_text(
+        '[tool_policy]\nallow = ["process_status", "test", "file_metadata"]\n',
+        encoding="utf-8",
+    )
+    config = ConfigLoader(tmp_path).load()
+    assert config.tool_policy.allow == ("process_status", "test", "file_metadata")
+
+
 def test_config_loads_scoped_approval_decisions(tmp_path: Path):
     directory = tmp_path / ".forgecode"
     directory.mkdir()

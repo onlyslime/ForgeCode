@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.8.202 — 2026-08-31
+
+- **Tool-policy completeness:** configuration validation now accepts every
+  tool registered by the runtime, including quality, metadata, Git commit,
+  and background-process tools.
+- **Verification:** configuration regression tests, compile, and diff checks
+  passed; manually loaded a policy allowing `process_status`, `test`, and
+  `file_metadata`.
+
 ## v0.8.201 — 2026-08-31
 
 - **Demo verification compatibility fix:** removed an over-strict final deadline gate in `run_command` that could classify a completed offline verification as failed when the overall run budget elapsed during result assembly.
