@@ -235,13 +235,19 @@ def _load_session(handle: str, workspace_hint: str | None = None) -> dict[str, A
             workspace = Path(str(raw["workspace"])).expanduser().resolve()
             if not workspace.is_dir() or (workspace / ".forgecode" / "rpc-sessions" / f"{handle}.json").resolve() != candidate.resolve():
                 continue
+            session_path = Path(raw["session_path"])
+            if session_path.is_absolute() or any(part in {"", ".", ".."} for part in session_path.parts):
+                continue
+            session_target = (workspace / session_path).resolve()
+            if not session_target.is_relative_to(workspace / ".forgecode" / "sessions") or session_target.suffix != ".jsonl":
+                continue
             events = raw.get("events", [])
             if not isinstance(events, list): events = []
             persisted_state = raw.get("state", "idle")
             # A daemon restart cannot retain an in-process worker. Never
             # claim that a recovered running handle is still executing.
             state = "recovery_required" if persisted_state == "running" else persisted_state
-            info = {"workspace": str(workspace), "mode": raw["mode"], "session_path": raw["session_path"], "state": state, "sequence": int(raw.get("sequence", 0)), "events": events[-_MAX_SESSION_EVENTS:], "created_monotonic": time.monotonic(), "created_at": raw.get("created_at"), "cancel_requested": bool(raw.get("cancel_requested", False)), "result": raw.get("result")}
+            info = {"workspace": str(workspace), "mode": raw["mode"], "session_path": session_path.as_posix(), "state": state, "sequence": int(raw.get("sequence", 0)), "events": events[-_MAX_SESSION_EVENTS:], "created_monotonic": time.monotonic(), "created_at": raw.get("created_at"), "cancel_requested": bool(raw.get("cancel_requested", False)), "result": raw.get("result")}
             if info["mode"] not in {"plan", "act"}: continue
             created_at = info.get("created_at")
             if isinstance(created_at, (int, float)) and time.time() - float(created_at) > _SESSION_TTL_SECONDS:

@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.7.38 — 2026-08-30
+
+- RPC session recovery now validates that persisted `session_path` is a
+  workspace-local relative `.jsonl` path under `.forgecode/sessions`.
+- External, traversal, malformed, or otherwise unsafe paths are ignored before
+  a session can be restored.
+
 ## v0.7.37 — 2026-08-30
 
 - Hardened RPC session recovery with a 512 KiB record-size limit, alias
