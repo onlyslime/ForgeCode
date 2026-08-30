@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.7.9 — 2026-08-30
+
+- Removed command text from `list_processes` summaries so task discovery cannot
+  expose credentials or other sensitive command arguments.
+- Added regression coverage for command-argument non-disclosure.
+
 ## v0.7.8 — 2026-08-30
 
 - Bounded background-process history to prevent completed task metadata from

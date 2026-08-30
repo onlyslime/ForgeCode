@@ -38,7 +38,15 @@ def test_background_processes_can_be_listed_without_output_or_secret_command(tmp
     rows = ListProcessesTool(guard, manager).execute({}, context)
     assert rows.metadata["count"] >= 1
     assert started.metadata["task_id"] in {row["task_id"] for row in rows.metadata["tasks"]}
-    assert all("output" not in row for row in rows.metadata["tasks"])
+    assert all("output" not in row and "command" not in row for row in rows.metadata["tasks"])
+
+def test_background_process_list_never_exposes_command_arguments(tmp_path):
+    guard = WorkspaceGuard(tmp_path); context = ToolContext(guard, AllowAllApproval())
+    manager = ProcessManager()
+    RunBackgroundTool(guard, manager).execute({"command": "python -c \"print('secret-token')\""}, context)
+    result = ListProcessesTool(guard, manager).execute({}, context)
+    assert "secret-token" not in result.output
+    assert all("command" not in row for row in result.metadata["tasks"])
 
 def test_background_history_is_bounded_without_evicting_active_tasks(tmp_path):
     guard = WorkspaceGuard(tmp_path); context = ToolContext(guard, AllowAllApproval())

@@ -74,8 +74,6 @@ class ProcessManager:
         for task_id in ids:
             data = self.snapshot(task_id)
             data.pop("output", None)
-            item = self.get(task_id)
-            data["command"] = item.command[:200] if item else ""
             rows.append(data)
         return rows
 
