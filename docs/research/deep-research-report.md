@@ -1199,3 +1199,13 @@ pytest collection warning。
 
 每项实现都需要源码入口、定向测试、CLI 可观察证据和 changelog 条目；不以
 “功能数量”替代可靠性、安全边界或可解释的失败结果。
+
+### Codex app-server schema 复核（2026-08-30）
+
+本轮通过 GitHub Contents API（HTTP 200）枚举 Codex app-server v2 的公开 schema
+目录；其中可见 `Thread*`、`Turn*`、`CommandExecution*`、`FileChange*`、
+`Reasoning*DeltaNotification`、`ContextCompactedNotification`、动态工具和多种
+权限 profile 类型。这表明 Codex 的后台任务、实时通知与可恢复线程是协议层对象，
+而不只是 CLI 文本。ForgeCode 当前 JSONL RPC 已有 session 事件、暂停/恢复/取消和
+能力描述，但尚未提供等价的 thread/turn 通知 schema。后续应先定义稳定事件类型和
+客户端订阅边界，再考虑长期 daemon，避免堆叠未经审计的后台功能。
