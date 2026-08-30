@@ -945,6 +945,11 @@ Tools/Permissions 文档和 Cline 工具/Plan 文档，ForgeCode 的优势是边
 
 ### 外部资料复核（2026-08-30）
 
+本轮（2026-08-30）重新请求 OpenCode Tools/Permissions 页面时均返回 HTTP 403，
+因此不扩展其当前实现结论；Codex GitHub API 仍返回 HTTP 200，可继续使用已记录的
+源码树与 `AskForApproval.ts` 证据。网络可访问性变化本身已记录，避免把旧页面状态
+误写成当前可访问。
+
 - OpenCode 官方 Tools 页面当前可访问（HTTP 200），明确列出 `read`、`write`、
   `edit`、`bash`、`grep`、`glob` 以及 experimental `lsp`；这验证了 ForgeCode
   已有基础读写/搜索工具，但仍缺少真正语言服务器协议和更多编辑语义。
