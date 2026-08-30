@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.7 — 2026-08-30
+
+- Included RunService loop diagnostics in interactive `/status` output while
+  preserving the existing controller metrics and additive machine contract.
+- Verification: CLI status/inspect contract tests passed; manual review checked
+  lock ordering and idle fallback behavior.
+
 ## v0.8.6 — 2026-08-30
 
 - Exposed the bounded live run snapshot through `RunService`, including

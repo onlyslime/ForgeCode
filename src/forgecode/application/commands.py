@@ -2502,6 +2502,8 @@ def main(argv: list[str] | None = None) -> int:
         def status() -> Any:
             manifests = transaction_store.list(limit=20)
             controller = controller_holder["value"]
+            with active_service_lock:
+                service = active_service
             metrics = {"provider_attempts": 0, "provider_retries": 0, "tool_calls": 0, "context_chars": 0}
             try:
                 for event in session.read(strict=False):
@@ -2518,7 +2520,10 @@ def main(argv: list[str] | None = None) -> int:
                 # Status is diagnostic and must remain usable even when an
                 # older or partially written session stream has issues.
                 metrics["audit_read_error"] = True
-            return {"mode": state["mode"], "run_id": session.run_id, "transactions": len(manifests), "last_state": getattr(state["last"], "state", None), "latest_verification": state["last_verification"], "metrics": metrics, "worker": controller.snapshot() if controller is not None else {"active": False}}
+            worker = controller.snapshot() if controller is not None else {"active": False}
+            if service is not None:
+                worker = {**worker, "loop": service.status_snapshot()}
+            return {"mode": state["mode"], "run_id": session.run_id, "transactions": len(manifests), "last_state": getattr(state["last"], "state", None), "latest_verification": state["last_verification"], "metrics": metrics, "worker": worker}
 
         def tools_command() -> Any:
             evidence_names = {"review", "test", "diagnostics", "git_status", "git_diff", "transaction", "rollback", "eval"}
