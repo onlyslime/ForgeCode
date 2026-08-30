@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.110 — 2026-08-31
+
+- Added object-argument validation to `repository_map`, aligning runtime
+  behavior with its published schema and preventing leaked attribute errors.
+- Verification: invalid-input regression, manual API check, compileall, and
+  diff checks passed.
+
 ## v0.8.109 — 2026-08-31
 
 - Hardened code-understanding source selection against symlink/junction

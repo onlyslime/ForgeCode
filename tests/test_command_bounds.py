@@ -111,6 +111,8 @@ def test_repository_map_budget_is_bounded(tmp_path: Path):
         RepositoryMapTool(guard).execute({"budget_chars": 100001}, context)
     schema = RepositoryMapTool(guard).definition.parameters
     assert schema["properties"]["budget_chars"]["maximum"] == 100_000
+    with pytest.raises(ValueError, match="arguments must be an object"):
+        RepositoryMapTool(guard).execute(None, context)
 
 
 def test_understanding_tools_reject_non_object_arguments(tmp_path: Path):

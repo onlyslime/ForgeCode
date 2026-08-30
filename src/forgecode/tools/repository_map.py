@@ -19,6 +19,8 @@ class RepositoryMapTool:
         self.guard = guard
 
     def execute(self, arguments: dict[str, Any], context: ToolContext) -> ToolResult:
+        if not isinstance(arguments, dict):
+            raise ValueError("arguments must be an object")
         task = arguments.get("task", "repository inspection")
         budget = arguments.get("budget_chars", 20_000)
         if isinstance(budget, bool) or not isinstance(budget, int) or not 256 <= budget <= _MAX_BUDGET_CHARS:
