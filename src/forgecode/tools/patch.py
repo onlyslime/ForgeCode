@@ -26,6 +26,10 @@ _MAX_PREVIEW_CHARS = 12_000
 _MAX_TARGET_FILE_BYTES = 2_000_000
 
 
+class _PatchDeadlineExceeded(RuntimeError):
+    """Abort an apply_patch operation before the next filesystem mutation."""
+
+
 @dataclass(frozen=True)
 class PatchHunk:
     old_start: int | None
@@ -425,6 +429,8 @@ class ApplyPatchTool:
         # CLI cancel cannot leak a side effect.
         if context.cancelled:
             return ToolResult(False, "apply_patch cancelled after approval", {"error": "cancelled", "approval": "approved", "cancellation_reason": context.cancellation_reason, "diff": safe_preview, "transaction_id": transaction_id, "operations": [asdict(op) for op in change_operations]})
+        if context.remaining_seconds(45.0) <= 0:
+            return ToolResult(False, "apply_patch skipped because the run deadline has expired", {"error": "deadline_exceeded", "transaction_id": transaction_id, "diff": safe_preview})
         stale = context.deny_if_stale(self.definition.name)
         if stale:
             return stale
@@ -475,16 +481,38 @@ class ApplyPatchTool:
                 except Exception:
                     pass
             return ToolResult(False, "apply_patch cancelled before write", {"error": "cancelled", "approval": "approved", "cancellation_reason": context.cancellation_reason, "diff": safe_preview, "transaction_id": transaction_id, "operations": [asdict(op) for op in change_operations]})
+        if context.remaining_seconds(45.0) <= 0:
+            if transaction_manifest is not None:
+                try:
+                    context.transaction_store.fail(transaction_id, "deadline exceeded before write", recovery_required=False)
+                except Exception:
+                    pass
+            return ToolResult(False, "apply_patch deadline expired before write", {"error": "deadline_exceeded", "transaction_id": transaction_id, "diff": safe_preview})
         written: list[tuple[Any, str | None]] = []
         try:
             for operation, target, _original, updated, _before_hash, _before_size, _before_mtime, _after_bytes in planned:
                 written.append((target, _original))
                 if context.pause_wait is not None:
                     context.pause_wait()
+                if context.remaining_seconds(45.0) <= 0:
+                    raise _PatchDeadlineExceeded()
                 if updated is None:
                     target.unlink()
                 else:
                     _atomic_write(target, updated)
+        except _PatchDeadlineExceeded:
+            for target, original in reversed(written):
+                try:
+                    if original is None:
+                        if target.exists(): target.unlink()
+                    else:
+                        _atomic_write(target, original)
+                except OSError:
+                    pass
+            if transaction_manifest is not None:
+                try: context.transaction_store.fail(transaction_id, "deadline exceeded during atomic replacement", recovery_required=False)
+                except Exception: pass
+            return ToolResult(False, "apply_patch deadline expired during atomic replacement", {"error": "deadline_exceeded", "transaction_id": transaction_id, "diff": safe_preview, "rolled_back": True})
         except PauseRequested:
             for target, original in reversed(written):
                 try:

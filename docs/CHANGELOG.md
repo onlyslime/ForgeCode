@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.178 — 2026-08-31
+
+- **Patch deadline boundary:** `apply_patch` now rechecks the run budget before each atomic replacement and rolls back prepared changes when the deadline expires.
+- **Verification:** command/recovery tests, compile checks, and manual expired-patch inspection passed.
+
 ## v0.8.177 — 2026-08-31
 
 - **Atomic write deadline gate:** `write_file` now rechecks the run budget immediately before `os.replace`, preventing a prepared temporary file from becoming a committed workspace mutation after deadline expiry.
