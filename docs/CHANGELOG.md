@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.7.12 — 2026-08-30
+
+- Tool inventory output now shows an explicit total count in human and machine
+  responses, making capability discovery consistent with the registered set.
+
 ## v0.7.11 — 2026-08-30
 
 - `kill_process` now distinguishes already-exited, confirmed termination, and

@@ -2446,7 +2446,7 @@ def main(argv: list[str] | None = None) -> int:
                 else:
                     category = "read_only"
                 rows.append({"name": definition.name, "description": definition.description, "available": True, "side_effecting": definition.side_effecting, "category": category})
-            return {"tools_status": True, "tools": rows, "mode": state["mode"]}
+            return {"tools_status": True, "tools": rows, "count": len(rows), "mode": state["mode"]}
 
         def login_command() -> Any:
             effective = settings.effective

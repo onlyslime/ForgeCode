@@ -58,7 +58,7 @@ def _human_result(value: object) -> str | None:
         ))
     if value.get("tools_status") is True:
         rows = value.get("tools") or []
-        lines = ["Available tools", "───────────────"]
+        lines = [f"Available tools ({len(rows)})", "────────────────────"]
         groups: dict[str, list[object]] = {"Read-only": [], "Changes": [], "Execution": [], "Evidence": [], "Other": []}
         evidence_names = {"review", "test", "diagnostics", "git_status", "git_diff", "transaction", "rollback", "eval"}
         execution_names = {"run_command", "run_background", "process_status", "poll_process", "kill_process"}
