@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.7.28 — 2026-08-30
+
+- Added `lsp_status`, a bounded read-only capability discovery tool that reports
+  common language-server executables on `PATH` without starting processes or
+  claiming full LSP support.
+- Registered the tool in the default registry and read-only execution policy,
+  with regression coverage for its discovery-only contract.
+
 ## v0.7.27 — 2026-08-30
 
 - Extended bounded read-only batch parallelism to `git_worktrees` and

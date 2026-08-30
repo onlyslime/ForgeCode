@@ -101,6 +101,20 @@ def test_symbol_hover_recognizes_typescript_arrow_exports(tmp_path) -> None:
     assert result.metadata["precision"] == "static"
 
 
+def test_lsp_status_is_discovery_only_and_bounded(tmp_path) -> None:
+    from forgecode.tools import LspStatusTool
+    guard = WorkspaceGuard(tmp_path)
+    result = LspStatusTool().execute({}, ToolContext(guard))
+    assert result.ok and result.metadata["supported"] is False
+    assert result.metadata["mode"] == "discovery_only"
+    assert len(result.metadata["servers"]) == 6
+
+
+def test_read_only_group_accepts_lsp_status() -> None:
+    policy = parse_tool_policy_options("lsp_status", available=("lsp_status",))
+    assert policy.allow == ("lsp_status",)
+
+
 def test_registry_policy_intersection_preserves_stable_unavailable_result(tmp_path: Path) -> None:
     guard = WorkspaceGuard(tmp_path)
     base = build_default_registry(guard)

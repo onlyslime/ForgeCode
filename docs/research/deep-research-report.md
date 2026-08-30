@@ -675,7 +675,7 @@ CLI/TUI
 - [x] 每个 P0/P1 能力都有可执行验收标准或演示场景。
 - [x] 已明确竞品参考与本题自研实现的边界，避免误用现成 agent 框架。
 
-## ForgeCode 当前差距复核（2026-08-30，v0.7.25）
+## ForgeCode 当前差距复核（2026-08-30，v0.7.28）
 
 本节以当前仓库源码、定向测试和正常 `fcc` 工作流为准；竞品能力只作为产品
 形态基线，不把未能直接访问的页面当作已验证事实。OpenAI 官方 Codex 页面在
@@ -692,7 +692,7 @@ CLI/TUI
 | 验证 | 测试 profile、有限修复、review/export、轨迹评估 | 缺少语言服务和调试器集成 | P1 |
 | 扩展发布 | Skills、hooks、SDK、JSONL RPC、工具收窄、uv/独立二进制布局 | 缺少 MCP、插件市场、跨平台一键安装 | P2 |
 
-截至当前 v0.7.27，正常交互工作流还提供 `/context`（有界索引健康度）和
+截至当前 v0.7.28，正常交互工作流还提供 `/context`（有界索引健康度）和
 `/events [limit] [kind]`（可筛选、带相对耗时和错误码的持久化事件尾部）。
 这些能力不改变工具权限，只把已有审计证据暴露给用户；对应交互、机器契约和
 provider 回归测试均已通过。
@@ -932,7 +932,7 @@ scope allow/deny 与 fallback 全局策略。该字段只描述策略路径，�
 - **非目标**：不改变 capability 内容、协议版本或会话执行行为。
 - **验证**：CLI machine contract 定向测试 27 passed，compileall 与 diff 检查通过。
 
-### 当前差距复核（v0.7.25）
+### 当前差距复核（v0.7.28）
 
 基于已核实的 Codex `AskForApproval.ts`、Codex app-server 源码树、OpenCode
 Tools/Permissions 文档和 Cline 工具/Plan 文档，ForgeCode 的优势是边界全部在本仓库
@@ -941,7 +941,7 @@ Tools/Permissions 文档和 Cline 工具/Plan 文档，ForgeCode 的优势是边
 | 能力 | ForgeCode 当前状态 | 优先级 |
 | --- | --- | --- |
 | 审批粒度 | 全局模式 + 可选 changes/execution/evidence scope，仍非 Codex granular | P1 |
-| 语言服务 | 静态 definition/reference/hover，非 LSP | P1 |
+| 语言服务 | 静态 definition/reference/hover；`lsp_status` 仅发现 PATH 可执行文件，非 LSP | P1 |
 | 后台任务 | 有界生命周期、持久化 stale 元数据；不自动恢复执行 | P1 |
 | 会话服务 | JSONL/RPC 可用；没有 Codex 等价的长期 daemon/app-server schema | P1 |
 | 隔离执行 | WorkspaceGuard 和审批边界；不是 worktree 或 OS sandbox | P1 |
@@ -978,13 +978,29 @@ Cline 将工具结果回传到模型，并把 Plan 限制为探索/规划、Act 
 ForgeCode 当前 ToolRegistry、Plan/Act 边界一致。Cline 的浏览器、MCP 和 Kanban
 worktree 并行能力仍属于 ForgeCode 的已知 P2/P1 差距，本轮未改变优先级。
 
-### 最新门禁证据（v0.7.27）
+### 最新门禁证据（v0.7.28）
 
-- 完整回归：`514 passed, 8 skipped, 2 warnings`（4 分 09 秒）。skip 均为当前
+- 完整回归：`515 passed, 8 skipped, 2 warnings`（3 分 13 秒）。skip 均为当前
   Windows 账户无法创建 symlink；warnings 为既有 pytest collection warning。
-- `forgecode doctor`、`python -m compileall -q src`、`git diff --check` 均通过。
+- `forgecode doctor` 显示 `lsp_status` 已注册，`python -m compileall -q src`、
+  `git diff --check` 均通过。
 - RPC/embedding/工具策略/后台任务/语义工具/只读并行的定向测试均在完整回归中覆盖；未发现
   JSONL、审批或 WorkspaceGuard 回归。
+
+### 0.7.28 实施审计：LSP capability discovery（2026-08-30）
+
+- **范围**：新增 `lsp_status` 只读工具，探测 PATH 上 Python、TypeScript、Rust、Go、
+  Java 与 C/C++ 常见语言服务器，并返回结构化可用性结果；加入默认 registry、doctor
+  清单和 AgentLoop 只读并行白名单。
+- **非目标**：不启动语言服务器、不读取项目源码、不执行外部进程、不实现 LSP 协议，
+  `supported: false` 明确表示 ForgeCode 尚未提供真正 LSP 集成。
+- **安全边界**：仅调用 `shutil.which` 做 PATH 发现，参数 schema 无可写字段，经过现有
+  ToolRegistry/WorkspaceGuard 入口，结果固定为六种语言且有界。
+- **验证**：`tests/test_v012_tool_policy.py` 定向测试 19 passed；compileall 与
+  `git diff --check` 通过。发布门禁将补充 doctor 与完整 pytest 结果。
+
+这一步只缩小了“能力可发现性”差距；Codex/OpenCode 的真实语言服务、诊断和语义索引
+仍是后续 P1 工作，不能将该工具描述为 LSP 实现。
 
 ### 0.7.27 实施审计：只读批次覆盖补齐（2026-08-30）
 

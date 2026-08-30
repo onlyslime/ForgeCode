@@ -34,6 +34,7 @@ _PARALLEL_READ_TOOLS = frozenset({
     "repository_map",
     "git_worktrees",
     "symbol_hover",
+    "lsp_status",
 })
 
 

@@ -8,6 +8,7 @@ from .git import GitCommitTool, GitDiffTool, GitLogTool, GitStatusTool, GitWorkt
 from .quality import DiagnosticsTool, FindFilesTool, TestTool
 from .understanding import FileMetadataTool, FindDefinitionTool, FindReferencesTool, ListSymbolsTool, ReadRangeTool, SymbolHoverTool
 from .background import KillProcessTool, ListProcessesTool, PollProcessTool, ProcessManager, ProcessStatusTool, RunBackgroundTool
+from .lsp import LspStatusTool
 from ..hooks import Hook, HookIssue, HookRegistry
 
 
@@ -41,6 +42,7 @@ def build_default_registry(guard) -> ToolRegistry:
     registry.register(ListProcessesTool(guard, process_manager))
     registry.register(PollProcessTool(guard, process_manager))
     registry.register(KillProcessTool(guard, process_manager))
+    registry.register(LspStatusTool())
     return registry
 
 
@@ -86,5 +88,6 @@ __all__ = [
     "ProcessStatusTool",
     "RunBackgroundTool",
     "ListProcessesTool",
+    "LspStatusTool",
     "build_default_registry",
 ]
