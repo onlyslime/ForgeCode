@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.136 — 2026-08-31
+
+- **Transport header validation:** constrain custom transport response headers to bounded string keys and values without control characters.
+- **Verification:** provider tests, compile checks, and manual malformed-header inspection passed.
+
 ## v0.8.135 — 2026-08-31
 
 - **Transport result validation:** normalize and bound status, body, and headers returned by custom transports, converting malformed values into clear `ValueError`s.

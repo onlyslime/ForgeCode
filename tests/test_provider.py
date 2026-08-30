@@ -183,6 +183,11 @@ def test_transport_result_rejects_invalid_status():
         _json_result((True, b"{}"))
 
 
+def test_transport_result_rejects_non_string_headers():
+    with pytest.raises(ValueError, match="invalid headers"):
+        _json_result((200, b"{}", {"X-Test": 1}))
+
+
 def test_provider_neutral_response_validation_rejects_nonfinite_usage_and_bad_finish_reason():
     assert not is_valid_response(ModelResponse(Message("assistant", "ok"), finish_reason="made_up"))
     assert not is_valid_response(ModelResponse(Message("assistant", "ok"), usage={"total_tokens": float("nan")}))
