@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.7.10 — 2026-08-30
+
+- Removed the full command from successful `run_background` tool metadata;
+  task IDs and status remain visible while command arguments stay out of model
+  context and structured tool results.
+- Added regression coverage for startup metadata non-disclosure.
+
 ## v0.7.9 — 2026-08-30
 
 - Removed command text from `list_processes` summaries so task discovery cannot

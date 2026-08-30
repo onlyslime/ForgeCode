@@ -7,6 +7,7 @@ def test_background_task_can_be_started_and_polled(tmp_path):
     manager = ProcessManager()
     started = RunBackgroundTool(guard, manager).execute({"command": "python -c \"print('hello')\""}, context)
     assert started.ok
+    assert "command" not in started.metadata
     task_id = started.metadata["task_id"]
     for _ in range(20):
         result = PollProcessTool(guard, manager).execute({"task_id": task_id}, context)

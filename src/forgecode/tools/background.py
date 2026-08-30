@@ -91,7 +91,7 @@ class RunBackgroundTool:
         if context.cancelled: return ToolResult(False, "run_background cancelled before start", {"error":"cancelled"})
         task_id = uuid.uuid4().hex[:16]
         self.manager.start(command, context.guard.root, task_id)
-        return ToolResult(True, f"background task started: {task_id}", {"task_id":task_id, "status":"running", "command":command})
+        return ToolResult(True, f"background task started: {task_id}", {"task_id":task_id, "status":"running"})
 
 class ProcessStatusTool:
     definition = ToolDefinition("process_status", "Get the status of a ForgeCode background task.", {"type":"object","properties":{"task_id":{"type":"string"}},"required":["task_id"]})
