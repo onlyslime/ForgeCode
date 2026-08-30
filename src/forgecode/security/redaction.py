@@ -24,6 +24,8 @@ _MAX_SECRET_CHARS = 4_096
 
 
 def _normalize_secrets(secrets: Iterable[str]) -> tuple[str, ...]:
+    if isinstance(secrets, (str, bytes, bytearray)):
+        raise ValueError("secrets must be an iterable of secret strings")
     values = tuple(secret for secret in secrets if isinstance(secret, str) and secret)
     if len(values) > _MAX_SECRETS or any(len(secret) > _MAX_SECRET_CHARS for secret in values):
         raise ValueError("secrets exceed redaction limits")

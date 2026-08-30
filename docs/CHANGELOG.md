@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.58 — 2026-08-31
+
+- Rejected strings and byte strings as direct redaction secret containers,
+  preventing accidental character-by-character over-redaction.
+- Verification: session/redaction tests, manual helper checks, compileall,
+  and diff checks passed.
+
 ## v0.8.57 — 2026-08-31
 
 - Isolated registered tool schema names and descriptions from post-registration
