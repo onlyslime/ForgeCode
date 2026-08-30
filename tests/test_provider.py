@@ -98,6 +98,11 @@ def test_provider_rejects_non_string_finish_reason():
         parse_chat_completion({"choices": [{"finish_reason": 1, "message": {"content": "ok"}}]})
 
 
+def test_provider_rejects_non_object_payload():
+    with pytest.raises(ProviderError, match="JSON object"):
+        parse_chat_completion([])
+
+
 def test_provider_neutral_response_validation_rejects_nonfinite_usage_and_bad_finish_reason():
     assert not is_valid_response(ModelResponse(Message("assistant", "ok"), finish_reason="made_up"))
     assert not is_valid_response(ModelResponse(Message("assistant", "ok"), usage={"total_tokens": float("nan")}))

@@ -309,6 +309,8 @@ def _parse_tool_calls(raw_calls: Any, *, max_calls: int = 64) -> tuple[ToolCall,
 
 
 def parse_chat_completion(payload: dict[str, Any]) -> ModelResponse:
+    if not isinstance(payload, dict):
+        raise ProviderError("model response must be a JSON object", category="protocol_error")
     choices = payload.get("choices")
     if not isinstance(choices, list) or len(choices) != 1 or not isinstance(choices[0], dict):
         raise ProviderError("model response has no choices", category="protocol_error")

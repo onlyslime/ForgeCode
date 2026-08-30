@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.116 — 2026-08-31
+
+- **Provider payload guard:** direct chat-completion parsing now reports a protocol error for non-object JSON payloads, matching the HTTP adapter contract.
+- **Verification:** provider regression test and compile checks passed.
+
 ## v0.8.115 — 2026-08-31
 
 - **Tool name validation:** malformed or empty tool-call names now return a structured error instead of triggering unhashable-key or lookup failures.
