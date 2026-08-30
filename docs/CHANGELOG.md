@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.8.34 — 2026-08-30
+
+- Added a bounded integer magnitude to provider tool arguments, preventing
+  oversized numeric values from bypassing JSON budgets and inflating logs or
+  downstream validation work.
+- Verification: provider contract tests, compileall, diff checks, and manual
+  oversized-integer validation passed.
+
 ## v0.8.33 — 2026-08-30
 
 - Hardened background-task state recovery with file-size, task-ID, and status

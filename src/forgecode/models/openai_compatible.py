@@ -46,6 +46,8 @@ def _validate_json_value(value: Any, *, depth: int = 0, budget: list[int] | None
         raise ProviderError("tool arguments contain too many values", category="response_limit")
     if isinstance(value, float) and not math.isfinite(value):
         raise ProviderError("tool arguments contain a non-finite number", category="protocol_error")
+    if isinstance(value, int) and not isinstance(value, bool) and len(str(abs(value))) > 1_000:
+        raise ProviderError("tool arguments contain an oversized integer", category="response_limit")
     if isinstance(value, str) and len(value) > 200_000:
         raise ProviderError("tool arguments contain an oversized string", category="response_limit")
     if isinstance(value, dict):

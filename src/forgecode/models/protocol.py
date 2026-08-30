@@ -177,6 +177,8 @@ def _valid_json_value(value: Any, *, depth: int = 0, budget: list[int] | None = 
     if budget[0] < 0:
         return False
     if value is None or isinstance(value, (str, int, bool)):
+        if isinstance(value, int) and not isinstance(value, bool) and len(str(abs(value))) > 1_000:
+            return False
         return not isinstance(value, str) or len(value) <= 200_000
     if isinstance(value, float):
         return math.isfinite(value)
