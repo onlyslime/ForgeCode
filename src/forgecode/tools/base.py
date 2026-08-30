@@ -145,6 +145,7 @@ class ToolRegistry:
     def __init__(self, *, max_output_chars: int = 20_000):
         self._tools: dict[str, Tool] = {}
         self._schema_snapshots: dict[str, dict[str, Any]] = {}
+        self._definition_snapshots: dict[str, tuple[str, str]] = {}
         self._unavailable_tools: set[str] = set()
         if isinstance(max_output_chars, bool) or not isinstance(max_output_chars, int) or not 1 <= max_output_chars <= 1_000_000:
             raise ValueError("max_output_chars must be an integer between 1 and 1000000")
@@ -172,6 +173,7 @@ class ToolRegistry:
             raise ValueError(f"duplicate tool: {tool.definition.name}")
         self._tools[name] = tool
         self._schema_snapshots[name] = schema_snapshot
+        self._definition_snapshots[name] = (name, description)
 
     def filter(self, policy: Any | None = None) -> "ToolRegistry":
         """Return a registry narrowed by policy; policy cannot add tools."""
@@ -206,12 +208,13 @@ class ToolRegistry:
             {
                 "type": "function",
                 "function": {
-                    "name": definition.name,
-                    "description": definition.description,
-                    "parameters": self._schema_snapshots[definition.name],
+                    "name": self._definition_snapshots[name][0],
+                    "description": self._definition_snapshots[name][1],
+                    "parameters": self._schema_snapshots[name],
                 },
             }
-            for definition in self.definitions(mode)
+            for name, tool in self._tools.items()
+            if mode is None or AgentMode(mode) in {AgentMode.ACT, AgentMode.BYPASS} or not getattr(tool.definition, "side_effecting", False)
         ]
 
     def execute(self, name: str, arguments: dict[str, Any], context: ToolContext) -> ToolResult:

@@ -236,3 +236,6 @@ def test_registry_schema_snapshot_resists_post_registration_mutation():
     parameters["properties"]["injected"] = {"type": "string"}
     schema = registry.schemas()[0]["function"]["parameters"]
     assert "injected" not in schema["properties"]
+    definition.name = "changed"
+    definition.description = "changed"
+    assert registry.schemas()[0]["function"]["name"] == "mutable_schema"

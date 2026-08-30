@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.57 — 2026-08-31
+
+- Isolated registered tool schema names and descriptions from post-registration
+  definition mutation, preventing schema lookup failures and payload drift.
+- Verification: registry/CLI tests, manual definition mutation check,
+  compileall, and diff checks passed.
+
 ## v0.8.56 — 2026-08-31
 
 - Snapshot validated tool schemas at registration time so post-registration
