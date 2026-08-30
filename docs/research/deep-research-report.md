@@ -1248,9 +1248,10 @@ v0.7.42 在此基础上为 `session.events` 增加有界 `type` 过滤；客户�
 Pi coding-agent README 当前可直接访问（GitHub raw，HTTP 200）。README 明确列出
 interactive/print/JSON/RPC/SDK 四种入口，并提供 providers/models、session branching、
 compaction、message queue、skills、extensions、themes、prompt templates 和可从 npm/git
-加载的 Pi Packages。ForgeCode 已有 JSONL RPC、skills、hooks、session compact 与模型
-配置，但仍缺少成熟的消息队列、扩展包加载和跨进程 SDK 生态；这些列为 P1/P2，而不在
-当前安全与恢复主线中抢占优先级。
+加载的 Pi Packages。ForgeCode 当前已有 JSONL RPC、skills、hooks、session compact、
+模型配置，以及交互控制器内有界的 follow-up message queue；仍缺少跨重启队列持久化、
+扩展包加载和成熟的跨进程 SDK 生态。这些列为 P1/P2，而不在当前安全与恢复主线中
+抢占优先级。
 
 ### 流式协议复核（2026-08-30）
 
