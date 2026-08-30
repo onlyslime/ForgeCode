@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.112 — 2026-08-31
+
+- Enforced schema `required` fields at the `ToolRegistry` boundary, returning
+  structured missing-field errors before tool dispatch.
+- Verification: required/unknown field regressions, manual registry checks,
+  compileall, and diff checks passed.
+
 ## v0.8.111 — 2026-08-31
 
 - Enforced `additionalProperties: false` at the registry execution boundary,

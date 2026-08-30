@@ -256,6 +256,12 @@ class ToolRegistry:
                 unknown = sorted(set(arguments) - set(properties))
                 if unknown:
                     return ToolResult(False, "tool arguments contain unknown fields", {"error": "invalid_arguments", "unknown_fields": unknown[:32]})
+        if isinstance(schema, dict):
+            required = schema.get("required", ())
+            if isinstance(required, list):
+                missing = [field for field in required if isinstance(field, str) and field not in arguments]
+                if missing:
+                    return ToolResult(False, "tool arguments are missing required fields", {"error": "invalid_arguments", "missing_fields": missing[:32]})
         before_hook_issues = ()
         if context.hooks is not None:
             hook_correlation = context.correlation_id or f"{context.run_id or 'run'}:tool:{name}"
