@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.84 — 2026-08-31
+
+- Enforced non-empty, newline-safe string task IDs across process status,
+  polling, and termination tools instead of coercing arbitrary values.
+- Verification: task-ID boundary regression, manual API checks, compileall,
+  and diff checks passed.
+
 ## v0.8.83 — 2026-08-31
 
 - Validated `ProcessManager.start()` working directories as existing,

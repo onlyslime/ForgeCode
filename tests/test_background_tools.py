@@ -109,6 +109,15 @@ def test_background_tools_reject_non_object_arguments(tmp_path):
             raise AssertionError("expected argument object validation")
 
 
+def test_background_status_tools_validate_task_ids(tmp_path):
+    guard = WorkspaceGuard(tmp_path); context = ToolContext(guard, AllowAllApproval()); manager = ProcessManager()
+    tools = [ProcessStatusTool(guard, manager), PollProcessTool(guard, manager), KillProcessTool(guard, manager)]
+    for tool in tools:
+        for value in (None, "", "x\n", 12):
+            with pytest.raises(ValueError, match="task_id"):
+                tool.execute({"task_id": value}, context)
+
+
 def test_background_output_is_hard_bounded_and_completion_duration_stable(tmp_path):
     guard = WorkspaceGuard(tmp_path); context = ToolContext(guard, AllowAllApproval())
     manager = ProcessManager(max_output_chars=12)

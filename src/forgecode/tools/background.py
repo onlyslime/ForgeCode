@@ -200,7 +200,10 @@ class ProcessStatusTool:
     def execute(self, arguments, context):
         if not isinstance(arguments, dict):
             raise ValueError("arguments must be an object")
-        data = self.manager.snapshot(str(arguments.get("task_id", "")))
+        task_id = arguments.get("task_id")
+        if not isinstance(task_id, str) or not task_id.strip() or any(ch in task_id for ch in "\r\n"):
+            raise ValueError("task_id must be non-empty newline-safe text")
+        data = self.manager.snapshot(task_id)
         return ToolResult("error" not in data, str(data), data)
 
 class ListProcessesTool:
@@ -219,7 +222,10 @@ class PollProcessTool(ProcessStatusTool):
             raise ValueError("arguments must be an object")
         cursor = arguments.get("cursor", 0)
         if isinstance(cursor, bool) or not isinstance(cursor, int) or cursor < 0: raise ValueError("cursor must be a non-negative integer")
-        data = self.manager.snapshot(str(arguments.get("task_id", "")), cursor)
+        task_id = arguments.get("task_id")
+        if not isinstance(task_id, str) or not task_id.strip() or any(ch in task_id for ch in "\r\n"):
+            raise ValueError("task_id must be non-empty newline-safe text")
+        data = self.manager.snapshot(task_id, cursor)
         return ToolResult("error" not in data, data.get("output", "") or data.get("status", data.get("error", "unknown")), data)
 
 class KillProcessTool(ProcessStatusTool):
@@ -229,7 +235,10 @@ class KillProcessTool(ProcessStatusTool):
             raise ValueError("arguments must be an object")
         denied = context.deny_if_plan(self.definition.name)
         if denied: return denied
-        task_id = str(arguments.get("task_id", "")); item = self.manager.get(task_id)
+        task_id = arguments.get("task_id")
+        if not isinstance(task_id, str) or not task_id.strip() or any(ch in task_id for ch in "\r\n"):
+            raise ValueError("task_id must be non-empty newline-safe text")
+        item = self.manager.get(task_id)
         if item is None: return ToolResult(False, "unknown background task", {"error":"unknown_task"})
         if not context.request_approval(self.definition.name, {"task_id":task_id}): return ToolResult(False, "kill_process denied by approval policy", {"error":"approval_denied"})
         if item.process.poll() is not None:
