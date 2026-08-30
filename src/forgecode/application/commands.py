@@ -1912,12 +1912,13 @@ def main(argv: list[str] | None = None) -> int:
                 try:
                     started_at = time.monotonic()
                     tool_steps = 0
+                    active_tool = ""
                     current_phase = ""
                     streamed_content = False
                     changed_files: set[str] = set()
                     file_snapshots: dict[str, str] = {}
                     def progress_event(kind: str, payload: dict[str, Any]) -> None:
-                        nonlocal tool_steps, current_phase, streamed_content
+                        nonlocal tool_steps, current_phase, streamed_content, active_tool
                         if machine_json:
                             return
                         labels = {"tool_call": "▸", "tool_result": "✓" if payload.get("ok") else "✗", "verification_result": "✓" if payload.get("ok") else "✗", "command_result": "✓" if payload.get("ok") else "✗", "command_timeout": "✗", "mode": "•", "model_message": "◆", "model_progress": "…", "model_delta": "", "provider_retry": "↻", "provider_attempt": "·"}
@@ -1976,6 +1977,7 @@ def main(argv: list[str] | None = None) -> int:
                             print(f"\x1b[2K\r{color}{labels[kind]} [{tool_steps + (1 if kind == 'tool_call' else 0)}] {text}  ({elapsed:.1f}s)\x1b[0m")
                             if kind == "tool_call":
                                 tool_steps += 1
+                                active_tool = text
                                 controller.update_metrics(tool_steps=tool_steps, phase=current_phase)
                             if kind == "tool_result" and tool == "read_file" and payload.get("ok"):
                                 path = str(payload.get("metadata", {}).get("path") or arguments.get("path") or "")
@@ -2024,7 +2026,8 @@ def main(argv: list[str] | None = None) -> int:
                             while not heartbeat_stop.wait(5.0):
                                 with output_lock:
                                     elapsed = time.monotonic() - started_at
-                                    print(f"\x1b[2K\r\x1b[90m… working ({elapsed:.1f}s) · {tool_steps} tool steps\x1b[0m")
+                                    current = f" · running {active_tool}" if active_tool else ""
+                                    print(f"\x1b[2K\r\x1b[90m… working ({elapsed:.1f}s) · {tool_steps} tool steps{current}\x1b[0m")
                                     redraw_input_bar()
                         heartbeat_thread = threading.Thread(target=heartbeat, name="forgecode-heartbeat", daemon=True)
                         heartbeat_thread.start()
