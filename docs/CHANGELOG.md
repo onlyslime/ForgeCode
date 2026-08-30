@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.7.39 — 2026-08-30
+
+- Serialized AgentLoop pause/resume flag access across the worker thread and
+  event loop, reducing approval-boundary races that could incorrectly cancel
+  an interactive task.
+- The pause behavior remains cooperative and fail-closed; no side effect runs
+  while an interactive pause is pending.
+
 ## v0.7.38 — 2026-08-30
 
 - RPC session recovery now validates that persisted `session_path` is a

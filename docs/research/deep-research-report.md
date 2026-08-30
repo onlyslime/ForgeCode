@@ -675,7 +675,7 @@ CLI/TUI
 - [x] 每个 P0/P1 能力都有可执行验收标准或演示场景。
 - [x] 已明确竞品参考与本题自研实现的边界，避免误用现成 agent 框架。
 
-## ForgeCode 当前差距复核（2026-08-30，v0.7.38）
+## ForgeCode 当前差距复核（2026-08-30，v0.7.39）
 
 本节以当前仓库源码、定向测试和正常 `fcc` 工作流为准；竞品能力只作为产品
 形态基线，不把未能直接访问的页面当作已验证事实。OpenAI 官方 Codex 页面在
@@ -692,7 +692,7 @@ CLI/TUI
 | 验证 | 测试 profile、有限修复、review/export、轨迹评估 | 缺少语言服务和调试器集成 | P1 |
 | 扩展发布 | Skills、hooks、SDK、JSONL RPC、工具收窄、uv/独立二进制布局 | 缺少 MCP、插件市场、跨平台一键安装 | P2 |
 
-截至当前 v0.7.38，正常交互工作流还提供 `/context`（有界索引健康度）和
+截至当前 v0.7.39，正常交互工作流还提供 `/context`（有界索引健康度）和
 `/events [limit] [kind]`（可筛选、带相对耗时和错误码的持久化事件尾部）。
 这些能力不改变工具权限，只把已有审计证据暴露给用户；对应交互、机器契约和
 provider 回归测试均已通过。
@@ -987,6 +987,21 @@ worktree 并行能力仍属于 ForgeCode 的已知 P2/P1 差距，本轮未改�
   `git diff --check` 均通过。
 - RPC/embedding/工具策略/后台任务/语义工具/只读并行的定向测试均在完整回归中覆盖；未发现
   JSONL、审批或 WorkspaceGuard 回归。
+
+### v0.7.39 实施审计：pause/resume synchronization（2026-08-30）
+
+- **范围**：AgentLoop 使用 `RLock` 保护 pause/resume/interative-control 状态在审批
+  线程、同步工具边界和异步 loop 边界之间的读写；暂停等待循环在锁保护下读取最新状态。
+- **非目标**：不改变暂停 API、取消语义或审批策略，不延长总任务超时，不提供强制终止
+  任意第三方线程。
+- **完成条件**：审批期间的暂停/恢复请求不会因未同步布尔状态而误判取消或绕过暂停；
+  side effect 边界仍在审批后、执行前受控。
+- **验证**：`tests/test_v010_interactive_controls.py` 5 passed，compileall 与 diff
+  检查通过；完整门禁将确认共享核心回归。
+
+修复后的发布门禁：`524 passed, 9 skipped, 2 warnings`（5 分 05 秒）。原先反复出现的
+审批暂停竞态用例在该门禁中通过；skip 仍为 Windows symlink 能力限制，warnings 仍为既有
+pytest collection warning。
 
 ### v0.7.38 门禁补充（2026-08-30）
 

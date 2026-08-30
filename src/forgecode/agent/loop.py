@@ -114,6 +114,7 @@ class AgentLoop:
         self._pause_requested = False
         self._interactive_pause = False
         self._pause_event_recorded = False
+        self._pause_lock = threading.RLock()
         # Attempt/retry ids are only unique within a provider request.  Some
         # adapters (and a number of test/fake adapters) restart their counter
         # for every turn, so using the id by itself can silently drop evidence
@@ -162,9 +163,12 @@ class AgentLoop:
         at this safe boundary.  Cancellation remains observable while waiting
         and fails closed before transaction preparation or process spawn.
         """
-        if not self._pause_requested:
+        with self._pause_lock:
+            pause_requested = self._pause_requested
+            interactive_pause = self._interactive_pause
+        if not pause_requested:
             return
-        if self._interactive_pause:
+        if interactive_pause:
             if not self.lifecycle.terminal and self.lifecycle.state is not RunState.PAUSED:
                 try:
                     self._transition(RunState.PAUSED, reason="interactive pause requested after approval")
@@ -173,7 +177,11 @@ class AgentLoop:
             if not self._pause_event_recorded:
                 self._record("pause", {"reason": "interactive pause requested after approval", "interactive": True})
                 self._pause_event_recorded = True
-            while self._pause_requested and not self.context.cancelled:
+            while True:
+                with self._pause_lock:
+                    pending = self._pause_requested
+                if not pending or self.context.cancelled:
+                    break
                 time.sleep(0.01)
             self._pause_event_recorded = False
             if self.context.cancelled:
@@ -276,22 +284,28 @@ class AgentLoop:
 
     def pause(self) -> None:
         """Request a cooperative pause at the next provider/tool boundary."""
-        self._pause_requested = True
+        with self._pause_lock:
+            self._pause_requested = True
 
     def enable_interactive_controls(self) -> None:
         """Keep the loop alive while paused so another thread can resume it."""
-        self._interactive_pause = True
+        with self._pause_lock:
+            self._interactive_pause = True
 
     def resume(self) -> bool:
         """Release an interactive pause; return whether a pause was pending."""
-        pending = bool(self._pause_requested)
-        self._pause_requested = False
+        with self._pause_lock:
+            pending = bool(self._pause_requested)
+            self._pause_requested = False
         return pending
 
     async def _pause_at_boundary(self, messages: list[Message], verification_ok: bool | None, explored: list[str]) -> LoopResult | None:
-        if not self._pause_requested:
+        with self._pause_lock:
+            pause_requested = self._pause_requested
+            interactive_pause = self._interactive_pause
+        if not pause_requested:
             return None
-        if not self._interactive_pause:
+        if not interactive_pause:
             if not self.lifecycle.terminal:
                 try:
                     self._transition(RunState.PAUSED, reason="cooperative pause requested")
@@ -309,7 +323,11 @@ class AgentLoop:
         if not self._pause_event_recorded:
             self._record("pause", {"reason": "interactive pause requested", "interactive": True})
             self._pause_event_recorded = True
-        while self._pause_requested and not self.context.cancelled:
+        while True:
+            with self._pause_lock:
+                pending = self._pause_requested
+            if not pending or self.context.cancelled:
+                break
             await asyncio.sleep(0.01)
         self._pause_event_recorded = False
         if self.context.cancelled:
@@ -1129,7 +1147,9 @@ class AgentLoop:
                 tool_started = time.monotonic()
                 tool_result = parallel_results.get(call.id) or self.registry.execute(call.name, call.arguments, self.context)
                 tool_duration = round(time.monotonic() - tool_started, 3)
-                if isinstance(tool_result.metadata, dict) and tool_result.metadata.get("error") == "paused" and not self._interactive_pause:
+                with self._pause_lock:
+                    interactive_pause = self._interactive_pause
+                if isinstance(tool_result.metadata, dict) and tool_result.metadata.get("error") == "paused" and not interactive_pause:
                     # The non-interactive API keeps its historical terminal
                     # pause result.  Do not continue to a provider turn after
                     # a side-effect boundary rejected execution.
