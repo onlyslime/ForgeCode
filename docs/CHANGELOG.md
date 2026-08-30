@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.97 — 2026-08-31
+
+- Enforced string validation for the Git diff `path` argument, preventing
+  implicit coercion of numbers or objects into filesystem paths.
+- Verification: path-boundary regression, manual API check, compileall, and
+  diff checks passed.
+
 ## v0.8.96 — 2026-08-31
 
 - Enforced strict boolean validation for `git_worktree_remove.force`,

@@ -108,7 +108,9 @@ class GitDiffTool:
             command.append("--cached")
         path = arguments.get("path")
         if path:
-            command.extend(["--", str(context.guard.relative(context.guard.resolve(str(path))))])
+            if not isinstance(path, str):
+                raise ValueError("path must be a string")
+            command.extend(["--", str(context.guard.relative(context.guard.resolve(path)))])
         try:
             result = subprocess.run(command, cwd=context.guard.root, capture_output=True, text=True, timeout=min(20.0, context.remaining_seconds(20.0)), check=False)
         except (OSError, subprocess.TimeoutExpired) as exc:

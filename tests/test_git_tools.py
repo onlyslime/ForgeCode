@@ -31,6 +31,8 @@ def test_git_inspection_rejects_non_boolean_flags(tmp_path):
         GitStatusTool(guard).execute({"porcelain": "yes"}, context)
     with pytest.raises(ValueError, match="staged"):
         GitDiffTool(guard).execute({"staged": 1}, context)
+    with pytest.raises(ValueError, match="path"):
+        GitDiffTool(guard).execute({"path": 42}, context)
 
 
 def test_git_worktree_tools_reject_non_object_arguments(tmp_path):
