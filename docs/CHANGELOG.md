@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.7.8 — 2026-08-30
+
+- Bounded background-process history to prevent completed task metadata from
+  growing without limit during long-lived sessions; active tasks are never
+  evicted.
+- Added regression coverage for history eviction and active-task protection.
+
 ## v0.7.7 — 2026-08-30
 
 - Synchronized the interactive and machine tool inventories after adding

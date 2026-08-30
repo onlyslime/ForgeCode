@@ -39,3 +39,13 @@ def test_background_processes_can_be_listed_without_output_or_secret_command(tmp
     assert rows.metadata["count"] >= 1
     assert started.metadata["task_id"] in {row["task_id"] for row in rows.metadata["tasks"]}
     assert all("output" not in row for row in rows.metadata["tasks"])
+
+def test_background_history_is_bounded_without_evicting_active_tasks(tmp_path):
+    guard = WorkspaceGuard(tmp_path); context = ToolContext(guard, AllowAllApproval())
+    manager = ProcessManager(max_history=2)
+    first = RunBackgroundTool(guard, manager).execute({"command": "python -c \"print(1)\""}, context)
+    second = RunBackgroundTool(guard, manager).execute({"command": "python -c \"print(2)\""}, context)
+    time.sleep(0.1)
+    third = RunBackgroundTool(guard, manager).execute({"command": "python -c \"import time; time.sleep(0.3)\""}, context)
+    assert manager.get(third.metadata["task_id"]) is not None
+    assert len(manager.list()) <= 2

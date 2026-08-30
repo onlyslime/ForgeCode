@@ -18,9 +18,12 @@ class _Process:
     finished: float | None = None
 
 class ProcessManager:
-    def __init__(self, max_output_chars: int = 100_000, max_tasks: int = 64):
+    def __init__(self, max_output_chars: int = 100_000, max_tasks: int = 64, max_history: int = 256):
+        if any(isinstance(value, bool) or not isinstance(value, int) or value < 1 for value in (max_output_chars, max_tasks, max_history)):
+            raise ValueError("background limits must be positive integers")
         self.max_output_chars = max_output_chars
         self.max_tasks = max_tasks
+        self.max_history = max_history
         self._items: dict[str, _Process] = {}
         self._lock = threading.Lock()
 
@@ -31,7 +34,12 @@ class ProcessManager:
                 raise RuntimeError("background task limit exceeded")
         process = subprocess.Popen(command, cwd=root, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
         item = _Process(process, command, time.monotonic())
-        with self._lock: self._items[task_id] = item
+        with self._lock:
+            self._items[task_id] = item
+            if len(self._items) > self.max_history:
+                finished = [key for key, value in self._items.items() if value.process.poll() is not None]
+                for key in finished[: max(0, len(self._items) - self.max_history)]:
+                    self._items.pop(key, None)
         def drain():
             assert process.stdout is not None
             for line in process.stdout:
