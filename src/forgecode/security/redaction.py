@@ -60,8 +60,10 @@ def redact_value(value: Any, secrets: Iterable[str] = ()) -> Any:
     def walk(item: Any, depth: int = 0) -> Any:
         if depth > 20:
             return "[maximum nesting depth exceeded]"
-        if item is None or isinstance(item, (bool, int)):
+        if item is None or isinstance(item, bool):
             return item
+        if isinstance(item, int):
+            return item if item.bit_length() < 3_322 else "[oversized number omitted]"
         if isinstance(item, float):
             return item if math.isfinite(item) else "[non-finite number omitted]"
         if isinstance(item, str):

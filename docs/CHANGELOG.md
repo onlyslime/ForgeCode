@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.49 — 2026-08-31
+
+- Added oversized-integer normalization to recursive metadata redaction,
+  preventing extreme provider/tool numbers from reaching logs or JSON output.
+- Verification: session/redaction tests, manual 5,000-digit metadata check,
+  compileall, and diff checks passed.
+
 ## v0.8.48 — 2026-08-31
 
 - Applied bounded secret-list validation directly inside `redact_text()` and
