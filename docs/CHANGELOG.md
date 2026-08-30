@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.168 — 2026-08-31
+
+- **Understanding-tool deadlines:** bounded range reads and symbol listing now fail fast on cancellation or expired runs before touching workspace files.
+- **Verification:** command-boundary tests, compile checks, and manual expired-understanding inspection passed.
+
 ## v0.8.167 — 2026-08-31
 
 - **Navigation deadline boundaries:** repository maps and file metadata now fail fast on cancellation or expired runs, avoiding unnecessary snapshot and hashing work.

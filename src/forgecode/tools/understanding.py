@@ -10,6 +10,10 @@ class ReadRangeTool:
     definition = ToolDefinition("read_range", "Read a bounded line range from a UTF-8 workspace file.", {"type":"object","properties":{"path":{"type":"string"},"start_line":{"type":"integer"},"end_line":{"type":"integer"}},"required":["path","start_line","end_line"]})
     def __init__(self, guard): self.guard = guard
     def execute(self, arguments, context):
+        if context.cancelled:
+            return ToolResult(False, "range read cancelled before access", {"error": "cancelled"})
+        if context.remaining_seconds(10.0) <= 0:
+            return ToolResult(False, "range read skipped because the run deadline has expired", {"error": "deadline_exceeded"})
         path_value = _required(arguments, "path")
         start = arguments.get("start_line"); end = arguments.get("end_line")
         if any(isinstance(v, bool) or not isinstance(v, int) for v in (start, end)) or start < 1 or end < start or end - start > 500:
@@ -24,6 +28,10 @@ class ListSymbolsTool:
     definition = ToolDefinition("list_symbols", "List common function, class, method, and export symbols in a source file.", {"type":"object","properties":{"path":{"type":"string"}},"required":["path"]})
     def __init__(self, guard): self.guard = guard
     def execute(self, arguments, context):
+        if context.cancelled:
+            return ToolResult(False, "symbol listing cancelled before access", {"error": "cancelled"})
+        if context.remaining_seconds(10.0) <= 0:
+            return ToolResult(False, "symbol listing skipped because the run deadline has expired", {"error": "deadline_exceeded"})
         path_value = _required(arguments, "path"); path = context.guard.resolve(path_value, must_exist=True)
         if _is_ignored(path, context.guard) or not path.is_file(): raise ValueError("path is not a readable file")
         text = path.read_text(encoding="utf-8")
