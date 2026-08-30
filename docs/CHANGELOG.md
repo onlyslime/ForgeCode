@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.172 — 2026-08-31
+
+- **Worktree mutation deadlines:** create and remove operations now recheck cancellation and run budgets after approval before touching Git state.
+- **Verification:** command-boundary tests, compile checks, and manual expired-worktree mutation inspection passed.
+
 ## v0.8.171 — 2026-08-31
 
 - **Mid-scan cancellation:** symbol definition, reference, and hover searches now recheck cancellation and deadlines for every source file, stopping long scans promptly.

@@ -280,6 +280,8 @@ class GitWorktreeCreateTool:
             return ToolResult(False, "git_worktree_create denied by approval policy", {"error": "approval_denied"})
         if context.cancelled:
             return ToolResult(False, "git_worktree_create cancelled before execution", {"error": "cancelled"})
+        if context.remaining_seconds(45.0) <= 0:
+            return ToolResult(False, "git_worktree_create skipped because the run deadline has expired", {"error": "deadline_exceeded"})
         target.parent.mkdir(parents=True, exist_ok=True)
         command = ["git", "worktree", "add", "-b", branch, str(target), start or "HEAD"]
         try:
@@ -348,6 +350,10 @@ class GitWorktreeRemoveTool:
             return ToolResult(False, "worktree belongs to another session", {"error": "worktree_owner_mismatch"})
         if not context.request_approval(self.definition.name, {"name": name, "force": force}):
             return ToolResult(False, "git_worktree_remove denied by approval policy", {"error": "approval_denied"})
+        if context.cancelled:
+            return ToolResult(False, "git_worktree_remove cancelled before execution", {"error": "cancelled"})
+        if context.remaining_seconds(45.0) <= 0:
+            return ToolResult(False, "git_worktree_remove skipped because the run deadline has expired", {"error": "deadline_exceeded"})
         command = ["git", "worktree", "remove"] + (["--force"] if force else []) + [str(target)]
         try:
             result = subprocess.run(command, cwd=context.guard.root, capture_output=True, text=True, timeout=min(45.0, context.remaining_seconds(45.0)), check=False)
