@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.28 — 2026-08-30
+
+- Rejected negative usage counters at the provider-neutral response boundary,
+  preventing custom providers from corrupting run metrics and diagnostics.
+- Verification: provider contract tests, compileall, and manual response-path
+  inspection passed.
+
 ## v0.8.27 — 2026-08-30
 
 - Rejected non-finite timeout values in Python embedding `session_wait` and

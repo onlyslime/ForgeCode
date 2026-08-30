@@ -144,6 +144,11 @@ def is_valid_response(response: Any) -> bool:
             return False
         if isinstance(value, float) and not math.isfinite(value):
             return False
+        # Usage counters represent consumed resources.  Reject negative
+        # values at the provider-neutral boundary as well as in concrete
+        # adapters, so custom providers cannot poison run metrics.
+        if value < 0:
+            return False
     if not isinstance(response.message.tool_calls, tuple):
         return False
     seen_ids: set[str] = set()
