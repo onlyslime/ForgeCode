@@ -142,7 +142,7 @@ def is_valid_response(response: Any) -> bool:
     if len(response.usage) > 32:
         return False
     for key, value in response.usage.items():
-        if not isinstance(key, str) or not key or len(key) > 128:
+        if not isinstance(key, str) or not key or len(key) > 128 or any(ord(ch) < 32 for ch in key):
             return False
         if isinstance(value, bool) or not isinstance(value, (int, float)):
             return False

@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.123 — 2026-08-31
+
+- **Usage metadata safety:** reject control-character usage field names in provider parsing and provider-neutral validation before they reach logs or telemetry.
+- **Verification:** provider tests, compile checks, and manual malformed-usage inspection passed.
+
 ## v0.8.122 — 2026-08-31
 
 - **Streaming index validation:** reject negative tool-call fragment indexes before assembly, preventing malformed call ordering state.

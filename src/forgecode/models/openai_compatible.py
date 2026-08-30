@@ -224,7 +224,7 @@ def _normalize_usage(raw: Any, *, stream: bool = False) -> dict[str, int | float
         raise ProviderError("model response usage must be a bounded object", category="protocol_error")
     safe: dict[str, int | float] = {}
     for key, value in raw.items():
-        if not isinstance(key, str) or not key or len(key) > 128:
+        if not isinstance(key, str) or not key or len(key) > 128 or any(ord(ch) < 32 for ch in key):
             raise ProviderError("model response usage has an invalid field name", category="protocol_error")
         if value is None or isinstance(value, dict):
             continue
