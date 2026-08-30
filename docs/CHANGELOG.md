@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.14 — 2026-08-30
+
+- Extended `/status` metric cache invalidation with session file size and
+  mtime, so appends from another process become visible without stale reuse.
+- Verification: cache-key logic was manually reviewed for append, missing-file,
+  and stat-error paths; existing status tests passed.
+
 ## v0.8.13 — 2026-08-30
 
 - Cached interactive `/status` aggregate metrics by the session event cursor,

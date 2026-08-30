@@ -1857,7 +1857,7 @@ def main(argv: list[str] | None = None) -> int:
         state = {"mode": args.mode, "last": None, "plan": None, "plan_targets": (), "reference_specs": (), "rules_fingerprint": "", "reference_fingerprint": "", "index_fingerprint": "", "last_message": "", "last_verification": None}
         active_service: RunService | None = None
         active_service_lock = threading.RLock()
-        status_metrics_cache: tuple[int, dict[str, Any]] | None = None
+        status_metrics_cache: tuple[tuple[int, int, int], dict[str, Any]] | None = None
         status_metrics_lock = threading.RLock()
         controller_holder: dict[str, InteractiveRunController | None] = {"value": None}
         shortcut_control: dict[str, Any] = {"token": None, "pause": None, "fingerprint": None}
@@ -2508,8 +2508,13 @@ def main(argv: list[str] | None = None) -> int:
             with active_service_lock:
                 service = active_service
             sequence = session.last_sequence
+            try:
+                stat = session.path.stat()
+                cache_key = (sequence, int(stat.st_size), int(stat.st_mtime_ns))
+            except OSError:
+                cache_key = (sequence, -1, -1)
             with status_metrics_lock:
-                cached = status_metrics_cache if status_metrics_cache and status_metrics_cache[0] == sequence else None
+                cached = status_metrics_cache if status_metrics_cache and status_metrics_cache[0] == cache_key else None
             if cached is not None:
                 metrics = dict(cached[1])
             else:
@@ -2528,7 +2533,7 @@ def main(argv: list[str] | None = None) -> int:
                 except (OSError, ValueError):
                     metrics["audit_read_error"] = True
                 with status_metrics_lock:
-                    status_metrics_cache = (sequence, dict(metrics))
+                    status_metrics_cache = (cache_key, dict(metrics))
             worker = controller.snapshot() if controller is not None else {"active": False}
             if service is not None:
                 worker = {**worker, "loop": service.status_snapshot()}
