@@ -249,6 +249,11 @@ class AgentLoop:
             "step": self._current_step,
             "provider_requests": self._provider_requests,
             "tool_calls": self._tool_calls,
+            "limits": {
+                "max_steps": self.config.max_steps,
+                "max_tool_calls_per_turn": self.config.max_tool_calls_per_turn,
+                "max_tool_calls_total": self.config.max_tool_calls_total,
+            },
             "elapsed_seconds": round(elapsed, 3) if elapsed is not None else None,
             "remaining_seconds": round(remaining, 3) if remaining is not None else None,
             "steering_items": steering_items,

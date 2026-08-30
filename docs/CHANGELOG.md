@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.11 — 2026-08-30
+
+- Added hard step and tool-call limits to live run diagnostics so operators can
+  distinguish normal progress from budget exhaustion.
+- Verification: status snapshot regression passed; manual review confirmed the
+  values are configuration metadata only and cannot alter enforcement.
+
 ## v0.8.10 — 2026-08-30
 
 - Added the current durable event sequence to live run snapshots, allowing
