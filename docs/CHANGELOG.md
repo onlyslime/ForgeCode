@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.54 — 2026-08-31
+
+- Added strict JSON and 1 MiB size validation for registered tool parameter
+  schemas, rejecting non-finite values and oversized provider definitions.
+- Verification: registry tests, manual malformed-schema checks, compileall,
+  and diff checks passed.
+
 ## v0.8.53 — 2026-08-31
 
 - Validated extension tool definitions during registration, bounding names

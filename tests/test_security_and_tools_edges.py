@@ -200,3 +200,15 @@ def test_registry_validates_extension_definition_fields():
         pass
     else:
         raise AssertionError("expected tool definition validation")
+
+
+def test_registry_rejects_non_json_or_oversized_schemas():
+    for parameters in ({"x": float("nan")}, {"x": "a" * 1_000_001}):
+        class Bad:
+            definition = type("D", (), {"name": "schema_bad", "description": "", "parameters": parameters})()
+        try:
+            ToolRegistry().register(Bad())
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("expected schema validation")
