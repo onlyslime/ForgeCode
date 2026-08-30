@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.93 — 2026-08-31
+
+- Added object-argument validation to `git_commit`, preventing malformed
+  direct calls from leaking attribute errors before approval handling.
+- Verification: commit-tool boundary regression, manual API check, compileall,
+  and diff checks passed.
+
 ## v0.8.92 — 2026-08-31
 
 - Added object-argument validation to Git status, diff, and log inspection

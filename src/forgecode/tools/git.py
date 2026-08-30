@@ -233,6 +233,8 @@ class GitWorktreeCreateTool:
         self.guard = guard
 
     def execute(self, arguments, context):
+        if not isinstance(arguments, dict):
+            raise ValueError("arguments must be an object")
         denied = context.deny_if_plan(self.definition.name)
         if denied:
             return denied
@@ -339,6 +341,8 @@ class GitCommitTool:
         self.guard = guard
 
     def execute(self, arguments, context):
+        if not isinstance(arguments, dict):
+            raise ValueError("arguments must be an object")
         denied = context.deny_if_plan(self.definition.name)
         if denied:
             return denied
