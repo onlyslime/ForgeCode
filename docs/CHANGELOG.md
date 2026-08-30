@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.192 — 2026-08-31
+
+- **Bounded source navigation scans:** definition, reference, and hover tools now exclude source files above the shared 2 MiB safety limit before loading them, preventing unbounded memory use during repository-wide scans.
+- **Verification:** focused understanding-tool tests, compile, and diff checks passed.
+
 ## v0.8.191 — 2026-08-31
 
 - **Post-read deadline enforcement:** understanding and metadata tools now reject results when blocking file I/O crosses the run deadline, keeping expiration semantics consistent before and after reads.

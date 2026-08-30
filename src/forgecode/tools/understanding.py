@@ -85,7 +85,11 @@ def _source_files(context: ToolContext, path_value: str | None = None):
         if not lexical.is_absolute():
             lexical = context.guard.root / lexical
         if candidate == lexical.absolute() and candidate.is_file() and not _is_ignored(candidate, context.guard):
-            yield candidate
+            try:
+                if candidate.stat().st_size <= _MAX_FILE_BYTES:
+                    yield candidate
+            except OSError:
+                return
         return
     count = 0
     for candidate in context.guard.root.rglob("*"):
@@ -98,6 +102,11 @@ def _source_files(context: ToolContext, path_value: str | None = None):
         except (OSError, ValueError):
             continue
         if safe != candidate.absolute():
+            continue
+        try:
+            if candidate.stat().st_size > _MAX_FILE_BYTES:
+                continue
+        except OSError:
             continue
         if candidate.suffix.lower() in {".py", ".js", ".ts", ".tsx", ".jsx", ".java", ".go", ".rs", ".c", ".h", ".cpp", ".cs"}:
             count += 1

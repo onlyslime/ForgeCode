@@ -44,3 +44,12 @@ def test_symbol_search_scanners_keep_cancellation_semantics(tmp_path):
         result = tool.execute({"symbol": "target"}, context)
         assert not result.ok
         assert result.metadata["error"] == "cancelled"
+
+
+def test_symbol_search_skips_oversized_source_files(tmp_path):
+    target = tmp_path / "huge.py"
+    target.write_bytes(b"# padding\n" * 300_000)
+    context = ToolContext(WorkspaceGuard(tmp_path), AllowAllApproval())
+    result = FindReferencesTool().execute({"symbol": "missing"}, context)
+    assert result.ok
+    assert result.metadata["count"] == 0
