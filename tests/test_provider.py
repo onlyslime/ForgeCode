@@ -85,6 +85,14 @@ def test_provider_capabilities_advertise_transport_modes():
     assert streamed.capabilities.to_dict()["transports"] == ("json", "sse")
 
 
+def test_model_capabilities_reject_unbounded_or_duplicate_values():
+    from forgecode.models import ModelCapabilities
+    with pytest.raises(ValueError, match="max_input_chars"):
+        ModelCapabilities(max_input_chars=0)
+    with pytest.raises(ValueError, match="transports"):
+        ModelCapabilities(transports=("json", "json"))
+
+
 def test_provider_rejects_non_string_finish_reason():
     with pytest.raises(ProviderError, match="finish_reason"):
         parse_chat_completion({"choices": [{"finish_reason": 1, "message": {"content": "ok"}}]})

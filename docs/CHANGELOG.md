@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.7.59 — 2026-08-30
+
+- Added bounded validation for provider capability declarations, rejecting
+  invalid limits, malformed transport names, and duplicate transports before
+  they reach AgentLoop or RPC diagnostics.
+
 ## v0.7.58 — 2026-08-30
 
 - Ollama responses now normalize local-model `message.tool_calls` into the

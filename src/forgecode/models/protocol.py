@@ -243,5 +243,20 @@ class ModelCapabilities:
     supports_temperature: bool = True
     transports: tuple[str, ...] = ("json",)
 
+    def __post_init__(self) -> None:
+        for name in ("tool_calling", "json_mode", "streaming", "supports_reasoning", "supports_temperature"):
+            if not isinstance(getattr(self, name), bool):
+                raise ValueError(f"{name} must be boolean")
+        for name in ("max_input_chars", "max_output_chars"):
+            value = getattr(self, name)
+            if isinstance(value, bool) or not isinstance(value, int) or value < 1 or value > 10_000_000:
+                raise ValueError(f"{name} must be an integer between 1 and 10000000")
+        if not isinstance(self.transports, tuple) or not self.transports or len(self.transports) > 8:
+            raise ValueError("transports must be a non-empty tuple of at most 8 items")
+        if any(not isinstance(item, str) or not item or len(item) > 32 for item in self.transports):
+            raise ValueError("transports must contain bounded non-empty strings")
+        if len(set(self.transports)) != len(self.transports):
+            raise ValueError("transports must not contain duplicates")
+
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
