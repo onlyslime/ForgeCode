@@ -51,6 +51,13 @@ def test_trajectory_evaluator_rejects_model_claim_without_verification(tmp_path:
     assert score.status == "failed" and not score.verification_passed and score.score < 1.0
 
 
+def test_trajectory_evaluator_does_not_call_new_session_failed(tmp_path: Path):
+    store = SessionStore(tmp_path / "new.jsonl")
+    store.append("run_created", {"run_id": store.run_id})
+    score = evaluate_events(tuple(store.read()))
+    assert score.status == "not_started"
+
+
 def test_path_completion_is_advisory_and_stable(tmp_path: Path):
     (tmp_path / "alpha.py").write_text("print(1)\n", encoding="utf-8")
     (tmp_path / ".env").write_text("TOKEN=hidden\n", encoding="utf-8")

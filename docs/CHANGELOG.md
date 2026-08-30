@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.7.60 — 2026-08-30
+
+- Trajectory evaluation now distinguishes newly opened sessions (`not_started`)
+  and active sessions (`in_progress`) from genuine failures, avoiding a false
+  `failed` status when no run has completed yet.
+
 ## v0.7.59 — 2026-08-30
 
 - Added bounded validation for provider capability declarations, rejecting

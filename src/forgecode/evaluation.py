@@ -74,7 +74,20 @@ def evaluate_events(events: Iterable[SessionEvent]) -> TrajectoryScore:
         terminal_state = final.payload["state"]
     task_completed = bool(final_reason == "model_finished" and terminal_state == "completed")
     audit_complete = not any(event.kind == "session_error" for event in records)
-    status = "completed" if task_completed and verification_passed and audit_complete and not conflicts and not unresolved else ("cancelled" if cancelled else ("recovery_required" if conflicts or unresolved else "failed"))
+    if task_completed and verification_passed and audit_complete and not conflicts and not unresolved:
+        status = "completed"
+    elif cancelled:
+        status = "cancelled"
+    elif conflicts or unresolved:
+        status = "recovery_required"
+    elif final is None and not failures:
+        # A newly opened session is not a failed trajectory. Distinguish it
+        # from a run that has started so status consumers can render an honest
+        # idle/in-progress state instead of treating missing evidence as an
+        # error.
+        status = "in_progress" if any(event.kind == "run_started" for event in records) else "not_started"
+    else:
+        status = "failed"
     score = 0.0
     score += 0.4 if task_completed else 0.0
     score += 0.3 if verification_passed else 0.0
