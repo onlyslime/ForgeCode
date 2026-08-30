@@ -691,7 +691,7 @@ CLI/TUI
 | 验证 | 测试 profile、有限修复、review/export、轨迹评估 | 缺少语言服务和调试器集成 | P1 |
 | 扩展发布 | Skills、hooks、SDK、JSONL RPC、工具收窄、uv/独立二进制布局 | 缺少 MCP、插件市场、跨平台一键安装 | P2 |
 
-截至当前 v0.7.18，正常交互工作流还提供 `/context`（有界索引健康度）和
+截至当前 v0.7.19，正常交互工作流还提供 `/context`（有界索引健康度）和
 `/events [limit] [kind]`（可筛选、带相对耗时和错误码的持久化事件尾部）。
 这些能力不改变工具权限，只把已有审计证据暴露给用户；对应交互、机器契约和
 provider 回归测试均已通过。
@@ -879,7 +879,7 @@ Codex 官方页面或未实现的竞品特性当作本项目已完成能力。
 scope allow/deny 与 fallback 全局策略。该字段只描述策略路径，不包含命令、内容或
 凭据，便于 `/events` 和 JSONL 审计解释“为什么被允许或拒绝”。
 
-### 当前差距复核（v0.7.18）
+### 当前差距复核（v0.7.19）
 
 基于已核实的 Codex `AskForApproval.ts`、Codex app-server 源码树、OpenCode
 Tools/Permissions 文档和 Cline 工具/Plan 文档，ForgeCode 的优势是边界全部在本仓库
