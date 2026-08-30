@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.187 — 2026-08-31
+
+- **Metadata read consistency:** `file_metadata` now compares file identity before and after reading, rejecting concurrent replacement or modification instead of reporting mixed metadata.
+- **Verification:** command-boundary tests, compile checks, and manual metadata race review passed.
+
 ## v0.8.186 — 2026-08-31
 
 - **Navigation read TOCTOU guard:** range and symbol readers now validate decoded content size after reading, closing growth races after the initial file-size check.

@@ -177,7 +177,8 @@ class FileMetadataTool:
         if path != lexical.absolute():
             raise ValueError("reading symlink or junction aliases is not allowed")
         if _is_ignored(path, context.guard) or not path.is_file(): raise ValueError("path is not a readable file")
-        if path.stat().st_size > _MAX_FILE_BYTES:
+        before_stat = path.stat()
+        if before_stat.st_size > _MAX_FILE_BYTES:
             return ToolResult(False, f"file exceeds the {_MAX_FILE_BYTES}-byte safety limit", {"error": "file_too_large", "path": path_value})
         raw = path.read_bytes()
         if len(raw) > _MAX_FILE_BYTES:
@@ -186,5 +187,9 @@ class FileMetadataTool:
         try: text = raw.decode("utf-8"); encoding = "utf-8"
         except UnicodeDecodeError: text = ""; encoding = "binary"
         stat = path.stat()
+        identity_before = (before_stat.st_size, before_stat.st_mtime_ns, getattr(before_stat, "st_ino", 0))
+        identity_after = (stat.st_size, stat.st_mtime_ns, getattr(stat, "st_ino", 0))
+        if identity_before != identity_after:
+            return ToolResult(False, "file changed while metadata was read", {"error": "file_changed_during_read", "path": path_value})
         data = {"path": context.guard.relative(path), "size_bytes": len(raw), "lines": len(text.splitlines()) if text else None, "encoding": encoding, "modified_ns": stat.st_mtime_ns, "sha256": hashlib.sha256(raw).hexdigest()}
         return ToolResult(True, "\n".join(f"{key}: {value}" for key, value in data.items()), data)
