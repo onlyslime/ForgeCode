@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.191 — 2026-08-31
+
+- **Post-read deadline enforcement:** understanding and metadata tools now reject results when blocking file I/O crosses the run deadline, keeping expiration semantics consistent before and after reads.
+- **Verification:** understanding and command-boundary tests passed; compile and diff checks passed.
+
 ## v0.8.190 — 2026-08-31
 
 - **Responsive code navigation cancellation:** symbol, definition, reference, and hover scans now poll cancellation and deadlines while traversing large files, bounding response latency after content loading.

@@ -28,6 +28,8 @@ class ReadRangeTool:
         if path.stat().st_size > _MAX_FILE_BYTES:
             return ToolResult(False, f"file exceeds the {_MAX_FILE_BYTES}-byte safety limit", {"error": "file_too_large", "path": path_value})
         raw = path.read_bytes()
+        if context.remaining_seconds(10.0) <= 0:
+            return ToolResult(False, "range read stopped because the run deadline expired while reading", {"error": "deadline_exceeded"})
         if len(raw) > _MAX_FILE_BYTES:
             return ToolResult(False, f"file exceeds the {_MAX_FILE_BYTES}-byte safety limit", {"error": "file_too_large", "path": path_value})
         lines = raw.decode("utf-8").splitlines()
@@ -52,6 +54,8 @@ class ListSymbolsTool:
         if path.stat().st_size > _MAX_FILE_BYTES:
             return ToolResult(False, f"file exceeds the {_MAX_FILE_BYTES}-byte safety limit", {"error": "file_too_large", "path": path_value})
         raw = path.read_bytes()
+        if context.remaining_seconds(10.0) <= 0:
+            return ToolResult(False, "symbol listing stopped because the run deadline expired while reading", {"error": "deadline_exceeded"})
         if len(raw) > _MAX_FILE_BYTES:
             return ToolResult(False, f"file exceeds the {_MAX_FILE_BYTES}-byte safety limit", {"error": "file_too_large", "path": path_value})
         text = raw.decode("utf-8")
@@ -119,6 +123,8 @@ class FindDefinitionTool:
                 return ToolResult(False, "definition search stopped because the run deadline has expired", {"error": "deadline_exceeded"})
             try: lines = path.read_text(encoding="utf-8").splitlines()
             except (OSError, UnicodeError): continue
+            if context.remaining_seconds(20.0) <= 0:
+                return ToolResult(False, "definition search stopped because the run deadline expired while reading", {"error": "deadline_exceeded"})
             for number, line in enumerate(lines, 1):
                 if number % 256 == 0:
                     if context.cancelled:
@@ -150,6 +156,8 @@ class FindReferencesTool:
                 return ToolResult(False, "reference search stopped because the run deadline has expired", {"error": "deadline_exceeded"})
             try: lines = path.read_text(encoding="utf-8").splitlines()
             except (OSError, UnicodeError): continue
+            if context.remaining_seconds(20.0) <= 0:
+                return ToolResult(False, "reference search stopped because the run deadline expired while reading", {"error": "deadline_exceeded"})
             for number, line in enumerate(lines, 1):
                 if number % 256 == 0:
                     if context.cancelled:
@@ -181,6 +189,8 @@ class SymbolHoverTool:
                 return ToolResult(False, "symbol hover stopped because the run deadline has expired", {"error": "deadline_exceeded"})
             try: lines = path.read_text(encoding="utf-8").splitlines()
             except (OSError, UnicodeError): continue
+            if context.remaining_seconds(20.0) <= 0:
+                return ToolResult(False, "symbol hover stopped because the run deadline expired while reading", {"error": "deadline_exceeded"})
             for number, line in enumerate(lines, 1):
                 if number % 256 == 0:
                     if context.cancelled:
@@ -213,6 +223,8 @@ class FileMetadataTool:
         if before_stat.st_size > _MAX_FILE_BYTES:
             return ToolResult(False, f"file exceeds the {_MAX_FILE_BYTES}-byte safety limit", {"error": "file_too_large", "path": path_value})
         raw = path.read_bytes()
+        if context.remaining_seconds(10.0) <= 0:
+            return ToolResult(False, "file metadata stopped because the run deadline expired while reading", {"error": "deadline_exceeded"})
         if len(raw) > _MAX_FILE_BYTES:
             return ToolResult(False, f"file exceeds the {_MAX_FILE_BYTES}-byte safety limit", {"error": "file_too_large", "path": path_value})
         import hashlib
