@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.148 — 2026-08-31
+
+- **Transport scheme safety:** restrict custom provider transport URLs to HTTP/HTTPS schemes before rewriting or dispatch.
+- **Verification:** provider tests, compile checks, and manual non-HTTP URL inspection passed.
+
 ## v0.8.147 — 2026-08-31
 
 - **Transport response bound:** cap custom transport response bodies at 4 MiB before parsing, matching provider safety limits and reducing memory pressure.

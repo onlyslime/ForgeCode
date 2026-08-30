@@ -178,6 +178,12 @@ def test_provider_transport_rejects_control_character_url():
         transport._request("https://example/\nchat/completions", {}, b"{}")
 
 
+def test_provider_transport_rejects_non_http_url():
+    transport = _ProtocolTransport(object(), "anthropic", "secret")
+    with pytest.raises(ValueError, match="request URL is invalid"):
+        transport._request("file:///tmp/chat/completions", {}, b"{}")
+
+
 def test_provider_transport_rejects_control_character_request_header():
     transport = _ProtocolTransport(object(), "anthropic", "secret")
     with pytest.raises(ValueError, match="request headers are invalid"):
