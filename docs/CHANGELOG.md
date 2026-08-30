@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.100 — 2026-08-31
+
+- Restricted worktree ownership paths to safe workspace-relative paths,
+  rejecting absolute, empty, and traversal components in metadata.
+- Verification: malformed-path regressions, manual parser checks, compileall,
+  and diff checks passed.
+
 ## v0.8.99 — 2026-08-31
 
 - Added object-argument validation to `git_worktrees`, completing consistent

@@ -55,3 +55,12 @@ def test_worktree_metadata_rejects_newline_fields(tmp_path):
     (folder / "worktrees.json").write_text('{"worktrees":{"demo":{"path":"ok\\nforged"}}}', encoding="utf-8")
     with pytest.raises(ValueError, match="ownership field"):
         _worktree_records(guard)
+
+
+def test_worktree_metadata_rejects_absolute_or_traversal_paths(tmp_path):
+    guard = WorkspaceGuard(tmp_path)
+    folder = tmp_path / ".forgecode"; folder.mkdir()
+    for value in ("C:/outside", "../outside", ".", "foo//bar"):
+        (folder / "worktrees.json").write_text('{"worktrees":{"demo":{"path":' + repr(value).replace("'", '"') + '}}}', encoding="utf-8")
+        with pytest.raises(ValueError, match="ownership path"):
+            _worktree_records(guard)

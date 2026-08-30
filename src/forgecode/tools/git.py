@@ -42,6 +42,11 @@ def _worktree_records(guard) -> dict[str, dict[str, str]]:
         fields = {str(field): value for field, value in item.items() if field in {"run_id", "branch", "path"}}
         if any(not isinstance(value, str) or len(value) > 256 or any(ch in value for ch in "\r\n") for value in fields.values()):
             raise ValueError("invalid worktree ownership field")
+        path_value = fields.get("path")
+        if path_value is not None:
+            path_parts = path_value.replace("\\", "/").split("/")
+            if Path(path_value).is_absolute() or any(part in {"", ".", ".."} for part in path_parts):
+                raise ValueError("invalid worktree ownership path")
         cleaned[key] = fields
     return cleaned
 
