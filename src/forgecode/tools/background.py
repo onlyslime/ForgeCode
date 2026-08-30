@@ -163,6 +163,8 @@ class RunBackgroundTool:
     definition = ToolDefinition("run_background", "Start a bounded approved background command and return its task ID.", {"type":"object","properties":{"command":{"type":"string"}},"required":["command"]}, side_effecting=True)
     def __init__(self, guard, manager): self.guard, self.manager = guard, manager
     def execute(self, arguments, context):
+        if not isinstance(arguments, dict):
+            raise ValueError("arguments must be an object")
         denied = context.deny_if_plan(self.definition.name)
         if denied: return denied
         command = arguments.get("command")
@@ -179,6 +181,8 @@ class ProcessStatusTool:
     definition = ToolDefinition("process_status", "Get the status of a ForgeCode background task.", {"type":"object","properties":{"task_id":{"type":"string"}},"required":["task_id"]})
     def __init__(self, guard, manager): self.manager = manager
     def execute(self, arguments, context):
+        if not isinstance(arguments, dict):
+            raise ValueError("arguments must be an object")
         data = self.manager.snapshot(str(arguments.get("task_id", "")))
         return ToolResult("error" not in data, str(data), data)
 
@@ -192,6 +196,8 @@ class ListProcessesTool:
 class PollProcessTool(ProcessStatusTool):
     definition = ToolDefinition("poll_process", "Read new output from a background task using a cursor.", {"type":"object","properties":{"task_id":{"type":"string"},"cursor":{"type":"integer"}},"required":["task_id"]})
     def execute(self, arguments, context):
+        if not isinstance(arguments, dict):
+            raise ValueError("arguments must be an object")
         cursor = arguments.get("cursor", 0)
         if isinstance(cursor, bool) or not isinstance(cursor, int) or cursor < 0: raise ValueError("cursor must be a non-negative integer")
         data = self.manager.snapshot(str(arguments.get("task_id", "")), cursor)
@@ -200,6 +206,8 @@ class PollProcessTool(ProcessStatusTool):
 class KillProcessTool(ProcessStatusTool):
     definition = ToolDefinition("kill_process", "Terminate a ForgeCode-owned background task after approval.", {"type":"object","properties":{"task_id":{"type":"string"}},"required":["task_id"]}, side_effecting=True)
     def execute(self, arguments, context):
+        if not isinstance(arguments, dict):
+            raise ValueError("arguments must be an object")
         denied = context.deny_if_plan(self.definition.name)
         if denied: return denied
         task_id = str(arguments.get("task_id", "")); item = self.manager.get(task_id)

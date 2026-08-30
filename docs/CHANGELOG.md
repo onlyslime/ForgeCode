@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.79 — 2026-08-31
+
+- Added consistent object-argument validation across all background process
+  tools, preventing leaked attribute errors on malformed direct calls.
+- Verification: four-tool invalid-input regression, manual API checks,
+  compileall, and diff checks passed.
+
 ## v0.8.78 — 2026-08-31
 
 - Added explicit object validation to test and diagnostics tool entrypoints,
