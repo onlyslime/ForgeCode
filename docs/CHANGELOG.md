@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.195 — 2026-08-31
+
+- **Filesystem scan responsiveness:** `read_file` and `search` now enforce post-read deadline checks and poll cancellation/deadlines while matching lines in large files.
+- **Verification:** filesystem/security command tests, compile, and diff checks passed.
+
 ## v0.8.194 — 2026-08-31
 
 - **Quality-check deadline correctness:** test and diagnostics tools now discard subprocess results only when an actual run deadline is configured and has expired, preserving normal no-deadline behavior while preventing stale successes after expiry.

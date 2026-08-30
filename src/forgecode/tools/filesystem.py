@@ -147,6 +147,8 @@ class ReadFileTool:
             if before_stat.st_size > _MAX_FILE_BYTES:
                 raise ValueError(f"file exceeds the {_MAX_FILE_BYTES}-byte safety limit")
             raw = path.read_bytes()
+            if context.deadline_monotonic is not None and context.remaining_seconds(0) <= 0:
+                return ToolResult(False, "file read stopped because the run deadline expired while reading", {"error": "deadline_exceeded"})
             after_stat = path.stat()
             if (before_stat.st_size, before_stat.st_mtime_ns, getattr(before_stat, "st_ino", 0)) != (after_stat.st_size, after_stat.st_mtime_ns, getattr(after_stat, "st_ino", 0)):
                 raise ValueError("file changed while it was read")
@@ -209,12 +211,19 @@ class SearchTool:
                 if before_stat.st_size > _MAX_FILE_BYTES:
                     continue
                 lines = safe_path.read_bytes().decode("utf-8").splitlines()
+                if context.deadline_monotonic is not None and context.remaining_seconds(0) <= 0:
+                    return ToolResult(False, "search stopped because the run deadline expired while reading", {"error": "deadline_exceeded"})
                 after_stat = safe_path.stat()
                 if (before_stat.st_size, before_stat.st_mtime_ns, getattr(before_stat, "st_ino", 0)) != (after_stat.st_size, after_stat.st_mtime_ns, getattr(after_stat, "st_ino", 0)):
                     continue
             except (UnicodeDecodeError, OSError, ValueError):
                 continue
             for number, line in enumerate(lines, 1):
+                if number % 256 == 0:
+                    if context.cancelled:
+                        return ToolResult(False, "search cancelled during file scan", {"error": "cancelled"})
+                    if context.remaining_seconds(10.0) <= 0:
+                        return ToolResult(False, "search stopped because the run deadline has expired", {"error": "deadline_exceeded"})
                 if pattern.search(line):
                     if len(results) < limit:
                         shown_line = line[:_MAX_SEARCH_LINE_CHARS] + ("..." if len(line) > _MAX_SEARCH_LINE_CHARS else "")
