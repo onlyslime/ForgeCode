@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.78 — 2026-08-31
+
+- Added explicit object validation to test and diagnostics tool entrypoints,
+  replacing leaked `AttributeError` failures with actionable input errors.
+- Verification: direct `None`/non-object checks, command tests, compileall,
+  and diff checks passed.
+
 ## v0.8.77 — 2026-08-31
 
 - Filtered sensitive environment variables from test and diagnostics

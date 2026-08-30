@@ -55,6 +55,13 @@ def test_quality_tools_reject_empty_explicit_commands(tmp_path: Path):
             tool.execute({"command": "   "}, context)
 
 
+def test_quality_tools_reject_non_object_arguments(tmp_path: Path):
+    context = ToolContext(WorkspaceGuard(tmp_path), AllowAllApproval())
+    for tool in (QualityCheckTool(tmp_path), DiagnosticsTool(tmp_path)):
+        with pytest.raises(ValueError, match="arguments must be an object"):
+            tool.execute(None, context)
+
+
 def test_quality_tools_apply_command_safety_classification(tmp_path: Path):
     context = ToolContext(WorkspaceGuard(tmp_path), AllowAllApproval())
     for tool in (QualityCheckTool(tmp_path), DiagnosticsTool(tmp_path)):
