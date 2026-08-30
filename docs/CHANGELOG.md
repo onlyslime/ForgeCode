@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.7.37 — 2026-08-30
+
+- Hardened RPC session recovery with a 512 KiB record-size limit, alias
+  rejection, and minimum workspace/mode/session schema validation.
+- Oversized, malformed, or symlinked records are ignored rather than loaded
+  into the daemon session table.
+
 ## v0.7.36 — 2026-08-30
 
 - Added read-only `git_worktree_reconcile` to compare actual Git worktrees with

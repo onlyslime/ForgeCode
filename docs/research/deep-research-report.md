@@ -675,7 +675,7 @@ CLI/TUI
 - [x] 每个 P0/P1 能力都有可执行验收标准或演示场景。
 - [x] 已明确竞品参考与本题自研实现的边界，避免误用现成 agent 框架。
 
-## ForgeCode 当前差距复核（2026-08-30，v0.7.36）
+## ForgeCode 当前差距复核（2026-08-30，v0.7.37）
 
 本节以当前仓库源码、定向测试和正常 `fcc` 工作流为准；竞品能力只作为产品
 形态基线，不把未能直接访问的页面当作已验证事实。OpenAI 官方 Codex 页面在
@@ -692,7 +692,7 @@ CLI/TUI
 | 验证 | 测试 profile、有限修复、review/export、轨迹评估 | 缺少语言服务和调试器集成 | P1 |
 | 扩展发布 | Skills、hooks、SDK、JSONL RPC、工具收窄、uv/独立二进制布局 | 缺少 MCP、插件市场、跨平台一键安装 | P2 |
 
-截至当前 v0.7.36，正常交互工作流还提供 `/context`（有界索引健康度）和
+截至当前 v0.7.37，正常交互工作流还提供 `/context`（有界索引健康度）和
 `/events [limit] [kind]`（可筛选、带相对耗时和错误码的持久化事件尾部）。
 这些能力不改变工具权限，只把已有审计证据暴露给用户；对应交互、机器契约和
 provider 回归测试均已通过。
@@ -987,6 +987,16 @@ worktree 并行能力仍属于 ForgeCode 的已知 P2/P1 差距，本轮未改�
   `git diff --check` 均通过。
 - RPC/embedding/工具策略/后台任务/语义工具/只读并行的定向测试均在完整回归中覆盖；未发现
   JSONL、审批或 WorkspaceGuard 回归。
+
+### 0.7.37 实施审计：bounded RPC session recovery（2026-08-30）
+
+- **范围**：RPC daemon 恢复 session record 前拒绝符号链接/junction，限制文件不超过
+  512 KiB，并要求 workspace、mode、session_path 为字符串；异常记录安全忽略。
+- **非目标**：不自动修复/删除损坏记录，不恢复运行中的进程，不改变 session TTL、取消或
+  replay 语义。
+- **完成条件**：恶意或异常大的恢复文件不会被加载，合法记录继续跨进程恢复。
+- **验证**：RPC session lifecycle 与 machine contract 定向测试 `34 passed`，compileall
+  与 diff 检查通过；发布门禁将补充 doctor 和完整回归。
 
 ### 0.7.36 实施审计：worktree reconcile observability（2026-08-30）
 

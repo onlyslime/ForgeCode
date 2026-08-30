@@ -22,6 +22,7 @@ from typing import Any, Iterable
 
 from .application.commands import main
 from .security.trust import TrustStore, TrustError
+from .security.workspace import WorkspaceViolation, assert_no_path_alias
 
 _SESSION_LOCK = threading.RLock()
 _SESSION_CONDITION = threading.Condition(_SESSION_LOCK)
@@ -34,6 +35,7 @@ _MAX_RPC_SESSIONS = 256
 _MAX_SESSION_EVENTS = 512
 _MAX_REQUEST_LINE_BYTES = 1_048_576
 _MAX_SESSION_RESULT_BYTES = 262_144
+_MAX_RPC_RECORD_BYTES = 512_000
 
 # Stable capability metadata for clients that cannot invoke the workspace-bound
 # ``tools`` command yet.  Keep this list declarative and bounded; it is not an
@@ -224,7 +226,12 @@ def _load_session(handle: str, workspace_hint: str | None = None) -> dict[str, A
         if not candidate.is_file():
             continue
         try:
+            assert_no_path_alias(candidate, message="RPC session record is a symlink or junction alias")
+            if candidate.stat().st_size > _MAX_RPC_RECORD_BYTES:
+                continue
             raw = json.loads(candidate.read_text(encoding="utf-8"))
+            if not isinstance(raw, dict) or not isinstance(raw.get("workspace"), str) or not isinstance(raw.get("mode"), str) or not isinstance(raw.get("session_path"), str):
+                continue
             workspace = Path(str(raw["workspace"])).expanduser().resolve()
             if not workspace.is_dir() or (workspace / ".forgecode" / "rpc-sessions" / f"{handle}.json").resolve() != candidate.resolve():
                 continue
@@ -240,7 +247,7 @@ def _load_session(handle: str, workspace_hint: str | None = None) -> dict[str, A
             if isinstance(created_at, (int, float)) and time.time() - float(created_at) > _SESSION_TTL_SECONDS:
                 continue
             return info
-        except (OSError, ValueError, KeyError, TypeError):
+        except (OSError, ValueError, KeyError, TypeError, WorkspaceViolation):
             continue
     return None
 

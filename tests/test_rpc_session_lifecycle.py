@@ -531,3 +531,13 @@ def test_rpc_persisted_record_is_valid_json_and_contains_no_prompt(tmp_path):
     payload = json.loads(record_path.read_text(encoding="utf-8"))
     assert payload["workspace"] == str(tmp_path)
     assert "prompt" not in payload and "credential" not in payload
+
+
+def test_rpc_oversized_or_aliased_record_is_not_recovered(tmp_path):
+    from forgecode import rpc
+    handle = "a" * 32
+    record_dir = tmp_path / ".forgecode" / "rpc-sessions"
+    record_dir.mkdir(parents=True)
+    record = record_dir / f"{handle}.json"
+    record.write_text("x" * 600_000, encoding="utf-8")
+    assert rpc._load_session(handle, str(tmp_path)) is None
