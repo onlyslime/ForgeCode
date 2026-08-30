@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.40 — 2026-08-30
+
+- Hardened the tool result boundary by rejecting non-mapping metadata from
+  extensions before redaction and output truncation.
+- Verification: tool registry tests, compileall, diff checks, and manual
+  malformed-result inspection passed.
+
 ## v0.8.39 — 2026-08-30
 
 - Bounded `ToolRegistry` output limits to integer values from 1 through

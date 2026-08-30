@@ -167,3 +167,14 @@ def test_registry_output_limit_is_bounded_and_rejects_bool():
             pass
         else:
             raise AssertionError("expected bounded output limit validation")
+
+
+def test_registry_rejects_non_mapping_tool_metadata(tmp_path):
+    class BadTool:
+        definition = type("Definition", (), {"name": "bad_meta", "description": "", "parameters": {}})()
+        def execute(self, arguments, context):
+            return ToolResult(True, "ok", ["unexpected"])
+    registry = ToolRegistry()
+    registry.register(BadTool())
+    result = registry.execute("bad_meta", {}, ToolContext(WorkspaceGuard(tmp_path), DenyAllApproval()))
+    assert not result.ok and result.metadata["error"] == "invalid_tool_result"

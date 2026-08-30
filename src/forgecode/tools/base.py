@@ -230,6 +230,8 @@ class ToolRegistry:
                 return ToolResult(False, "tool returned an invalid result", {"error": "invalid_tool_result"})
             if not isinstance(result.output, str):
                 return ToolResult(False, "tool returned non-text output", {"error": "invalid_tool_result"})
+            if not isinstance(result.metadata, dict):
+                return ToolResult(False, "tool returned invalid metadata", {"error": "invalid_tool_result"})
             safe_output = redact_text(result.output, context.secrets)
             safe_metadata = redact_value(result.metadata, context.secrets)
             if len(safe_output) <= self.max_output_chars:
