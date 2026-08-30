@@ -1,7 +1,8 @@
 """Controlled background process tools with incremental output polling."""
 from __future__ import annotations
 from dataclasses import dataclass, field
-import os, subprocess, threading, time, uuid
+import json, os, subprocess, threading, time, uuid
+from pathlib import Path
 from typing import Any
 from .base import ToolContext, ToolDefinition, ToolResult
 from .shell import classify_command
@@ -18,14 +19,46 @@ class _Process:
     finished: float | None = None
 
 class ProcessManager:
-    def __init__(self, max_output_chars: int = 100_000, max_tasks: int = 64, max_history: int = 256):
+    def __init__(self, max_output_chars: int = 100_000, max_tasks: int = 64, max_history: int = 256, state_path: Path | str | None = None):
         if any(isinstance(value, bool) or not isinstance(value, int) or value < 1 for value in (max_output_chars, max_tasks, max_history)):
             raise ValueError("background limits must be positive integers")
         self.max_output_chars = max_output_chars
         self.max_tasks = max_tasks
         self.max_history = max_history
         self._items: dict[str, _Process] = {}
+        self._stale: dict[str, dict[str, Any]] = {}
         self._lock = threading.Lock()
+        self._state_path = Path(state_path) if state_path is not None else None
+        if self._state_path is not None:
+            self._load_state()
+
+    def _load_state(self) -> None:
+        try:
+            payload = json.loads(self._state_path.read_text(encoding="utf-8"))
+            rows = payload.get("tasks", []) if isinstance(payload, dict) else []
+            if isinstance(rows, list):
+                for row in rows[-self.max_history:]:
+                    if isinstance(row, dict) and isinstance(row.get("task_id"), str):
+                        status = "stale" if row.get("status") == "running" else str(row.get("status", "stale"))
+                        self._stale[row["task_id"]] = {**row, "status": status, "recoverable": False}
+        except (OSError, ValueError, TypeError):
+            return
+
+    def _persist_state(self) -> None:
+        if self._state_path is None:
+            return
+        rows = []
+        for task_id, item in self._items.items():
+            rows.append({"task_id": task_id, "pid": item.process.pid, "started": item.started, "status": "running" if item.process.poll() is None else "completed"})
+        rows.extend(self._stale.values())
+        rows = rows[-self.max_history:]
+        try:
+            self._state_path.parent.mkdir(parents=True, exist_ok=True)
+            tmp = self._state_path.with_suffix(self._state_path.suffix + ".tmp")
+            tmp.write_text(json.dumps({"schema_version": 1, "tasks": rows}, ensure_ascii=False), encoding="utf-8")
+            os.replace(tmp, self._state_path)
+        except OSError:
+            return
 
     def start(self, command: str, root, task_id: str) -> _Process:
         with self._lock:
@@ -36,6 +69,8 @@ class ProcessManager:
         item = _Process(process, command, time.monotonic())
         with self._lock:
             self._items[task_id] = item
+            self._stale.pop(task_id, None)
+            self._persist_state()
             if len(self._items) > self.max_history:
                 finished = [key for key, value in self._items.items() if value.process.poll() is not None]
                 for key in finished[: max(0, len(self._items) - self.max_history)]:
@@ -53,6 +88,7 @@ class ProcessManager:
                         item.truncated = True
             process.wait()
             with item.lock: item.finished = time.monotonic()
+            with self._lock: self._persist_state()
         threading.Thread(target=drain, name=f"forgecode-bg-{task_id[:8]}", daemon=True).start()
         return item
 
@@ -61,15 +97,17 @@ class ProcessManager:
 
     def snapshot(self, task_id: str, cursor: int = 0) -> dict[str, Any]:
         item = self.get(task_id)
-        if item is None: return {"error": "unknown_task", "task_id": task_id}
+        if item is None:
+            stale = self._stale.get(task_id)
+            return {**stale, "task_id": task_id} if stale is not None else {"error": "unknown_task", "task_id": task_id}
         with item.lock: lines = item.output[cursor:]; total = len(item.output); truncated = item.truncated
         code = item.process.poll()
         ended = item.finished if item.finished is not None else time.monotonic()
-        return {"task_id": task_id, "status": "running" if code is None else ("completed" if code == 0 else "failed"), "exit_code": code, "output": "\n".join(lines), "cursor": total, "truncated": truncated, "duration_seconds": round(ended - item.started, 3), "pid": item.process.pid}
+        return {"task_id": task_id, "status": "running" if code is None else ("completed" if code == 0 else "failed"), "exit_code": code, "output": "\n".join(lines), "cursor": total, "truncated": truncated, "duration_seconds": round(ended - item.started, 3), "pid": item.process.pid, "recoverable": False}
 
     def list(self) -> list[dict[str, Any]]:
         with self._lock:
-            ids = list(self._items)[:128]
+            ids = list(self._items)[:128] + [key for key in self._stale if key not in self._items][:128]
         rows = []
         for task_id in ids:
             data = self.snapshot(task_id)

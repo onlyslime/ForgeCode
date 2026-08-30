@@ -13,7 +13,7 @@ from ..hooks import Hook, HookIssue, HookRegistry
 
 def build_default_registry(guard) -> ToolRegistry:
     registry = ToolRegistry()
-    process_manager = ProcessManager()
+    process_manager = ProcessManager(state_path=guard.root / ".forgecode" / "background-tasks.json")
     registry.register(ListFilesTool(guard))
     registry.register(ReadFileTool(guard))
     registry.register(SearchTool(guard))

@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.7.17 — 2026-08-30
+
+- Background task metadata is persisted under `.forgecode` without commands or
+  output; tasks observed after a process restart are reported as `stale` and
+  explicitly non-recoverable instead of being replayed.
+- Added bounded persistence and restart-safety regression coverage.
+
 ## v0.7.16 — 2026-08-30
 
 - CLI tool policy now accepts audited risk groups (`read_only`, `changes`,

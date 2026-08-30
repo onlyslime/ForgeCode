@@ -691,7 +691,7 @@ CLI/TUI
 | 验证 | 测试 profile、有限修复、review/export、轨迹评估 | 缺少语言服务和调试器集成 | P1 |
 | 扩展发布 | Skills、hooks、SDK、JSONL RPC、工具收窄、uv/独立二进制布局 | 缺少 MCP、插件市场、跨平台一键安装 | P2 |
 
-截至当前 v0.7.16，正常交互工作流还提供 `/context`（有界索引健康度）和
+截至当前 v0.7.17，正常交互工作流还提供 `/context`（有界索引健康度）和
 `/events [limit] [kind]`（可筛选、带相对耗时和错误码的持久化事件尾部）。
 这些能力不改变工具权限，只把已有审计证据暴露给用户；对应交互、机器契约和
 provider 回归测试均已通过。
@@ -854,7 +854,17 @@ Codex 官方页面或未实现的竞品特性当作本项目已完成能力。
 - **验证**：工具策略定向测试 10 passed；发布前执行完整 pytest、doctor、compileall
   与 diff 检查。
 
-### 当前差距复核（v0.7.16）
+### 0.7.17 实施审计：后台任务 stale 持久化（2026-08-30）
+
+- **范围**：将后台任务的非敏感元数据写入 `.forgecode/background-tasks.json`；
+  新进程加载仍在运行的记录时标记为 `stale`，并提供只读状态查询。
+- **非目标**：不保存命令、输出或凭据；不恢复 PID、不自动重放命令，也不承诺跨主机恢复。
+- **受影响文件**：`src/forgecode/tools/background.py`、`src/forgecode/tools/__init__.py`、
+  `tests/test_background_tools.py` 及版本/变更记录。
+- **完成条件**：状态文件有界、写入失败安全降级、重启记录不可执行且可审计。
+- **验证**：后台工具定向测试 7 passed，compileall 与 diff 检查通过；发布前执行完整回归。
+
+### 当前差距复核（v0.7.17）
 
 基于已核实的 Codex `AskForApproval.ts`、Codex app-server 源码树、OpenCode
 Tools/Permissions 文档和 Cline 工具/Plan 文档，ForgeCode 的优势是边界全部在本仓库

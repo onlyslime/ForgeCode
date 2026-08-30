@@ -65,3 +65,15 @@ def test_kill_process_reports_confirmed_termination(tmp_path):
     started = RunBackgroundTool(guard, manager).execute({"command": "python -c \"import time; time.sleep(10)\""}, context)
     result = KillProcessTool(guard, manager).execute({"task_id": started.metadata["task_id"]}, context)
     assert result.ok and result.metadata["termination_result"] in {"confirmed", "already_exited"}
+
+def test_background_state_reopens_as_stale_without_command_or_replay(tmp_path):
+    state = tmp_path / ".forgecode" / "background-tasks.json"
+    guard = WorkspaceGuard(tmp_path); context = ToolContext(guard, AllowAllApproval())
+    manager = ProcessManager(state_path=state)
+    started = RunBackgroundTool(guard, manager).execute({"command": "python -c \"import time; time.sleep(1)\""}, context)
+    task_id = started.metadata["task_id"]
+    reopened = ProcessManager(state_path=state)
+    data = reopened.snapshot(task_id)
+    assert data["status"] == "stale"
+    assert data["recoverable"] is False
+    assert "command" not in data and "persisted" not in str(data)
