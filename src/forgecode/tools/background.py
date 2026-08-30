@@ -152,9 +152,13 @@ class ProcessManager:
         return item
 
     def get(self, task_id: str) -> _Process | None:
+        if not isinstance(task_id, str) or not task_id.strip() or len(task_id) > _MAX_TASK_ID_CHARS or any(ch in task_id for ch in "\r\n"):
+            raise ValueError("task_id must be non-empty newline-safe text")
         with self._lock: return self._items.get(task_id)
 
     def snapshot(self, task_id: str, cursor: int = 0) -> dict[str, Any]:
+        if not isinstance(task_id, str) or not task_id.strip() or len(task_id) > _MAX_TASK_ID_CHARS or any(ch in task_id for ch in "\r\n"):
+            raise ValueError("task_id must be non-empty newline-safe text")
         if isinstance(cursor, bool) or not isinstance(cursor, int) or cursor < 0:
             raise ValueError("cursor must be a non-negative integer")
         item = self.get(task_id)

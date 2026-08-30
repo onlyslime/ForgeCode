@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.8.86 — 2026-08-31
+
+- Enforced task-ID validation in public `ProcessManager.get()` and
+  `snapshot()` APIs, preventing unhashable or newline-bearing values from
+  leaking internal errors or ambiguous lookups.
+- Verification: manager API boundary regression, background tests, compileall,
+  and diff checks passed.
+
 ## v0.8.85 — 2026-08-31
 
 - Preserved command risk metadata on quality-tool approval-denied and

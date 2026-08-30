@@ -118,6 +118,15 @@ def test_background_status_tools_validate_task_ids(tmp_path):
                 tool.execute({"task_id": value}, context)
 
 
+def test_background_manager_validates_task_ids_at_public_api(tmp_path):
+    manager = ProcessManager()
+    for value in ([], "", "x\n", "x" * 129):
+        with pytest.raises(ValueError, match="task_id"):
+            manager.get(value)
+        with pytest.raises(ValueError, match="task_id"):
+            manager.snapshot(value)
+
+
 def test_background_output_is_hard_bounded_and_completion_duration_stable(tmp_path):
     guard = WorkspaceGuard(tmp_path); context = ToolContext(guard, AllowAllApproval())
     manager = ProcessManager(max_output_chars=12)
@@ -186,7 +195,8 @@ def test_background_state_loader_discards_unbounded_or_unknown_rows(tmp_path):
     state.parent.mkdir()
     state.write_text('{"tasks":[{"task_id":"\\nsecret","status":"running","command":"x"},{"task_id":"ok","status":"mystery","command":"x"}]}', encoding="utf-8")
     manager = ProcessManager(state_path=state)
-    assert manager.snapshot("\nok")["error"] == "unknown_task"
+    with pytest.raises(ValueError, match="task_id"):
+        manager.snapshot("\nok")
     assert manager.snapshot("ok")["status"] == "stale"
     assert "command" not in manager.snapshot("ok")
 
