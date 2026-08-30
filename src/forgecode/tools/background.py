@@ -7,6 +7,9 @@ from typing import Any
 from .base import ToolContext, ToolDefinition, ToolResult
 from .shell import classify_command
 
+_MAX_STATE_BYTES = 2_000_000
+_MAX_TASK_ID_CHARS = 128
+
 @dataclass
 class _Process:
     process: subprocess.Popen
@@ -34,13 +37,18 @@ class ProcessManager:
 
     def _load_state(self) -> None:
         try:
+            if self._state_path.stat().st_size > _MAX_STATE_BYTES:
+                return
             payload = json.loads(self._state_path.read_text(encoding="utf-8"))
             rows = payload.get("tasks", []) if isinstance(payload, dict) else []
             if isinstance(rows, list):
                 for row in rows[-self.max_history:]:
-                    if isinstance(row, dict) and isinstance(row.get("task_id"), str):
+                    task_id = row.get("task_id") if isinstance(row, dict) else None
+                    if isinstance(task_id, str) and 0 < len(task_id) <= _MAX_TASK_ID_CHARS and not any(ch in task_id for ch in "\r\n"):
                         status = "stale" if row.get("status") == "running" else str(row.get("status", "stale"))
-                        self._stale[row["task_id"]] = {**row, "status": status, "recoverable": False}
+                        if status not in {"stale", "completed", "failed", "cancelled"}:
+                            status = "stale"
+                        self._stale[task_id] = {"task_id": task_id, "status": status, "recoverable": False}
         except (OSError, ValueError, TypeError):
             return
 

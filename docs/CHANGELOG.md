@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.33 — 2026-08-30
+
+- Hardened background-task state recovery with file-size, task-ID, and status
+  bounds, and removed untrusted persisted fields from stale-task responses.
+- Verification: background tool tests, compileall, diff checks, and manual
+  malformed-state inspection passed.
+
 ## v0.8.32 — 2026-08-30
 
 - Isolated `EmbeddedSession` stderr readers by reconnect generation so stale

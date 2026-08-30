@@ -91,3 +91,13 @@ def test_background_state_reopens_as_stale_without_command_or_replay(tmp_path):
     assert data["status"] == "stale"
     assert data["recoverable"] is False
     assert "command" not in data and "persisted" not in str(data)
+
+
+def test_background_state_loader_discards_unbounded_or_unknown_rows(tmp_path):
+    state = tmp_path / ".forgecode" / "background-tasks.json"
+    state.parent.mkdir()
+    state.write_text('{"tasks":[{"task_id":"\\nsecret","status":"running","command":"x"},{"task_id":"ok","status":"mystery","command":"x"}]}', encoding="utf-8")
+    manager = ProcessManager(state_path=state)
+    assert manager.snapshot("\nok")["error"] == "unknown_task"
+    assert manager.snapshot("ok")["status"] == "stale"
+    assert "command" not in manager.snapshot("ok")
