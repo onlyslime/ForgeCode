@@ -969,6 +969,11 @@ SHA `1d605501b2a3164d9effca75a6940d67ae833abb`）。当前 schema 仍明确包�
 permissions/MCP 五个布尔域；ForgeCode 的 `[approval_scopes]` 仍是风险域近似，
 并不覆盖这些 Codex 专用维度。
 
+本轮再次请求 Cline 官方工具参考与 Plan/Act 文档，均返回 HTTP 200。资料继续确认
+Cline 将工具结果回传到模型，并把 Plan 限制为探索/规划、Act 用于执行修改；这与
+ForgeCode 当前 ToolRegistry、Plan/Act 边界一致。Cline 的浏览器、MCP 和 Kanban
+worktree 并行能力仍属于 ForgeCode 的已知 P2/P1 差距，本轮未改变优先级。
+
 ### 最新门禁证据（v0.7.27）
 
 - 完整回归：`514 passed, 8 skipped, 2 warnings`（4 分 09 秒）。skip 均为当前
