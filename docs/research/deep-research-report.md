@@ -1258,6 +1258,10 @@ v0.7.42 在此基础上为 `session.events` 增加有界 `type` 过滤；客户�
 内容当作当前能力证据；OpenCode 权限页仍返回 HTTP 200。后续比较 Cline 时仅采用
 可重新访问的官方入口或源码，不用搜索摘要替代证据。
 
+对 “DSH coding harness” 的 GitHub repository search 返回多个无关项目，未能确认
+唯一官方仓库或稳定文档入口；本轮不把这些搜索结果当作 DSH 能力证据。后续若用户
+提供确切仓库 URL，再按源码、测试和 CLI 运行证据纳入比较。
+
 Pi coding-agent README 当前可直接访问（GitHub raw，HTTP 200）。README 明确列出
 interactive/print/JSON/RPC/SDK 四种入口，并提供 providers/models、session branching、
 compaction、message queue、skills、extensions、themes、prompt templates 和可从 npm/git
