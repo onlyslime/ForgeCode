@@ -40,6 +40,21 @@ def test_kill_confirms_cleanup_even_after_deadline(tmp_path):
     assert result.metadata["termination_result"] == "confirmed"
 
 
+def test_persisted_failed_process_keeps_failed_status(tmp_path):
+    guard = WorkspaceGuard(tmp_path)
+    state = tmp_path / "background.json"
+    manager = ProcessManager(state_path=state)
+    item = manager.start("python -c \"raise SystemExit(3)\"", tmp_path, "failed-task")
+    item.process.wait(timeout=5)
+    for _ in range(20):
+        if state.exists() and '"status": "failed"' in state.read_text(encoding="utf-8"):
+            break
+        time.sleep(0.05)
+    assert '"status": "failed"' in state.read_text(encoding="utf-8")
+    restored = ProcessManager(state_path=state)
+    assert restored.snapshot("failed-task")["status"] == "failed"
+
+
 def test_background_manager_rejects_duplicate_task_id(tmp_path):
     manager = ProcessManager()
     item = manager.start("python -c \"print('ok')\"", tmp_path, "same")

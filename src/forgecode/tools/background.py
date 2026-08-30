@@ -78,7 +78,9 @@ class ProcessManager:
             return
         rows = []
         for task_id, item in self._items.items():
-            rows.append({"task_id": task_id, "pid": item.process.pid, "started": item.started, "status": "running" if item.process.poll() is None else "completed"})
+            exit_code = item.process.poll()
+            status = "running" if exit_code is None else ("completed" if exit_code == 0 else "failed")
+            rows.append({"task_id": task_id, "pid": item.process.pid, "started": item.started, "status": status})
         rows.extend(self._stale.values())
         rows = rows[-self.max_history:]
         try:

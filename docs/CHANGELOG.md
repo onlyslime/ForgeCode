@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.161 — 2026-08-31
+
+- **Background failure persistence:** persisted task snapshots now retain `failed` for non-zero exits instead of collapsing every finished process into `completed`.
+- **Verification:** background-tool tests, compile checks, and manual persisted-state inspection passed.
+
 ## v0.8.160 — 2026-08-31
 
 - **Background cleanup reliability:** killing a ForgeCode-owned process now uses its independent bounded cleanup window even after the parent run deadline, so successful termination is not misreported as unresolved.
