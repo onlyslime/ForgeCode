@@ -59,6 +59,18 @@ class ProcessManager:
         ended = item.finished if item.finished is not None else time.monotonic()
         return {"task_id": task_id, "status": "running" if code is None else ("completed" if code == 0 else "failed"), "exit_code": code, "output": "\n".join(lines), "cursor": total, "truncated": truncated, "duration_seconds": round(ended - item.started, 3), "pid": item.process.pid}
 
+    def list(self) -> list[dict[str, Any]]:
+        with self._lock:
+            ids = list(self._items)[:128]
+        rows = []
+        for task_id in ids:
+            data = self.snapshot(task_id)
+            data.pop("output", None)
+            item = self.get(task_id)
+            data["command"] = item.command[:200] if item else ""
+            rows.append(data)
+        return rows
+
 class RunBackgroundTool:
     definition = ToolDefinition("run_background", "Start a bounded approved background command and return its task ID.", {"type":"object","properties":{"command":{"type":"string"}},"required":["command"]}, side_effecting=True)
     def __init__(self, guard, manager): self.guard, self.manager = guard, manager
@@ -79,6 +91,13 @@ class ProcessStatusTool:
     definition = ToolDefinition("process_status", "Get the status of a ForgeCode background task.", {"type":"object","properties":{"task_id":{"type":"string"}},"required":["task_id"]})
     def __init__(self, guard, manager): self.manager = manager
     def execute(self, arguments, context): return ToolResult(True, str(self.manager.snapshot(str(arguments.get("task_id", "")))), self.manager.snapshot(str(arguments.get("task_id", ""))))
+
+class ListProcessesTool:
+    definition = ToolDefinition("list_processes", "List bounded ForgeCode background task summaries.", {"type":"object"})
+    def __init__(self, guard, manager): self.manager = manager
+    def execute(self, arguments, context):
+        rows = self.manager.list()
+        return ToolResult(True, "\n".join(f"{r['task_id']} {r['status']} pid={r['pid']} duration={r['duration_seconds']}s" for r in rows) or "no background tasks", {"tasks": rows, "count": len(rows)})
 
 class PollProcessTool(ProcessStatusTool):
     definition = ToolDefinition("poll_process", "Read new output from a background task using a cursor.", {"type":"object","properties":{"task_id":{"type":"string"},"cursor":{"type":"integer"}},"required":["task_id"]})

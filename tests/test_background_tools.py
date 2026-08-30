@@ -1,6 +1,6 @@
 import time
 from forgecode.security import WorkspaceGuard
-from forgecode.tools import AllowAllApproval, ProcessManager, PollProcessTool, RunBackgroundTool, ToolContext
+from forgecode.tools import AllowAllApproval, ListProcessesTool, ProcessManager, PollProcessTool, RunBackgroundTool, ToolContext
 
 def test_background_task_can_be_started_and_polled(tmp_path):
     guard = WorkspaceGuard(tmp_path); context = ToolContext(guard, AllowAllApproval())
@@ -30,3 +30,12 @@ def test_background_output_is_hard_bounded_and_completion_duration_stable(tmp_pa
     time.sleep(0.05)
     later = PollProcessTool(guard, manager).execute({"task_id": task_id}, context)
     assert later.metadata["duration_seconds"] == first_duration
+
+def test_background_processes_can_be_listed_without_output_or_secret_command(tmp_path):
+    guard = WorkspaceGuard(tmp_path); context = ToolContext(guard, AllowAllApproval())
+    manager = ProcessManager()
+    started = RunBackgroundTool(guard, manager).execute({"command": "python -c \"print('x')\""}, context)
+    rows = ListProcessesTool(guard, manager).execute({}, context)
+    assert rows.metadata["count"] >= 1
+    assert started.metadata["task_id"] in {row["task_id"] for row in rows.metadata["tasks"]}
+    assert all("output" not in row for row in rows.metadata["tasks"])

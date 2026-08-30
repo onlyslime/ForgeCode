@@ -7,7 +7,7 @@ from .shell import AllowAllApproval, DenyAllApproval, InteractiveApproval, Shell
 from .git import GitCommitTool, GitDiffTool, GitLogTool, GitStatusTool
 from .quality import DiagnosticsTool, FindFilesTool, TestTool
 from .understanding import FileMetadataTool, FindDefinitionTool, FindReferencesTool, ListSymbolsTool, ReadRangeTool
-from .background import KillProcessTool, PollProcessTool, ProcessManager, ProcessStatusTool, RunBackgroundTool
+from .background import KillProcessTool, ListProcessesTool, PollProcessTool, ProcessManager, ProcessStatusTool, RunBackgroundTool
 from ..hooks import Hook, HookIssue, HookRegistry
 
 
@@ -36,6 +36,7 @@ def build_default_registry(guard) -> ToolRegistry:
     registry.register(FindReferencesTool())
     registry.register(RunBackgroundTool(guard, process_manager))
     registry.register(ProcessStatusTool(guard, process_manager))
+    registry.register(ListProcessesTool(guard, process_manager))
     registry.register(PollProcessTool(guard, process_manager))
     registry.register(KillProcessTool(guard, process_manager))
     return registry
@@ -79,5 +80,6 @@ __all__ = [
     "ProcessManager",
     "ProcessStatusTool",
     "RunBackgroundTool",
+    "ListProcessesTool",
     "build_default_registry",
 ]

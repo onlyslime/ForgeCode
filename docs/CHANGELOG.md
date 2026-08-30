@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.7.6 — 2026-08-30
+
+- Added a bounded `list_processes` background-task tool for discovering active
+  and completed tasks without replaying captured output.
+
 ## v0.7.5 — 2026-08-30
 
 - Hardened background task observability with a 64-task active limit, strict
