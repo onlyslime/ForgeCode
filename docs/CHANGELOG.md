@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.30 — 2026-08-30
+
+- Bound `EmbeddedSession` reader threads to their process generation so a
+  reconnect cannot leak stale process-exit events into the new session queue.
+- Verification: embedding/recovery tests, compileall, and manual reconnect
+  queue inspection passed.
+
 ## v0.8.29 — 2026-08-30
 
 - Fixed Node `invokeStream()` to close stdin for both RPC and CLI JSONL modes,

@@ -30,6 +30,11 @@ def test_embedded_session_reconnects_dead_worker(tmp_path):
         assert session.reconnect() is True
         event = session.poll(2)
         assert event and event.get("kind") == "process_reconnected"
+        # The old reader must not publish its exit into the new generation's
+        # queue after reconnecting.
+        time.sleep(0.1)
+        trailing = [session.poll(0) for _ in range(8)]
+        assert not any(item and item.get("kind") == "process_exit" for item in trailing)
     finally:
         session.close()
 

@@ -360,15 +360,21 @@ class EmbeddedSession:
         return True
 
     def _read(self) -> None:
-        assert self.process.stdout is not None
-        for line in self.process.stdout:
-            try: self._events.put(json.loads(line))
+        # Capture the process and queue for this reader generation.  During
+        # reconnect() self.process is replaced; consulting the mutable field
+        # here could publish an old worker's exit as a new worker event.
+        process = self.process
+        events = self._events
+        assert process.stdout is not None
+        for line in process.stdout:
+            try: events.put(json.loads(line))
             except ValueError: continue
-        self._events.put({"kind": "process_exit", "code": self.process.returncode})
+        events.put({"kind": "process_exit", "code": process.returncode})
 
     def _read_stderr(self) -> None:
-        if self.process.stderr is None: return
-        for line in self.process.stderr:
+        process = self.process
+        if process.stderr is None: return
+        for line in process.stderr:
             self._stderr_text = (self._stderr_text + line)[-16_000:]
 
     @property
