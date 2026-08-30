@@ -1,7 +1,7 @@
 ForgeCode（自研、可审计的本地 coding agent）
 
 仓库：https://github.com/onlyslime/ForgeCode
-版本：v0.8.1
+版本：v0.8.25
 
 环境：Python 3.11+、uv
 
