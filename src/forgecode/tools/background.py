@@ -5,7 +5,7 @@ import json, os, subprocess, tempfile, threading, time, uuid
 from pathlib import Path
 from typing import Any
 from .base import ToolContext, ToolDefinition, ToolResult
-from .shell import classify_command
+from .shell import classify_command, _terminate_process_tree
 from ..security.workspace import WorkspaceViolation, assert_no_path_alias
 
 _MAX_STATE_BYTES = 2_000_000
@@ -132,7 +132,12 @@ class ProcessManager:
                 for name, value in os.environ.items()
                 if not any(marker in name.upper() for marker in ("API_KEY", "APIKEY", "TOKEN", "SECRET", "PASSWORD", "COOKIE"))
             }
-            process = subprocess.Popen(command, cwd=safe_root, shell=True, env=environment, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
+            process_options: dict[str, Any] = {}
+            if os.name == "nt":
+                process_options["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
+            else:
+                process_options["start_new_session"] = True
+            process = subprocess.Popen(command, cwd=safe_root, shell=True, env=environment, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1, **process_options)
             item = _Process(process, command, time.monotonic())
             self._items[task_id] = item
             self._stale.pop(task_id, None)
@@ -262,14 +267,26 @@ class KillProcessTool(ProcessStatusTool):
         item = self.manager.get(task_id)
         if item is None: return ToolResult(False, "unknown background task", {"error":"unknown_task"})
         if not context.request_approval(self.definition.name, {"task_id":task_id}): return ToolResult(False, "kill_process denied by approval policy", {"error":"approval_denied"})
-        if item.process.poll() is not None:
+        with item.lock:
+            finished = item.finished is not None
+        if finished or item.process.poll() is not None:
             return ToolResult(True, f"background task already exited: {task_id}", {"task_id": task_id, "status": "already_exited", "exit_code": item.process.returncode, "termination_result": "already_exited"})
         try:
-            item.process.terminate()
+            terminated = _terminate_process_tree(item.process)
         except ProcessLookupError:
             return ToolResult(True, f"background task already exited: {task_id}", {"task_id": task_id, "status": "already_exited", "exit_code": item.process.returncode, "termination_result": "already_exited"})
         except OSError as exc:
             return ToolResult(False, f"background task termination failed: {type(exc).__name__}", {"task_id": task_id, "error": "termination_failed", "termination_result": "failed"})
+        if not terminated:
+            try:
+                # Preserve the platform's direct-process race signal when a
+                # tree kill cannot observe the child immediately.
+                item.process.terminate()
+            except ProcessLookupError:
+                return ToolResult(True, f"background task already exited: {task_id}", {"task_id": task_id, "status": "already_exited", "exit_code": item.process.returncode, "termination_result": "already_exited"})
+            except OSError:
+                pass
+            return ToolResult(False, f"background task termination unresolved: {task_id}", {"task_id": task_id, "status": "running", "termination_result": "unresolved", "error": "termination_unresolved", "pid": item.process.pid})
         try:
             # Cleanup must remain bounded but cannot depend on the run
             # deadline: an expired run still needs a chance to confirm that

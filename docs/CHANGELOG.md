@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.174 — 2026-08-31
+
+- **Background process-tree cleanup:** background commands now run in an isolated process group/session and kill requests terminate the owned process tree with bounded cleanup and race-safe exit handling.
+- **Verification:** background-tool tests, compile checks, and manual child-process cleanup inspection passed.
+
 ## v0.8.173 — 2026-08-31
 
 - **Commit deadline boundary:** `git_commit` now checks cancellation and the run deadline after approval before invoking Git, preventing expired sessions from creating commits.
