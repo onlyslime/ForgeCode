@@ -162,7 +162,7 @@ class ToolRegistry:
             raise ValueError("tool parameters must be an object")
         try:
             encoded_parameters = json.dumps(parameters, ensure_ascii=False, allow_nan=False, separators=(",", ":"))
-        except (TypeError, ValueError) as exc:
+        except (TypeError, ValueError, RecursionError) as exc:
             raise ValueError("tool parameters must be strict JSON") from exc
         if len(encoded_parameters.encode("utf-8")) > 1_000_000:
             raise ValueError("tool parameters exceed 1 MiB")

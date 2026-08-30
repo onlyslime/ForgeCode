@@ -212,3 +212,17 @@ def test_registry_rejects_non_json_or_oversized_schemas():
             pass
         else:
             raise AssertionError("expected schema validation")
+
+
+def test_registry_rejects_deeply_nested_schema():
+    parameters = value = {}
+    for _ in range(10_000):
+        value["nested"] = {}
+        value = value["nested"]
+    definition = type("D", (), {"name": "deep_schema", "description": "", "parameters": parameters})()
+    try:
+        ToolRegistry().register(type("T", (), {"definition": definition})())
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("expected deep schema validation")

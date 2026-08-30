@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.55 — 2026-08-31
+
+- Hardened tool schema registration against recursion-depth failures by
+  converting `RecursionError` into a bounded validation error.
+- Verification: registry tests, manual 10,000-level schema check, compileall,
+  and diff checks passed.
+
 ## v0.8.54 — 2026-08-31
 
 - Added strict JSON and 1 MiB size validation for registered tool parameter
