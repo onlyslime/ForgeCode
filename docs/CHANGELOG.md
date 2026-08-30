@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.176 — 2026-08-31
+
+- **Quality output draining:** cancellable test/diagnostic processes now drain stdout and stderr during polling, preventing pipe-buffer deadlocks on verbose commands; cleanup timeouts fail safely.
+- **Verification:** quality/cancellation tests, a 2 MiB-output manual run, compile checks, and diff checks passed.
+
 ## v0.8.175 — 2026-08-31
 
 - **Quality process cancellation:** `test` and `diagnostics` now run in an isolated process group with polling-based cancellation and bounded process-tree cleanup instead of blocking in `subprocess.run`.

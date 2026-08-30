@@ -40,15 +40,23 @@ class _CheckTool:
             options = {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if os.name == "nt" else {"start_new_session": True}
             p = subprocess.Popen(command, cwd=context.guard.root, shell=True, env=environment, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, **options)
             deadline = time.monotonic() + context.remaining_seconds(60.0)
+            stdout = stderr = ""
             while p.poll() is None:
                 if context.cancelled:
                     terminated = _terminate_process_tree(p)
-                    stdout, stderr = p.communicate(timeout=5)
+                    try:
+                        stdout, stderr = p.communicate(timeout=5)
+                    except subprocess.TimeoutExpired:
+                        stdout, stderr = "", ""
                     return ToolResult(False, "check cancelled", {"error": "cancelled", "termination_result": "confirmed" if terminated else "unresolved", **risk_metadata})
                 if time.monotonic() >= deadline:
                     raise subprocess.TimeoutExpired(command, 60.0)
-                time.sleep(0.05)
-            stdout, stderr = p.communicate()
+                try:
+                    stdout, stderr = p.communicate(timeout=min(0.05, max(0.001, deadline - time.monotonic())))
+                except subprocess.TimeoutExpired:
+                    continue
+            if not stdout and not stderr:
+                stdout, stderr = p.communicate()
         except subprocess.TimeoutExpired:
             if 'p' in locals() and p.poll() is None:
                 _terminate_process_tree(p)
