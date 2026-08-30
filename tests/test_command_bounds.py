@@ -142,6 +142,20 @@ def test_understanding_reads_reject_oversized_file(tmp_path: Path):
         assert result.metadata["error"] == "file_too_large"
 
 
+def test_file_metadata_rejects_alias_path(tmp_path: Path):
+    target = tmp_path / "target.txt"
+    target.write_text("safe", encoding="utf-8")
+    alias = tmp_path / "alias.txt"
+    try:
+        alias.symlink_to(target)
+    except (OSError, NotImplementedError):
+        pytest.skip("symlink unavailable")
+    registry = build_default_registry(WorkspaceGuard(tmp_path))
+    result = registry.execute("file_metadata", {"path": "alias.txt"}, ToolContext(WorkspaceGuard(tmp_path), AllowAllApproval()))
+    assert result.ok is False
+    assert result.metadata["error"] == "ValueError"
+
+
 def test_symbol_navigation_reports_expired_deadline(tmp_path: Path):
     registry = build_default_registry(WorkspaceGuard(tmp_path))
     context = ToolContext(WorkspaceGuard(tmp_path), AllowAllApproval(), deadline_monotonic=time.monotonic() - 1)

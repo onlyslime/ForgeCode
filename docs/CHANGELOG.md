@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.185 — 2026-08-31
+
+- **Metadata alias safety:** `file_metadata` now rejects symlink and junction aliases, matching `read_file` and preventing metadata from silently describing a different target path.
+- **Verification:** command-boundary tests, compile checks, and manual alias inspection passed (symlink test is platform-conditional).
+
 ## v0.8.184 — 2026-08-31
 
 - **Understanding read limits:** `read_range` and `list_symbols` now reject files over the shared 2 MiB safety limit before loading full contents.
