@@ -7,6 +7,7 @@ from forgecode.tools import AllowAllApproval, ToolContext, build_default_registr
 from forgecode.tools.shell import classify_command
 from forgecode.tools.quality import DiagnosticsTool, TestTool as QualityCheckTool
 from forgecode.tools.filesystem import ListFilesTool, ReadFileTool, SearchTool, WriteFileTool
+from forgecode.tools.repository_map import RepositoryMapTool
 import pytest
 
 
@@ -99,3 +100,9 @@ def test_filesystem_tools_reject_non_object_arguments(tmp_path: Path):
     for tool in tools:
         with pytest.raises(ValueError, match="arguments must be an object"):
             tool.execute(None, context)
+
+
+def test_repository_map_budget_is_bounded(tmp_path: Path):
+    guard = WorkspaceGuard(tmp_path); context = ToolContext(guard, AllowAllApproval())
+    with pytest.raises(ValueError, match="between 256 and 100000"):
+        RepositoryMapTool(guard).execute({"budget_chars": 100001}, context)

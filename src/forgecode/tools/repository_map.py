@@ -5,6 +5,8 @@ from typing import Any
 from ..context.repository import RepositoryMapBuilder
 from .base import ToolContext, ToolDefinition, ToolResult
 
+_MAX_BUDGET_CHARS = 100_000
+
 
 class RepositoryMapTool:
     definition = ToolDefinition(
@@ -19,8 +21,8 @@ class RepositoryMapTool:
     def execute(self, arguments: dict[str, Any], context: ToolContext) -> ToolResult:
         task = arguments.get("task", "repository inspection")
         budget = arguments.get("budget_chars", 20_000)
-        if isinstance(budget, bool) or not isinstance(budget, int):
-            raise ValueError("budget_chars must be an integer")
+        if isinstance(budget, bool) or not isinstance(budget, int) or not 256 <= budget <= _MAX_BUDGET_CHARS:
+            raise ValueError(f"budget_chars must be between 256 and {_MAX_BUDGET_CHARS}")
         repository = RepositoryMapBuilder(context.guard).build()
         plan = repository.plan_context(task, budget_chars=budget)
         return ToolResult(True, plan.render(), {"snapshot": repository.to_dict(), "selected_paths": list(plan.selected_paths), "omitted": plan.omitted, "budget_chars": plan.budget_chars})

@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.102 — 2026-08-31
+
+- Added a 100,000-character upper bound to `repository_map.budget_chars`,
+  preventing unbounded context allocation from model-supplied requests.
+- Verification: oversized-budget regression, manual boundary check,
+  compileall, and diff checks passed.
+
 ## v0.8.101 — 2026-08-31
 
 - Rejected newline-bearing Git worktree `start_point` refs to prevent
