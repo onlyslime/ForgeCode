@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.188 — 2026-08-31
+
+- **Navigation alias safety:** range reads and symbol listing now reject symlink/junction aliases, aligning all source-reading tools with the workspace path policy.
+- **Verification:** command-boundary tests, compile checks, and manual alias inspection passed (symlink test is platform-conditional).
+
 ## v0.8.187 — 2026-08-31
 
 - **Metadata read consistency:** `file_metadata` now compares file identity before and after reading, rejecting concurrent replacement or modification instead of reporting mixed metadata.
