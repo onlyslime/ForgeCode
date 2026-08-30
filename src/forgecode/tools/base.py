@@ -286,6 +286,8 @@ class ToolRegistry:
             result = tool.execute(arguments, context)
             if not isinstance(result, ToolResult):
                 return ToolResult(False, "tool returned an invalid result", {"error": "invalid_tool_result"})
+            if not isinstance(result.ok, bool):
+                return ToolResult(False, "tool returned a non-boolean success flag", {"error": "invalid_tool_result"})
             if not isinstance(result.output, str):
                 return ToolResult(False, "tool returned non-text output", {"error": "invalid_tool_result"})
             if not isinstance(result.metadata, dict):

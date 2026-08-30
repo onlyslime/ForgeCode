@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.151 — 2026-08-31
+
+- **Tool result contract:** require extension tools to return a boolean `ToolResult.ok` flag, preventing truthy string values from corrupting execution and audit semantics.
+- **Verification:** security-edge tests, compile checks, and manual malformed-result inspection passed.
+
 ## v0.8.150 — 2026-08-31
 
 - **Request body bound:** custom provider transport requests now reject bodies larger than 4 MiB before JSON parsing.
