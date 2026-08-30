@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.186 — 2026-08-31
+
+- **Navigation read TOCTOU guard:** range and symbol readers now validate decoded content size after reading, closing growth races after the initial file-size check.
+- **Verification:** command-boundary tests, compile checks, and manual oversized-navigation inspection passed.
+
 ## v0.8.185 — 2026-08-31
 
 - **Metadata alias safety:** `file_metadata` now rejects symlink and junction aliases, matching `read_file` and preventing metadata from silently describing a different target path.
