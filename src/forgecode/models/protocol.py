@@ -129,6 +129,8 @@ def is_valid_response(response: Any) -> bool:
         return False
     if not isinstance(response.message.role, str) or response.message.role != "assistant" or not isinstance(response.message.content, str):
         return False
+    if response.message.tool_call_id is not None and (not isinstance(response.message.tool_call_id, str) or not response.message.tool_call_id or len(response.message.tool_call_id) > 256 or any(ord(ch) < 32 for ch in response.message.tool_call_id)):
+        return False
     if len(response.message.content) > 200_000:
         return False
     if response.finish_reason is not None and not isinstance(response.finish_reason, str):
@@ -157,7 +159,7 @@ def is_valid_response(response: Any) -> bool:
         return False
     seen_ids: set[str] = set()
     for call in response.message.tool_calls:
-        if not isinstance(call, ToolCall) or not isinstance(call.id, str) or not call.id or len(call.id) > 256 or call.id in seen_ids or not isinstance(call.name, str) or not call.name or len(call.name) > 256 or not isinstance(call.arguments, dict):
+        if not isinstance(call, ToolCall) or not isinstance(call.id, str) or not call.id or len(call.id) > 256 or any(ord(ch) < 32 for ch in call.id) or call.id in seen_ids or not isinstance(call.name, str) or not call.name or len(call.name) > 256 or any(ord(ch) < 32 for ch in call.name) or not isinstance(call.arguments, dict):
             return False
         seen_ids.add(call.id)
         if not _valid_json_value(call.arguments):

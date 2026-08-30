@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.121 — 2026-08-31
+
+- **Neutral protocol validation:** custom providers now receive the same control-character and length checks for tool IDs, tool names, and tool-result correlation IDs as concrete adapters.
+- **Verification:** provider tests, compile checks, and manual constructed-response checks passed.
+
 ## v0.8.120 — 2026-08-31
 
 - **Regression correction:** fixed the malformed-ID test fixture to exercise an actual newline and verified the new provider guard.

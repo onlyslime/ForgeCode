@@ -123,3 +123,5 @@ def test_provider_neutral_response_validation_rejects_nonfinite_usage_and_bad_fi
     assert not is_valid_response(ModelResponse(Message("assistant", "ok", tool_calls=(ToolCall("x", "read_file", {"value": 10 ** 1_000}),))))
     assert not is_valid_response(ModelResponse(Message("assistant", "ok", tool_calls=(ToolCall("x", "read_file", {"value": 10 ** 5_000}),))))
     assert not is_valid_response(ModelResponse(Message("assistant", "ok", tool_calls=(ToolCall("x", "read_file", {}),)), finish_reason="stop"))
+    assert not is_valid_response(ModelResponse(Message("assistant", "ok", tool_calls=(ToolCall("bad\nid", "read_file", {}),)), finish_reason="tool_calls"))
+    assert not is_valid_response(ModelResponse(Message("assistant", "ok", tool_call_id="bad\nid")))
