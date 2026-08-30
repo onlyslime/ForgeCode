@@ -1253,6 +1253,12 @@ compaction、message queue、skills、extensions、themes、prompt templates 和
 扩展包加载和成熟的跨进程 SDK 生态。这些列为 P1/P2，而不在当前安全与恢复主线中
 抢占优先级。
 
+Pi 的消息队列章节还区分 steering（当前工具调用完成后注入）与 follow-up（整轮结束后
+注入），并支持 one-at-a-time/all 投递策略、Escape 中止后恢复队列、Alt+Up 取回待发
+消息。ForgeCode 当前队列是单一 FIFO：在当前 AgentLoop 返回后依次执行，Escape 会
+清空待发消息；尚未实现 steering/follow-up 两级语义或取回编辑。这是明确的 P1 交互
+差距，后续实现需先定义取消与工具边界，不能简单中断副作用执行。
+
 ### 流式协议复核（2026-08-30）
 
 源码审计确认 OpenAI-compatible provider 对 SSE 做了有界 fail-closed 处理：拒绝重复
