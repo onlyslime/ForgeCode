@@ -178,8 +178,8 @@ bounded selectors as the CLI and RPC login methods.
 Python embedding mirrors this contract with `forgecode.embed.ForgeCodeError`.
 `session_open` and `session_run` create and drive durable sessions using the
 same bounded workspace, mode, session, and prompt fields as the RPC contract.
-`session_inspect` and `session_events` expose bounded read-only metadata and
-incremental audit events.
+`session_inspect`, `session_status`, and `session_events` expose bounded
+read-only metadata and incremental audit events.
 `config_profiles` provides provider/model profile discovery with the same
 workspace-bound RPC request semantics.
 Node and Python clients also expose `providerList`/`provider_list` and
