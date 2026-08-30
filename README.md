@@ -92,6 +92,11 @@ Type `/help` in `fcc` for the complete list. Useful starting points are
 filter recent audit entries, for example `/events 20 error`. `!command` sends a bounded command
 result to the model; `!!command` keeps it local.
 
+For a deliberately narrow run, use an audited group such as
+`fcc --tools read_only` or `fcc --exclude-tools execution`. Groups expand
+against tools registered in the current mode; they narrow runtime policy and
+are not an OS sandbox.
+
 ## Architecture
 
 ForgeCode keeps the complete agent boundary in this repository:

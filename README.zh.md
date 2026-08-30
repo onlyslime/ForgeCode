@@ -56,6 +56,10 @@ fcc --act
 
 在 Act 或 Bypass 模式打开未信任的工作区时，ForgeCode 会询问是否信任该目录
 以执行副作用。输入 `y` 会保存本地信任记录，直接回车则继续但拒绝副作用。
+
+需要收窄一次运行时的工具范围时，可以使用风险组，例如
+`fcc --tools read_only` 或 `fcc --exclude-tools execution`。组名会根据当前模式实际
+注册的工具展开；它们只是运行时策略，不等同于操作系统沙箱。
 也可以使用显式命令：`forgecode trust grant`。
 
 ## 它能做什么
