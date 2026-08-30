@@ -1365,7 +1365,10 @@ class AgentLoop:
 
     @staticmethod
     def _tool_message_content(tool_result) -> str:
-        metadata = json.dumps(tool_result.metadata, ensure_ascii=False, sort_keys=True, default=str)
+        try:
+            metadata = json.dumps(tool_result.metadata, ensure_ascii=False, sort_keys=True, allow_nan=False)
+        except (TypeError, ValueError, RecursionError):
+            metadata = json.dumps({"error": "metadata_not_json_safe"}, ensure_ascii=False)
         return f"{tool_result.output}\n[metadata] {metadata}"
 
     def _with_current_audit(self, result: LoopResult) -> LoopResult:

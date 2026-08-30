@@ -356,3 +356,7 @@ def test_plan_mode_records_mode_denial_event(tmp_path):
     events = list(session.read())
     denied = [event for event in events if event.kind == "mode_denied"]
     assert denied and denied[0].payload["tool"] == "write_file"
+def test_tool_message_content_rejects_non_json_metadata():
+    result = ToolResult(True, "ok", {"bad": object()})
+    content = AgentLoop._tool_message_content(result)
+    assert "metadata_not_json_safe" in content

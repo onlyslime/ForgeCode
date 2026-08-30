@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.152 — 2026-08-31
+
+- **Tool message serialization:** reject non-JSON-safe metadata instead of coercing arbitrary objects with `default=str`; emit a bounded safe marker for model context.
+- **Verification:** agent-edge tests, compile checks, and manual metadata serialization inspection passed.
+
 ## v0.8.151 — 2026-08-31
 
 - **Tool result contract:** require extension tools to return a boolean `ToolResult.ok` flag, preventing truthy string values from corrupting execution and audit semantics.
