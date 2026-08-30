@@ -1,6 +1,7 @@
 """Bounded project quality checks exposed as first-class tools."""
 from __future__ import annotations
 import subprocess
+import os
 from typing import Any
 from .base import ToolContext, ToolDefinition, ToolResult
 from .filesystem import ListFilesTool
@@ -28,7 +29,12 @@ class _CheckTool:
         if context.cancelled:
             return ToolResult(False, f"{self.definition.name} cancelled before execution", {"error": "cancelled"})
         try:
-            p = subprocess.run(command, cwd=context.guard.root, shell=True, capture_output=True, text=True, timeout=min(60.0, context.remaining_seconds(60.0)), check=False)
+            environment = {
+                name: value
+                for name, value in os.environ.items()
+                if not any(marker in name.upper() for marker in ("API_KEY", "APIKEY", "TOKEN", "SECRET", "PASSWORD", "COOKIE"))
+            }
+            p = subprocess.run(command, cwd=context.guard.root, shell=True, env=environment, capture_output=True, text=True, timeout=min(60.0, context.remaining_seconds(60.0)), check=False)
         except (OSError, subprocess.TimeoutExpired) as exc:
             return ToolResult(False, f"check failed: {type(exc).__name__}", {"error": "check_failed"})
         output = (p.stdout + ("\n" + p.stderr if p.stderr else "")).strip()[:20_000]

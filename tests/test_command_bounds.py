@@ -1,4 +1,5 @@
 import time
+import os
 from pathlib import Path
 
 from forgecode.security import WorkspaceGuard
@@ -61,3 +62,12 @@ def test_quality_tools_apply_command_safety_classification(tmp_path: Path):
         assert result.ok is False
         assert result.metadata["error"] == "risk_blocked"
         assert result.metadata["hard_blocked"] is True
+
+
+def test_quality_tools_do_not_forward_sensitive_environment(tmp_path: Path, monkeypatch):
+    monkeypatch.setenv("FORGECODE_TEST_SECRET", "hidden-value")
+    context = ToolContext(WorkspaceGuard(tmp_path), AllowAllApproval())
+    result = DiagnosticsTool(tmp_path).execute({"command": "python -c \"import os; print(os.getenv('FORGECODE_TEST_SECRET', 'absent'))\""}, context)
+    assert result.ok
+    assert "hidden-value" not in result.output
+    assert "absent" in result.output

@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.77 — 2026-08-31
+
+- Filtered sensitive environment variables from test and diagnostics
+  subprocesses, closing a credential-leakage bypass through quality tools.
+- Verification: injected-secret manual check, command tests, compileall, and
+  diff checks passed.
+
 ## v0.8.76 — 2026-08-31
 
 - Applied the shared command risk classifier to test and diagnostics tools,
