@@ -63,7 +63,15 @@ def classify_command(command: str) -> tuple[str, tuple[str, ...], bool]:
 def _text(value: Any) -> str:
     if isinstance(value, bytes):
         return value.decode("utf-8", errors="replace")
-    return value or ""
+    if value is None:
+        return ""
+    # subprocess normally returns text here, but mocked/extension-owned
+    # runners can yield arbitrary objects. Normalize before bounded slicing
+    # so malformed output cannot escape as an internal TypeError.
+    try:
+        return value if isinstance(value, str) else str(value)
+    except Exception:
+        return "[unrenderable command output]"
 
 
 def _bounded(value: str, limit: int = _MAX_COMMAND_OUTPUT_CHARS) -> tuple[str, bool]:

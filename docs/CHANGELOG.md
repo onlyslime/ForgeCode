@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.8.208 — 2026-08-31
+
+- **Shell result resilience:** normalize non-string or unrenderable subprocess
+  output before bounded rendering so extension/mocked runners cannot trigger
+  an internal formatting exception.
+- **Verification:** command-boundary tests, compile, diff checks, and manual
+  broken-output rendering passed.
+
 ## v0.8.207 — 2026-08-31
 
 - **Cancellation resilience:** cancellation remains effective when an

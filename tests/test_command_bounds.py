@@ -13,6 +13,15 @@ from forgecode.tools.lsp import LspStatusTool
 from forgecode.tools.summary import WorkspaceSummaryTool
 import pytest
 
+from forgecode.tools.shell import _text
+
+
+def test_shell_output_normalization_handles_unrenderable_values():
+    class Broken:
+        def __str__(self):
+            raise RuntimeError("boom")
+    assert _text(Broken()) == "[unrenderable command output]"
+
 
 def test_command_classifier_handles_shell_and_git_variants():
     blocked = ["GIT  RESET   --HARD HEAD", "git clean -xfd", "git push origin main --force-with-lease", "git push origin --mirror", "git push origin --delete main", "git push -f origin main", "git push -fd origin main", "git push -d origin main", "git -C repo push origin +main", "git --git-dir=.git push origin +main", "git -c core.sshCommand=ssh push origin +main", "shutdown /s", "sudo reboot"]
