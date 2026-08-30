@@ -1288,7 +1288,6 @@ streaming 时为 `json+sse`；不宣称 WebSocket。相比 Pi 的多传输 auto 
 v0.7.50 在 RPC session status 中增加受限 `active_flags`，用于表达执行中、暂停和
 需要恢复三种活动原因。这与 Codex ThreadStatus 的 active flags 方向一致，但仍是
 session 级描述，不等价于 Codex 的 thread/turn 状态对象。
-v0.7.48 发布后的完整回归一次出现既有的 pause/approval 时序失败：
-`1 failed, 527 passed, 9 skipped, 2 warnings`；该用例随后单独连续 4 次通过，
-确认是已知非确定性竞态而非 `/queue` 渲染失败。后续共享核心改动仍需以独立测试和
-完整门禁双重证据判断，不将这次组合失败标记为绿色发布证据。
+此前一次完整回归曾出现既有的 pause/approval 时序失败；本轮在同一环境下单独连续
+20 次运行该用例全部通过，随后完整门禁也通过 `528 passed, 9 skipped, 2 warnings`。
+当前没有可稳定复现的失败；仍保留该时序用例作为后续共享核心改动的重点回归项。
