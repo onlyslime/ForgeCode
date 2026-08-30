@@ -76,6 +76,14 @@ class _ProtocolTransport:
         response_headers = dict(raw_result[2]) if len(raw_result) == 3 else {}
 
         def events():
+            anthropic_tools: dict[int, int] = {}
+            next_tool_index = 0
+            emitted_finish = False
+
+            def frame(delta: dict[str, Any], finish_reason: str | None = None) -> bytes:
+                choice = {"index": 0, "delta": delta, "finish_reason": finish_reason}
+                return b"data: " + json.dumps({"choices": [choice]}, ensure_ascii=False).encode() + b"\n\n"
+
             for raw in chunks:
                 if not isinstance(raw, (bytes, bytearray)):
                     raise ValueError("provider stream yielded non-byte data")
@@ -89,11 +97,27 @@ class _ProtocolTransport:
                         item = json.loads(payload.decode("utf-8"))
                     except (ValueError, UnicodeDecodeError):
                         continue
-                    text = ""; done = False
+                    text = ""; done = False; finish_reason: str | None = None
                     if self.provider == "anthropic":
                         event_type = item.get("type")
                         if event_type == "content_block_delta":
-                            text = str(item.get("delta", {}).get("text", ""))
+                            block = item.get("index")
+                            delta = item.get("delta", {})
+                            if isinstance(delta, dict) and (delta.get("type") == "text_delta" or "text" in delta):
+                                text = str(delta.get("text", ""))
+                            elif isinstance(block, int) and block in anthropic_tools and isinstance(delta, dict) and delta.get("type") == "input_json_delta":
+                                yield frame({"tool_calls": [{"index": anthropic_tools[block], "function": {"arguments": str(delta.get("partial_json", ""))}}]})
+                        elif event_type == "content_block_start":
+                            block = item.get("index")
+                            content = item.get("content_block", {})
+                            if isinstance(block, int) and isinstance(content, dict) and content.get("type") == "tool_use":
+                                anthropic_tools[block] = next_tool_index
+                                next_tool_index += 1
+                                yield frame({"tool_calls": [{"index": anthropic_tools[block], "id": str(content.get("id", "")), "function": {"name": str(content.get("name", "")), "arguments": ""}}]})
+                        elif event_type == "message_delta":
+                            stop_reason = item.get("delta", {}).get("stop_reason") if isinstance(item.get("delta"), dict) else None
+                            if stop_reason in {"tool_use", "end_turn", "max_tokens"}:
+                                finish_reason = "tool_calls" if stop_reason == "tool_use" else ("length" if stop_reason == "max_tokens" else "stop")
                         done = event_type == "message_stop"
                     elif self.provider == "google":
                         parts = item.get("candidates", [{}])[0].get("content", {}).get("parts", [])
@@ -104,9 +128,14 @@ class _ProtocolTransport:
                         text = str(message.get("content", ""))
                         done = bool(item.get("done"))
                     if text:
-                        yield (b"data: " + json.dumps({"choices": [{"index": 0, "delta": {"content": text}, "finish_reason": None}]}).encode() + b"\n\n")
+                        yield frame({"content": text})
+                    if finish_reason is not None:
+                        yield frame({}, finish_reason)
+                        emitted_finish = True
                     if done:
-                        yield b'data: {"choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n'
+                        if not emitted_finish:
+                            yield frame({}, "tool_calls" if anthropic_tools else "stop")
+                        yield b"data: [DONE]\n\n"
         return status, events(), response_headers
 
 

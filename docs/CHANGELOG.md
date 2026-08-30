@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.7.54 — 2026-08-30
+
+- Anthropic streaming responses now normalize `tool_use` blocks and
+  incremental `input_json_delta` arguments into the provider-neutral tool-call
+  protocol, preserving tool IDs, names, arguments, and finish reasons.
+- Existing text-only streaming behavior remains compatible.
+
 ## v0.7.53 — 2026-08-30
 
 - Fixed named provider adapters so their default production transport also

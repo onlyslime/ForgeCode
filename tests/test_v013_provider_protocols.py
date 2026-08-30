@@ -51,6 +51,24 @@ def test_anthropic_stream_is_normalized_to_openai_sse():
     assert result.message.content == "hi"
 
 
+def test_anthropic_stream_tool_use_is_normalized_to_openai_tool_call():
+    class ToolStreamTransport(Transport):
+        def post_stream(self, url, headers, body, timeout):
+            frames = [
+                b'data: {"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"call-1","name":"read_file"}}\n\n',
+                b'data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"{\\"path\\":\\"README.md\\"}"}}\n\n',
+                b'data: {"type":"message_delta","delta":{"stop_reason":"tool_use"}}\n\n',
+                b'data: {"type":"message_stop"}\n\n',
+            ]
+            return 200, frames, {}
+    provider = AnthropicProvider(api_key="secret", base_url="https://a.test/v1", model="m", transport=ToolStreamTransport({}), streaming=True)
+    result = asyncio.run(provider.complete([Message("user", "read")], []))
+    assert result.finish_reason == "tool_calls"
+    assert result.message.tool_calls[0].id == "call-1"
+    assert result.message.tool_calls[0].name == "read_file"
+    assert result.message.tool_calls[0].arguments == {"path": "README.md"}
+
+
 def test_stream_interruption_has_stable_error_category():
     class InterruptedTransport(Transport):
         def post_stream(self, url, headers, body, timeout):
