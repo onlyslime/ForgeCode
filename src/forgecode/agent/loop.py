@@ -245,6 +245,7 @@ class AgentLoop:
             "active": not self.lifecycle.terminal and self._started_monotonic is not None,
             "state": self.lifecycle.state.value,
             "run_id": self.run_id,
+            "event_sequence": self._last_event_sequence,
             "step": self._current_step,
             "provider_requests": self._provider_requests,
             "tool_calls": self._tool_calls,

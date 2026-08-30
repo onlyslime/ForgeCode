@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.8.10 — 2026-08-30
+
+- Added the current durable event sequence to live run snapshots, allowing
+  clients to correlate status refreshes with incremental session reads.
+- Verification: snapshot regression passed; manual review confirmed the value
+  is sourced only from the validated session append cursor and is zero without
+  a session.
+
 ## v0.8.9 — 2026-08-30
 
 - Reset live status counters at run entry so reusable embedded loop instances
