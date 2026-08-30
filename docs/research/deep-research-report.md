@@ -846,6 +846,13 @@ Codex 官方页面或未实现的竞品特性当作本项目已完成能力。
   可执行工具、结果回传，以及 Plan 只探索/规划、Act 执行修改；这与 ForgeCode
   的工具注册和模式权限方向一致。Continue 目标工具页本轮返回 HTTP 404，未将其
   作为已验证证据。
+- OpenCode GitHub `packages/opencode/src/tool/tool.ts` 源码当前可直接访问（HTTP 200，
+  约 6 KB），其工具层显式依赖 permission、session message 和 truncate 模块，
+  说明成熟 harness 会把工具执行、权限决策、会话消息和输出截断拆成独立边界；
+  ForgeCode 已有对应 ToolRegistry/ApprovalPolicy/SessionStore/输出上限，但尚未
+  达到 OpenCode 那样的细粒度权限对象和 LSP 集成。
+- OpenCode permission 源码本轮请求超时，不能声称已读取实现细节；仅保留官方权限
+  文档的 allow/ask/deny 结论。
 
 ### 0.7.3 实施审计：静态语义导航（2026-08-30）
 
