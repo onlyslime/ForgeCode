@@ -1979,6 +1979,8 @@ def main(argv: list[str] | None = None) -> int:
                                 tool_steps += 1
                                 active_tool = text
                                 controller.update_metrics(tool_steps=tool_steps, phase=current_phase)
+                            elif kind in {"tool_result", "command_result", "command_timeout"}:
+                                active_tool = ""
                             if kind == "tool_result" and tool == "read_file" and payload.get("ok"):
                                 path = str(payload.get("metadata", {}).get("path") or arguments.get("path") or "")
                                 output = str(payload.get("output") or "")
@@ -2026,7 +2028,7 @@ def main(argv: list[str] | None = None) -> int:
                             while not heartbeat_stop.wait(5.0):
                                 with output_lock:
                                     elapsed = time.monotonic() - started_at
-                                    current = f" · running {active_tool}" if active_tool else ""
+                                    current = f" · running {active_tool}" if active_tool else " · waiting for model"
                                     print(f"\x1b[2K\r\x1b[90m… working ({elapsed:.1f}s) · {tool_steps} tool steps{current}\x1b[0m")
                                     redraw_input_bar()
                         heartbeat_thread = threading.Thread(target=heartbeat, name="forgecode-heartbeat", daemon=True)
