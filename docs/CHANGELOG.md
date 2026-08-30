@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.181 — 2026-08-31
+
+- **Approval failure isolation:** exceptions from custom approval policies now fail closed as a denial and still notify the approval observer for complete audit evidence.
+- **Verification:** security/tool tests, compile checks, and manual broken-approval inspection passed.
+
 ## v0.8.180 — 2026-08-31
 
 - **Policy extension isolation:** exceptions from custom tool-policy `permits()` callbacks now fail closed, marking the affected tool unavailable instead of aborting the agent or widening access.

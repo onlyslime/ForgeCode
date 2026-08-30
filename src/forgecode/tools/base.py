@@ -99,7 +99,13 @@ class ToolContext:
         return "cancelled"
 
     def request_approval(self, tool_name: str, arguments: dict[str, Any]) -> bool:
-        approved = self.approval is not None and self.approval.approve(tool_name, arguments)
+        try:
+            approved = self.approval is not None and bool(self.approval.approve(tool_name, arguments))
+        except Exception:
+            # Approval implementations may be extension-owned.  A callback
+            # failure must fail closed and still flow through the observer so
+            # the audit trail records a denial rather than a tool crash.
+            approved = False
         if self.approval_observer:
             self.approval_observer(tool_name, arguments, approved)
         if approved and self.pause_wait is not None:

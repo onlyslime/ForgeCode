@@ -27,6 +27,16 @@ def test_tool_policy_exception_fails_closed():
     assert filtered.unavailable_names() == ("safe",)
 
 
+def test_approval_exception_fails_closed_and_notifies_observer(tmp_path):
+    observed = []
+    class BrokenApproval:
+        def approve(self, tool_name, arguments):
+            raise RuntimeError("approval backend unavailable")
+    context = ToolContext(WorkspaceGuard(tmp_path), BrokenApproval(), approval_observer=lambda n, a, ok: observed.append((n, ok)))
+    assert context.request_approval("write_file", {"path": "x"}) is False
+    assert observed == [("write_file", False)]
+
+
 def test_absolute_outside_and_symlink_escape_are_rejected(tmp_path):
     guard = WorkspaceGuard(tmp_path)
     outside = tmp_path.parent / "outside.txt"
