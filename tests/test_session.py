@@ -77,6 +77,8 @@ def test_redaction_secret_limits_apply_to_direct_helpers():
         redact_text("x", secrets=["s" * 4_097])
     with pytest.raises(ValueError):
         redact_text("abc", secrets="abc")
+    with pytest.raises(ValueError):
+        redact_text("x", secrets=(str(i) for i in range(100_000)))
 
 
 def test_redaction_walker_bounds_oversized_integers():

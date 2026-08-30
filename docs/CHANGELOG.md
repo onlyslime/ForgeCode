@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.59 — 2026-08-31
+
+- Made redaction secret normalization stop after the configured bound,
+  preventing infinite generators from being consumed indefinitely.
+- Verification: session/redaction tests, manual generator-bound check,
+  compileall, and diff checks passed.
+
 ## v0.8.58 — 2026-08-31
 
 - Rejected strings and byte strings as direct redaction secret containers,
