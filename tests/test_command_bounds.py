@@ -4,6 +4,8 @@ from pathlib import Path
 from forgecode.security import WorkspaceGuard
 from forgecode.tools import AllowAllApproval, ToolContext, build_default_registry
 from forgecode.tools.shell import classify_command
+from forgecode.tools.quality import DiagnosticsTool, TestTool
+import pytest
 
 
 def test_command_classifier_handles_shell_and_git_variants():
@@ -43,3 +45,10 @@ def test_command_cancellation_terminates_process(tmp_path: Path):
     context = ToolContext(WorkspaceGuard(tmp_path), AllowAllApproval(), cancellation_requested=is_cancelled)
     result = registry.execute("run_command", {"command": "python -c \"import time; time.sleep(3)\"", "timeout_seconds": 10}, context)
     assert not result.ok and result.metadata["error"] == "cancelled"
+
+
+def test_quality_tools_reject_empty_explicit_commands(tmp_path: Path):
+    context = ToolContext(WorkspaceGuard(tmp_path), AllowAllApproval())
+    for tool in (TestTool(tmp_path), DiagnosticsTool(tmp_path)):
+        with pytest.raises(ValueError, match="non-empty"):
+            tool.execute({"command": "   "}, context)

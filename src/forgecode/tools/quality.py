@@ -32,14 +32,16 @@ class _CheckTool:
 class TestTool(_CheckTool):
     definition = ToolDefinition("test", "Run the project's tests using its detected test runner.", {"type":"object","properties":{"command":{"type":"string"}},"additionalProperties":False}, side_effecting=True)
     def execute(self, arguments, context):
-        command = arguments.get("command") or ("pytest -q" if (context.guard.root / "pytest.ini").exists() or (context.guard.root / "tests").is_dir() else "python -m unittest")
-        if not isinstance(command, str) or len(command) > 500: raise ValueError("command must be bounded text")
+        supplied = arguments.get("command")
+        command = supplied if supplied is not None else ("pytest -q" if (context.guard.root / "pytest.ini").exists() or (context.guard.root / "tests").is_dir() else "python -m unittest")
+        if not isinstance(command, str) or not command.strip() or len(command) > 500: raise ValueError("command must be non-empty bounded text")
         return self._run(command, context)
 
 class DiagnosticsTool(_CheckTool):
     definition = ToolDefinition("diagnostics", "Run bounded compile/type diagnostics for the project.", {"type":"object","properties":{"command":{"type":"string"}},"additionalProperties":False}, side_effecting=True)
     def execute(self, arguments, context):
         root = context.guard.root
-        command = arguments.get("command") or ("python -m compileall -q ." if any(root.rglob("*.py")) else "git diff --check")
-        if not isinstance(command, str) or len(command) > 500: raise ValueError("command must be bounded text")
+        supplied = arguments.get("command")
+        command = supplied if supplied is not None else ("python -m compileall -q ." if any(root.rglob("*.py")) else "git diff --check")
+        if not isinstance(command, str) or not command.strip() or len(command) > 500: raise ValueError("command must be non-empty bounded text")
         return self._run(command, context)

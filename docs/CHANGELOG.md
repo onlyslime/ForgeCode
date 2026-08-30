@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.75 — 2026-08-31
+
+- Tightened explicit command validation for test and diagnostics tools so
+  whitespace-only commands cannot fall through to shell execution.
+- Verification: direct tool boundary checks, targeted command tests, compileall,
+  and diff checks passed.
+
 ## v0.8.74 — 2026-08-31
 
 - Added manager-level validation for background commands, rejecting empty,
