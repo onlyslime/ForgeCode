@@ -126,3 +126,10 @@ def test_source_file_scan_stops_at_bounded_limit(tmp_path: Path):
         (tmp_path / f"file_{index:03d}.py").write_text("x = 1\n", encoding="utf-8")
     files = list(_source_files(context))
     assert len(files) == 500
+
+
+def test_understanding_path_must_be_string(tmp_path: Path):
+    from forgecode.tools.understanding import _source_files
+    guard = WorkspaceGuard(tmp_path); context = ToolContext(guard, AllowAllApproval())
+    with pytest.raises(ValueError, match="path must be a string"):
+        list(_source_files(context, 42))

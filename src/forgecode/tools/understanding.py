@@ -39,6 +39,8 @@ class ListSymbolsTool:
 
 def _source_files(context: ToolContext, path_value: str | None = None):
     """Yield bounded, guarded text files without importing or executing code."""
+    if path_value is not None and not isinstance(path_value, str):
+        raise ValueError("path must be a string")
     if path_value:
         candidate = context.guard.resolve(path_value, must_exist=True)
         if candidate.is_file() and not _is_ignored(candidate, context.guard):

@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.106 — 2026-08-31
+
+- Added strict string validation for optional code-understanding `path`
+  filters, preventing non-string values from leaking path resolution errors.
+- Verification: invalid-path regression, manual API check, compileall, and
+  diff checks passed.
+
 ## v0.8.105 — 2026-08-31
 
 - Stopped code-understanding source scans immediately at the 500-file bound,
