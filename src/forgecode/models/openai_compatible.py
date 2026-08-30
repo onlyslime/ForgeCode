@@ -585,7 +585,8 @@ class OpenAICompatibleProvider:
 
     @property
     def capabilities(self) -> ModelCapabilities:
-        return ModelCapabilities(streaming=self.streaming, max_input_chars=self.max_request_bytes, max_output_chars=self.max_response_bytes)
+        transports = ("json", "sse") if self.streaming else ("json",)
+        return ModelCapabilities(streaming=self.streaming, max_input_chars=self.max_request_bytes, max_output_chars=self.max_response_bytes, transports=transports)
 
     def health(self) -> dict[str, Any]:
         """Return offline configuration diagnostics; never performs a request."""

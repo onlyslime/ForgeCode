@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.7.49 — 2026-08-30
+
+- Provider capabilities now advertise transport modes (`json`, and `sse` when
+  streaming is enabled), making protocol negotiation explicit without claiming
+  unsupported WebSocket support.
+
 ## v0.7.48 — 2026-08-30
 
 - Added `/queue`, a read-only interactive view of pending follow-up capacity and

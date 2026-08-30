@@ -241,6 +241,7 @@ class ModelCapabilities:
     max_output_chars: int = 200_000
     supports_reasoning: bool = False
     supports_temperature: bool = True
+    transports: tuple[str, ...] = ("json",)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

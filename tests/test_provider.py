@@ -78,6 +78,13 @@ def test_provider_requires_configuration():
         OpenAICompatibleProvider(api_key="", base_url="https://example.test/v1", model="demo")
 
 
+def test_provider_capabilities_advertise_transport_modes():
+    plain = OpenAICompatibleProvider(api_key="fake", base_url="https://example.test/v1", model="demo", streaming=False)
+    streamed = OpenAICompatibleProvider(api_key="fake", base_url="https://example.test/v1", model="demo", streaming=True)
+    assert plain.capabilities.to_dict()["transports"] == ("json",)
+    assert streamed.capabilities.to_dict()["transports"] == ("json", "sse")
+
+
 def test_provider_rejects_non_string_finish_reason():
     with pytest.raises(ProviderError, match="finish_reason"):
         parse_chat_completion({"choices": [{"finish_reason": 1, "message": {"content": "ok"}}]})
