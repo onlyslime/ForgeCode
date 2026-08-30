@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.7.22 — 2026-08-30
+
+- Human `/tools` output is now grouped by risk category and marks
+  side-effecting tools, making the permission boundary visible at a glance.
+- Machine-readable tool output remains unchanged.
+
 ## v0.7.21 — 2026-08-30
 
 - Added `symbol_hover`, a bounded static symbol definition/context tool that

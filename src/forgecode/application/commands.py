@@ -2883,8 +2883,17 @@ def main(argv: list[str] | None = None) -> int:
             envelope["type"] = "tools"
             _emit_machine(envelope)
             return 0
-        for definition in registry.definitions():
-            print(f"{definition.name}: {definition.description}")
+        grouped = {"read_only": [], "changes": [], "execution": [], "evidence": []}
+        for item in tool_data:
+            grouped.setdefault(item["category"], []).append(item)
+        for category in ("read_only", "changes", "execution", "evidence"):
+            rows = grouped.get(category, [])
+            if not rows:
+                continue
+            print(f"[{category}] ({len(rows)})")
+            for item in rows:
+                marker = "!" if item["side_effecting"] else "-"
+                print(f"  {marker} {item['name']}: {item['description']}")
         return 0
 
     if command in {"inspect", "map"}:

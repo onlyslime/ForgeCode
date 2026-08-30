@@ -691,7 +691,7 @@ CLI/TUI
 | 验证 | 测试 profile、有限修复、review/export、轨迹评估 | 缺少语言服务和调试器集成 | P1 |
 | 扩展发布 | Skills、hooks、SDK、JSONL RPC、工具收窄、uv/独立二进制布局 | 缺少 MCP、插件市场、跨平台一键安装 | P2 |
 
-截至当前 v0.7.21，正常交互工作流还提供 `/context`（有界索引健康度）和
+截至当前 v0.7.22，正常交互工作流还提供 `/context`（有界索引健康度）和
 `/events [limit] [kind]`（可筛选、带相对耗时和错误码的持久化事件尾部）。
 这些能力不改变工具权限，只把已有审计证据暴露给用户；对应交互、机器契约和
 provider 回归测试均已通过。
@@ -895,6 +895,13 @@ scope allow/deny 与 fallback 全局策略。该字段只描述策略路径，�
   `precision=static`，不导入或执行项目代码。
 - **非目标**：不声称实现 LSP hover/type inference，不启动语言服务器，不修改文件。
 - **验证**：定向工具策略测试 17 passed，compileall 与 diff 检查通过。
+
+### 0.7.22 实施审计：工具面板风险分组（2026-08-30）
+
+- **范围**：人类 `/tools` 输出按 read_only、changes、execution、evidence 分组，
+  并用 `!` 标记副作用工具；JSON/JSONL 输出契约保持不变。
+- **非目标**：不改变工具注册、审批或实际权限，不新增专用演示入口。
+- **验证**：CLI machine contract 与工具策略定向测试通过，compileall/diff 检查通过。
 
 ### 当前差距复核（v0.7.19）
 
