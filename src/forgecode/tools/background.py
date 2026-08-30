@@ -248,7 +248,12 @@ class KillProcessTool(ProcessStatusTool):
         if not context.request_approval(self.definition.name, {"task_id":task_id}): return ToolResult(False, "kill_process denied by approval policy", {"error":"approval_denied"})
         if item.process.poll() is not None:
             return ToolResult(True, f"background task already exited: {task_id}", {"task_id": task_id, "status": "already_exited", "exit_code": item.process.returncode, "termination_result": "already_exited"})
-        item.process.terminate()
+        try:
+            item.process.terminate()
+        except ProcessLookupError:
+            return ToolResult(True, f"background task already exited: {task_id}", {"task_id": task_id, "status": "already_exited", "exit_code": item.process.returncode, "termination_result": "already_exited"})
+        except OSError as exc:
+            return ToolResult(False, f"background task termination failed: {type(exc).__name__}", {"task_id": task_id, "error": "termination_failed", "termination_result": "failed"})
         try:
             item.process.wait(timeout=min(0.5, context.remaining_seconds(0.5)))
         except subprocess.TimeoutExpired:

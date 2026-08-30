@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.8.88 — 2026-08-31
+
+- Hardened `kill_process` against a process-exit race, returning structured
+  `already_exited` or `termination_failed` results instead of leaking OS
+  exceptions.
+- Verification: injected `ProcessLookupError` regression, manual termination
+  race check, compileall, and diff checks passed.
+
 ## v0.8.87 — 2026-08-31
 
 - Protected stale background-task lookups with the manager lock, preventing

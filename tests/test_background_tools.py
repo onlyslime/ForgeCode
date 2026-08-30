@@ -185,6 +185,16 @@ def test_kill_process_reports_confirmed_termination(tmp_path):
     result = KillProcessTool(guard, manager).execute({"task_id": started.metadata["task_id"]}, context)
     assert result.ok and result.metadata["termination_result"] in {"confirmed", "already_exited"}
 
+
+def test_kill_process_handles_process_lookup_race(tmp_path, monkeypatch):
+    guard = WorkspaceGuard(tmp_path); context = ToolContext(guard, AllowAllApproval()); manager = ProcessManager()
+    item = manager.start("python -c \"print('done')\"", tmp_path, "race")
+    item.process.wait(timeout=5)
+    monkeypatch.setattr(item.process, "poll", lambda: None)
+    monkeypatch.setattr(item.process, "terminate", lambda: (_ for _ in ()).throw(ProcessLookupError()))
+    result = KillProcessTool(guard, manager).execute({"task_id": "race"}, context)
+    assert result.ok and result.metadata["termination_result"] == "already_exited"
+
 def test_background_state_reopens_as_stale_without_command_or_replay(tmp_path):
     state = tmp_path / ".forgecode" / "background-tasks.json"
     guard = WorkspaceGuard(tmp_path); context = ToolContext(guard, AllowAllApproval())
