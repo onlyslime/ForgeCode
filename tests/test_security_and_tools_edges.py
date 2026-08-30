@@ -261,3 +261,5 @@ def test_registry_schema_snapshot_resists_post_registration_mutation():
     definitions = registry.definitions()
     definitions[0].parameters["mutated"] = True
     assert "mutated" not in registry.schemas()[0]["function"]["parameters"]
+    filtered = registry.filter(type("P", (), {"permits": lambda self, name, available: True})())
+    assert filtered.schemas()[0]["function"]["name"] == "mutable_schema"

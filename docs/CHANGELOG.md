@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.65 — 2026-08-31
+
+- Hardened `ToolRegistry.filter()` to preserve validated source snapshots
+  without re-reading mutable extension definitions.
+- Verification: registry tests, manual post-registration mutation check,
+  compileall, and diff checks passed.
+
 ## v0.8.64 — 2026-08-31
 
 - Added explicit path-like validation to `WorkspaceGuard`, turning invalid

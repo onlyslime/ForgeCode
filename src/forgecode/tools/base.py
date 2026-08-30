@@ -188,7 +188,12 @@ class ToolRegistry:
         for name, tool in self._tools.items():
             permits = getattr(policy, "permits", None)
             if permits is None or permits(name, available=available):
-                result.register(tool)
+                # Reuse the already-validated source entry without invoking
+                # register(), which would trust a potentially mutated
+                # extension-owned definition again.
+                result._tools[name] = tool
+                result._schema_snapshots[name] = copy.deepcopy(self._schema_snapshots[name])
+                result._definition_snapshots[name] = self._definition_snapshots[name]
             else:
                 result._unavailable_tools.add(name)
         result._unavailable_tools.update(self._unavailable_tools)
