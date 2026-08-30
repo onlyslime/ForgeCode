@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.159 — 2026-08-31
+
+- **Background deadline boundary:** approved background commands now fail fast when the run budget is exhausted, preventing an expired run from spawning a detached process.
+- **Verification:** background-tool tests, compile checks, and manual no-process inspection passed.
+
 ## v0.8.158 — 2026-08-31
 
 - **Quality-tool deadline diagnostics:** `test` and `diagnostics` now skip process startup after the run deadline and distinguish deadline expiry from ordinary check timeouts.

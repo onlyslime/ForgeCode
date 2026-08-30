@@ -17,6 +17,17 @@ def test_background_task_can_be_started_and_polled(tmp_path):
     assert "hello" in result.output
 
 
+def test_background_task_respects_expired_deadline(tmp_path):
+    guard = WorkspaceGuard(tmp_path)
+    context = ToolContext(guard, AllowAllApproval(), deadline_monotonic=time.monotonic() - 1)
+    manager = ProcessManager()
+    result = RunBackgroundTool(guard, manager).execute({"command": "python -c \"open('should-not-exist','w').write('x')\""}, context)
+    assert result.ok is False
+    assert result.metadata["error"] == "deadline_exceeded"
+    assert manager.list() == []
+    assert not (tmp_path / "should-not-exist").exists()
+
+
 def test_background_manager_rejects_duplicate_task_id(tmp_path):
     manager = ProcessManager()
     item = manager.start("python -c \"print('ok')\"", tmp_path, "same")

@@ -200,6 +200,8 @@ class RunBackgroundTool:
         if blocked: return ToolResult(False, "command blocked by safety policy", {"error":"risk_blocked", "risk":risk, "risk_reasons":list(reasons)})
         if not context.request_approval(self.definition.name, {"command":command, "_risk":risk, "_risk_reasons":list(reasons)}): return ToolResult(False, "run_background denied by approval policy", {"error":"approval_denied"})
         if context.cancelled: return ToolResult(False, "run_background cancelled before start", {"error":"cancelled"})
+        if context.remaining_seconds(1.0) <= 0:
+            return ToolResult(False, "run_background skipped because the run deadline has expired", {"error": "deadline_exceeded", "risk": risk, "risk_reasons": list(reasons)})
         task_id = uuid.uuid4().hex[:16]
         try:
             self.manager.start(command, context.guard.root, task_id)
