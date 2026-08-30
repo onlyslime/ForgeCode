@@ -326,6 +326,23 @@ def _prune_sessions() -> None:
         _RPC_SESSIONS.pop(oldest, None)
 
 
+def _refresh_session_from_disk(handle: str, info: dict[str, Any]) -> dict[str, Any]:
+    """Refresh read-only RPC views when another daemon appended the record.
+
+    Never replace an in-process worker's state: its memory is authoritative
+    until it reaches a terminal state.  A detached/recovered handle has no
+    worker and can safely adopt a newer durable cursor.
+    """
+    if info.get("worker") is not None or info.get("process") is not None:
+        return info
+    restored = _load_session(handle, info.get("workspace"))
+    if restored is None or int(restored.get("sequence", 0)) <= int(info.get("sequence", 0)):
+        return info
+    restored["created_monotonic"] = info.get("created_monotonic", time.monotonic())
+    _RPC_SESSIONS[handle] = restored
+    return restored
+
+
 def serve_lines(lines: Iterable[str]) -> Iterable[str]:
     for line in lines:
         method = None
@@ -490,6 +507,8 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                         raise ValueError("session handle is unknown")
                     with _SESSION_LOCK:
                         info = _RPC_SESSIONS.get(handle, {})
+                        if method in {"session.status", "session.result", "session.wait", "session.events"}:
+                            info = _refresh_session_from_disk(handle, info)
                         requested_workspace = params.get("workspace")
                         if requested_workspace is not None:
                             if not isinstance(requested_workspace, str) or not requested_workspace or len(requested_workspace) > 1_000 or any(ch in requested_workspace for ch in "\r\n"):

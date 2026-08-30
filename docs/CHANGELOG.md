@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.19 — 2026-08-30
+
+- Added safe cross-process refresh for read-only RPC session views, allowing
+  status, result, wait, and event polling to observe newer durable cursors.
+- Verification: targeted regression, manual second-writer simulation,
+  compileall, and diff checks passed.
+
 ## v0.8.18 — 2026-08-30
 
 - Corrected `session.wait` responses so lifecycle `active_flags` are refreshed

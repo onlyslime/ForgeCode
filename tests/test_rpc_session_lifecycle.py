@@ -442,6 +442,24 @@ def test_rpc_session_wait_refreshes_active_flags_after_completion(tmp_path, monk
     assert result["data"]["active_flags"] == []
 
 
+def test_rpc_read_views_refresh_newer_durable_events(tmp_path):
+    handle = _call({"method": "session.open", "params": {"workspace": str(tmp_path)}})["data"]["session"]
+    from forgecode import rpc
+    info = rpc._RPC_SESSIONS[handle]
+    info["sequence"] = 1
+    info["events"] = [{"sequence": 1, "type": "checkpoint"}]
+    rpc._persist_session(handle, info)
+    # Simulate another daemon advancing the same durable handle.
+    external = dict(info)
+    external["sequence"] = 2
+    external["events"] = [*info["events"], {"sequence": 2, "type": "run_finished", "state": "completed"}]
+    rpc._persist_session(handle, external)
+    status = _call({"method": "session.status", "params": {"session": handle}})["data"]
+    assert status["sequence"] == 2 and status["state"] == "idle"
+    events = _call({"method": "session.events", "params": {"session": handle, "after": 1}})["data"]["events"]
+    assert [event["sequence"] for event in events] == [2]
+
+
 def test_rpc_cancel_exposes_auditable_cancel_request(tmp_path):
     handle = _call({"method": "session.open", "params": {"workspace": str(tmp_path)}})["data"]["session"]
     cancelled = _call({"method": "session.cancel", "params": {"session": handle}})
