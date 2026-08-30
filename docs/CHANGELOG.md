@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.7.58 — 2026-08-30
+
+- Ollama responses now normalize local-model `message.tool_calls` into the
+  provider-neutral tool-call contract for both JSON and streaming transports.
+- Tool IDs, names, arguments, and `tool_calls` finish reasons are preserved.
+
 ## v0.7.57 — 2026-08-30
 
 - Provider adapters now translate prior assistant tool calls and tool results

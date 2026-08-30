@@ -110,7 +110,12 @@ class _ProtocolTransport:
             data = {"choices": [{"message": {"role": "assistant", "content": text, "tool_calls": calls}, "finish_reason": "tool_calls" if calls else "stop"}], "usage": data.get("usageMetadata", {})}
         elif self.provider == "ollama":
             msg = data.get("message", {})
-            data = {"choices": [{"message": {"role": "assistant", "content": msg.get("content", "")}, "finish_reason": "stop"}], "usage": {}}
+            calls = []
+            for index, call in enumerate(msg.get("tool_calls", []) if isinstance(msg, dict) else []):
+                function = call.get("function", {}) if isinstance(call, dict) else {}
+                if isinstance(function, dict) and function.get("name"):
+                    calls.append({"id": str(call.get("id") or f"call-{index}"), "type": "function", "function": {"name": function["name"], "arguments": json.dumps(function.get("arguments", function.get("parameters", {})), ensure_ascii=False)}})
+            data = {"choices": [{"message": {"role": "assistant", "content": msg.get("content", ""), "tool_calls": calls}, "finish_reason": "tool_calls" if calls else "stop"}], "usage": {}}
         return json.dumps(data, ensure_ascii=False).encode()
 
     def post_json(self, url: str, headers: dict[str, str], body: bytes, timeout: float):
@@ -191,6 +196,10 @@ class _ProtocolTransport:
                     else:
                         message = item.get("message", {})
                         text = str(message.get("content", ""))
+                        for index, call in enumerate(message.get("tool_calls", []) if isinstance(message, dict) else []):
+                            function = call.get("function", {}) if isinstance(call, dict) else {}
+                            if isinstance(function, dict) and function.get("name"):
+                                yield frame({"tool_calls": [{"index": index, "id": str(call.get("id") or f"call-{index}"), "function": {"name": function["name"], "arguments": json.dumps(function.get("arguments", function.get("parameters", {})), ensure_ascii=False)}}]})
                         done = bool(item.get("done"))
                     if text:
                         yield frame({"content": text})

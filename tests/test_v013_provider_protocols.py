@@ -77,6 +77,15 @@ def test_google_stream_function_call_is_normalized():
     assert result.message.tool_calls[0].arguments == {"path": "README.md"}
 
 
+def test_ollama_tool_call_translation():
+    transport = Transport({"message": {"role": "assistant", "content": "", "tool_calls": [{"id": "call-1", "function": {"name": "read_file", "arguments": {"path": "README.md"}}}]}})
+    provider = OllamaProvider(api_key="", base_url="http://localhost:11434/v1", model="m", transport=transport)
+    result = asyncio.run(provider.complete([Message("user", "read")], []))
+    assert result.finish_reason == "tool_calls"
+    assert result.message.tool_calls[0].name == "read_file"
+    assert result.message.tool_calls[0].arguments == {"path": "README.md"}
+
+
 def test_anthropic_stream_is_normalized_to_openai_sse():
     class StreamTransport(Transport):
         def post_stream(self, url, headers, body, timeout):
