@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.150 — 2026-08-31
+
+- **Request body bound:** custom provider transport requests now reject bodies larger than 4 MiB before JSON parsing.
+- **Verification:** provider tests, compile checks, and manual oversized-request inspection passed.
+
 ## v0.8.149 — 2026-08-31
 
 - **Provider text strictness:** response translators now reject non-string text/content fields instead of coercing arbitrary JSON values into assistant text.

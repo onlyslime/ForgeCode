@@ -49,6 +49,8 @@ class _ProtocolTransport:
             raise ValueError("provider request headers are invalid")
         if not isinstance(body, (bytes, bytearray)):
             raise ValueError("provider request body must be bytes")
+        if len(body) > 4_000_000:
+            raise ValueError("provider request body exceeds size limit")
         try:
             payload = json.loads(body.decode("utf-8"))
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
