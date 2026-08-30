@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.179 — 2026-08-31
+
+- **Background snapshot race:** task snapshots now honor the drain worker's `finished` marker when OS polling briefly lags, preventing completed processes from being reported as running.
+- **Verification:** background-tool tests, compile checks, and manual poll-lag inspection passed.
+
 ## v0.8.178 — 2026-08-31
 
 - **Patch deadline boundary:** `apply_patch` now rechecks the run budget before each atomic replacement and rolls back prepared changes when the deadline expires.

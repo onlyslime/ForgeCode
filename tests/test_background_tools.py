@@ -68,6 +68,20 @@ def test_list_processes_renders_recovered_stale_task(tmp_path):
     assert "old-task stale pid=unknown duration=unknowns" in result.output
 
 
+def test_snapshot_uses_drain_completion_when_poll_lags(tmp_path, monkeypatch):
+    manager = ProcessManager()
+    item = manager.start("python -c \"print('done')\"", tmp_path, "lagging")
+    item.process.wait(timeout=5)
+    for _ in range(100):
+        with item.lock:
+            if item.finished is not None:
+                break
+        time.sleep(0.05)
+    monkeypatch.setattr(item.process, "poll", lambda: None)
+    result = manager.snapshot("lagging")
+    assert result["status"] == "completed"
+
+
 def test_background_manager_rejects_duplicate_task_id(tmp_path):
     manager = ProcessManager()
     item = manager.start("python -c \"print('ok')\"", tmp_path, "same")

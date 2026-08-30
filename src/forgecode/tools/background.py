@@ -178,10 +178,19 @@ class ProcessManager:
             with self._lock:
                 stale = self._stale.get(task_id)
             return {**stale, "task_id": task_id} if stale is not None else {"error": "unknown_task", "task_id": task_id}
-        with item.lock: lines = item.output[cursor:]; total = len(item.output); truncated = item.truncated
+        with item.lock:
+            lines = item.output[cursor:]
+            total = len(item.output)
+            truncated = item.truncated
+            finished = item.finished is not None
         code = item.process.poll()
         ended = item.finished if item.finished is not None else time.monotonic()
-        return {"task_id": task_id, "status": "running" if code is None else ("completed" if code == 0 else "failed"), "exit_code": code, "output": "\n".join(lines), "cursor": total, "truncated": truncated, "duration_seconds": round(ended - item.started, 3), "pid": item.process.pid, "recoverable": False}
+        if finished and code is None:
+            # The drain worker has observed process.wait() even if the OS has
+            # not refreshed poll() yet (notably with Windows shell wrappers).
+            code = item.process.returncode
+        status = "running" if not finished and code is None else ("completed" if code == 0 else "failed")
+        return {"task_id": task_id, "status": status, "exit_code": code, "output": "\n".join(lines), "cursor": total, "truncated": truncated, "duration_seconds": round(ended - item.started, 3), "pid": item.process.pid, "recoverable": False}
 
     def list(self) -> list[dict[str, Any]]:
         with self._lock:
