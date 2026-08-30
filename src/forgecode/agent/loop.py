@@ -295,7 +295,15 @@ class AgentLoop:
                         },
                     )
         if self.on_event:
-            self.on_event(kind, safe_payload)
+            try:
+                self.on_event(kind, safe_payload)
+            except Exception as exc:
+                self.audit_complete = False
+                if kind != "session_error":
+                    try:
+                        self.on_event("session_error", {"event": kind, "error": f"{type(exc).__name__}: {exc}"})
+                    except Exception:
+                        pass
         if kind != "session_error" and not self.audit_complete:
             # The task may continue safely, but a success claim is invalid
             # without a complete audit trail.

@@ -360,3 +360,18 @@ def test_tool_message_content_rejects_non_json_metadata():
     result = ToolResult(True, "ok", {"bad": object()})
     content = AgentLoop._tool_message_content(result)
     assert "metadata_not_json_safe" in content
+
+
+def test_record_isolates_failing_event_callback():
+    loop = AgentLoop.__new__(AgentLoop)
+    loop.session = None
+    loop.audit_complete = True
+    seen = []
+    def callback(kind, payload):
+        seen.append(kind)
+        if kind == "tool_result":
+            raise RuntimeError("ui failed")
+    loop.on_event = callback
+    loop._record("tool_result", {"ok": True})
+    assert loop.audit_complete is False
+    assert seen == ["tool_result", "session_error"]
