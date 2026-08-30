@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.85 — 2026-08-31
+
+- Preserved command risk metadata on quality-tool approval-denied and
+  cancellation results, improving auditability of early exits.
+- Verification: denial metadata regression, manual approval-path check,
+  compileall, and diff checks passed.
+
 ## v0.8.84 — 2026-08-31
 
 - Enforced non-empty, newline-safe string task IDs across process status,

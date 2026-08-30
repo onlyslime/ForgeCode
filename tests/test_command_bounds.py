@@ -78,3 +78,15 @@ def test_quality_tools_do_not_forward_sensitive_environment(tmp_path: Path, monk
     assert result.ok
     assert "hidden-value" not in result.output
     assert "absent" in result.output
+
+
+def test_quality_tool_denials_preserve_risk_metadata(tmp_path: Path):
+    class Deny:
+        def approve(self, *_args):
+            return False
+    context = ToolContext(WorkspaceGuard(tmp_path), Deny())
+    result = DiagnosticsTool(tmp_path).execute({"command": "python -m compileall"}, context)
+    assert result.ok is False
+    assert result.metadata["error"] == "approval_denied"
+    assert result.metadata["risk"] == "normal"
+    assert result.metadata["hard_blocked"] is False

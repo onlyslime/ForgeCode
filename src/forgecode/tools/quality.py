@@ -25,9 +25,9 @@ class _CheckTool:
         if hard_blocked:
             return ToolResult(False, "command blocked by safety policy", {"error": "risk_blocked", **risk_metadata})
         if not context.request_approval(self.definition.name, {"command": command, "_risk": risk, "_risk_reasons": list(reasons)}):
-            return ToolResult(False, f"{self.definition.name} denied by approval policy", {"error": "approval_denied"})
+            return ToolResult(False, f"{self.definition.name} denied by approval policy", {"error": "approval_denied", **risk_metadata})
         if context.cancelled:
-            return ToolResult(False, f"{self.definition.name} cancelled before execution", {"error": "cancelled"})
+            return ToolResult(False, f"{self.definition.name} cancelled before execution", {"error": "cancelled", **risk_metadata})
         try:
             environment = {
                 name: value
