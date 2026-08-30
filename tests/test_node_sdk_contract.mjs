@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { ForgeCodeError, configPolicy, configProfiles, invoke, invokeStream, interactive, providerHealth, providerList, sessionApproval, sessionCancel, sessionControl, sessionEvents, sessionList, sessionOpen, sessionPause, sessionResult, sessionResume, sessionRun, sessionTree, trust } from "../sdk/node/index.mjs";
+import { ForgeCodeError, configPolicy, configProfiles, invoke, invokeStream, interactive, providerHealth, providerList, sessionApproval, sessionCancel, sessionControl, sessionEvents, sessionList, sessionOpen, sessionPause, sessionResult, sessionResume, sessionRun, sessionTree, sessionWait, trust } from "../sdk/node/index.mjs";
 
 assert.equal(typeof ForgeCodeError, "function");
 assert.equal(typeof sessionList, "function");
@@ -28,6 +28,8 @@ assert.throws(() => sessionList({ state: "bogus" }), TypeError);
 assert.throws(() => sessionEvents("session", { after: -1 }), TypeError);
 assert.throws(() => sessionEvents("session", { wait: 31 }), TypeError);
 assert.throws(() => sessionEvents("session", { type: "bad\nkind" }), TypeError);
+assert.throws(() => sessionWait("session", { timeout: 61 }), TypeError);
+assert.throws(() => sessionWait("session", { timeout: Number.NaN }), TypeError);
 assert.throws(() => configProfiles({ workspace: "bad\npath" }), TypeError);
 assert.throws(() => configPolicy({ mode: "unsafe" }), TypeError);
 assert.throws(() => configPolicy({ noTools: "yes" }), TypeError);

@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.8.25 — 2026-08-30
+
+- Added bounded finite timeout validation to the Node `sessionWait` helper,
+  matching the Python SDK and RPC contract.
+- Verification: Node SDK contract, Python embed contract, and diff checks passed.
+
 ## v0.8.24 — 2026-08-30
 
 - Exposed bounded `wait` and event `type` filtering in Python and Node
