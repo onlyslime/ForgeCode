@@ -10,7 +10,7 @@ def fc_main() -> int:
     # ``--version`` and top-level help belong to the root parser and must be
     # passed through unchanged.  Previously ``fcc --version`` was rewritten
     # as ``chat --version`` (an invalid subcommand invocation).
-    if argv and argv[0] in {"--version", "-h", "--help"}:
+    if "--version" in argv or (argv and argv[0] in {"-h", "--help"}):
         return main()
     launch_modes = {"--plan": "plan", "--act": "act", "--bypass": "bypass"}
     selected = [launch_modes[item] for item in argv if item in launch_modes]

@@ -22,6 +22,15 @@ def test_fcc_version_passthrough(monkeypatch, capsys):
     assert capsys.readouterr().out.strip()
 
 
+def test_fcc_version_passthrough_after_workspace(monkeypatch, capsys, tmp_path):
+    monkeypatch.setattr("sys.argv", ["fcc", "--workspace", str(tmp_path), "--version"])
+    import pytest
+    with pytest.raises(SystemExit) as exc:
+        fc_main()
+    assert exc.value.code == 0
+    assert capsys.readouterr().out.strip()
+
+
 def test_doctor_command(capsys, tmp_path):
     assert main(["--workspace", str(tmp_path), "doctor"]) == 0
     output = capsys.readouterr().out
