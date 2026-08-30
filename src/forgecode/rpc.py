@@ -269,14 +269,44 @@ def _load_session(handle: str, workspace_hint: str | None = None) -> dict[str, A
             if not session_target.is_relative_to(workspace / ".forgecode" / "sessions") or session_target.suffix != ".jsonl":
                 continue
             events = raw.get("events", [])
-            if not isinstance(events, list): events = []
+            # Persisted events are client-visible cursors.  Recover only the
+            # bounded, well-shaped subset so malformed records cannot make
+            # status/events fail with an internal exception after restart.
+            if not isinstance(events, list):
+                events = []
+            clean_events: list[dict[str, Any]] = []
+            for event in events[-_MAX_SESSION_EVENTS:]:
+                if not isinstance(event, dict):
+                    continue
+                sequence = event.get("sequence")
+                event_type = event.get("type")
+                if isinstance(sequence, bool) or not isinstance(sequence, int) or sequence < 1 or sequence > 2**53:
+                    continue
+                if not isinstance(event_type, str) or not event_type or len(event_type) > 64 or any(ch in event_type for ch in "\r\n"):
+                    continue
+                clean_events.append({"sequence": sequence, "type": event_type, **{key: value for key, value in event.items() if key not in {"sequence", "type"}}})
+            clean_events.sort(key=lambda item: item["sequence"])
+            deduped_events: list[dict[str, Any]] = []
+            seen_sequences: set[int] = set()
+            for event in clean_events:
+                if event["sequence"] not in seen_sequences:
+                    deduped_events.append(event)
+                    seen_sequences.add(event["sequence"])
             persisted_state = raw.get("state", "idle")
             if not isinstance(persisted_state, str) or persisted_state not in _RPC_SESSION_STATES:
                 persisted_state = "recovery_required"
             # A daemon restart cannot retain an in-process worker. Never
             # claim that a recovered running handle is still executing.
             state = "recovery_required" if persisted_state == "running" else persisted_state
-            info = {"workspace": str(workspace), "mode": raw["mode"], "session_path": session_path.as_posix(), "state": state, "sequence": int(raw.get("sequence", 0)), "events": events[-_MAX_SESSION_EVENTS:], "created_monotonic": time.monotonic(), "created_at": raw.get("created_at"), "cancel_requested": bool(raw.get("cancel_requested", False)), "result": raw.get("result")}
+            sequence = raw.get("sequence", 0)
+            if isinstance(sequence, bool) or not isinstance(sequence, int) or sequence < 0 or sequence > 2**53:
+                continue
+            if deduped_events:
+                sequence = max(sequence, deduped_events[-1]["sequence"])
+            execution = raw.get("execution")
+            if execution not in {None, "thread", "process"}:
+                execution = None
+            info = {"workspace": str(workspace), "mode": raw["mode"], "session_path": session_path.as_posix(), "state": state, "sequence": sequence, "events": deduped_events, "created_monotonic": time.monotonic(), "created_at": raw.get("created_at"), "cancel_requested": bool(raw.get("cancel_requested", False)), "result": raw.get("result"), "execution": execution}
             if info["mode"] not in {"plan", "act"}: continue
             created_at = info.get("created_at")
             if isinstance(created_at, (int, float)) and time.time() - float(created_at) > _SESSION_TTL_SECONDS:

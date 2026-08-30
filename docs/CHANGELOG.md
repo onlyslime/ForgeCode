@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.17 — 2026-08-30
+
+- Hardened RPC session recovery by restoring execution metadata and filtering
+  malformed or duplicate persisted event cursors before exposing them to clients.
+- Verification: targeted RPC lifecycle tests, compileall, diff checks, and a
+  manual restart simulation with malformed events passed.
+
 ## v0.8.16 — 2026-08-30
 
 - Added a `cache_hit` diagnostic to `/status` metrics so operators can tell

@@ -406,6 +406,27 @@ def test_rpc_session_status_exposes_bounded_lifecycle_metadata(tmp_path):
     assert "created_monotonic" not in status["data"]
 
 
+def test_rpc_recovery_restores_execution_and_filters_malformed_events(tmp_path):
+    handle = _call({"method": "session.open", "params": {"workspace": str(tmp_path)}})["data"]["session"]
+    from forgecode import rpc
+    info = rpc._RPC_SESSIONS[handle]
+    info["execution"] = "process"
+    info["sequence"] = 4
+    info["events"] = [
+        {"sequence": 2, "type": "pause"},
+        {"sequence": 2, "type": "duplicate"},
+        {"sequence": 3, "type": "bad\nline"},
+        {"sequence": "four", "type": "invalid"},
+        {"sequence": 4, "type": "resume", "detail": "ok"},
+    ]
+    rpc._persist_session(handle, info)
+    rpc._RPC_SESSIONS.pop(handle, None)
+    restored = _call({"method": "session.open", "params": {"workspace": str(tmp_path), "session": handle}})
+    assert restored["data"]["execution"] == "process"
+    events = _call({"method": "session.events", "params": {"session": handle, "after": 0}})["data"]["events"]
+    assert [event["sequence"] for event in events] == [2, 4]
+
+
 def test_rpc_cancel_exposes_auditable_cancel_request(tmp_path):
     handle = _call({"method": "session.open", "params": {"workspace": str(tmp_path)}})["data"]["session"]
     cancelled = _call({"method": "session.cancel", "params": {"session": handle}})
