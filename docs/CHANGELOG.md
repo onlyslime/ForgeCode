@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.138 — 2026-08-31
+
+- **Transport body validation:** reject non-byte request bodies before decoding, converting malformed custom transport inputs into clear `ValueError`s.
+- **Verification:** provider tests, compile checks, and manual malformed-body inspection passed.
+
 ## v0.8.137 — 2026-08-31
 
 - **Google request validation:** malformed non-list or non-object tool schemas are now rejected instead of silently dropped during provider translation.

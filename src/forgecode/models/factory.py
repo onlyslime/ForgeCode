@@ -37,6 +37,8 @@ class _ProtocolTransport:
         self.delegate, self.provider, self.api_key = delegate, provider, api_key
 
     def _request(self, url: str, headers: dict[str, str], body: bytes) -> tuple[str, dict[str, str], bytes]:
+        if not isinstance(body, (bytes, bytearray)):
+            raise ValueError("provider request body must be bytes")
         try:
             payload = json.loads(body.decode("utf-8"))
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
