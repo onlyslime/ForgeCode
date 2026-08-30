@@ -1,4 +1,5 @@
 import time
+import pytest
 from forgecode.security import WorkspaceGuard
 from forgecode.tools import AllowAllApproval, KillProcessTool, ListProcessesTool, ProcessManager, PollProcessTool, RunBackgroundTool, ToolContext
 
@@ -112,3 +113,15 @@ def test_background_state_loader_discards_unbounded_or_unknown_rows(tmp_path):
     assert manager.snapshot("\nok")["error"] == "unknown_task"
     assert manager.snapshot("ok")["status"] == "stale"
     assert "command" not in manager.snapshot("ok")
+
+
+def test_background_manager_rejects_symlink_state_path(tmp_path):
+    target = tmp_path / "target.json"
+    target.write_text("{}", encoding="utf-8")
+    alias = tmp_path / "alias.json"
+    try:
+        alias.symlink_to(target)
+    except (OSError, NotImplementedError) as exc:
+        pytest.skip(f"symlink unavailable: {exc}")
+    with pytest.raises(ValueError, match="symlink"):
+        ProcessManager(state_path=alias)

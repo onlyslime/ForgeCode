@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 from .base import ToolContext, ToolDefinition, ToolResult
 from .shell import classify_command
+from ..security.workspace import WorkspaceViolation, assert_no_path_alias
 
 _MAX_STATE_BYTES = 2_000_000
 _MAX_TASK_ID_CHARS = 128
@@ -31,11 +32,21 @@ class ProcessManager:
         self._items: dict[str, _Process] = {}
         self._stale: dict[str, dict[str, Any]] = {}
         self._lock = threading.Lock()
-        self._state_path = Path(state_path) if state_path is not None else None
+        if state_path is None:
+            self._state_path = None
+        else:
+            try:
+                self._state_path = assert_no_path_alias(Path(state_path), message="background state path is a symlink or junction alias")
+            except WorkspaceViolation as exc:
+                raise ValueError(str(exc)) from exc
         if self._state_path is not None:
             self._load_state()
 
     def _load_state(self) -> None:
+        try:
+            assert_no_path_alias(self._state_path, message="background state path is a symlink or junction alias")
+        except WorkspaceViolation:
+            return
         try:
             if self._state_path.stat().st_size > _MAX_STATE_BYTES:
                 return
@@ -54,6 +65,11 @@ class ProcessManager:
 
     def _persist_state(self) -> None:
         if self._state_path is None:
+            return
+        try:
+            assert_no_path_alias(self._state_path.parent, message="background state directory is a symlink or junction alias")
+            assert_no_path_alias(self._state_path, message="background state path is a symlink or junction alias")
+        except WorkspaceViolation:
             return
         rows = []
         for task_id, item in self._items.items():

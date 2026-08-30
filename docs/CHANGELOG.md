@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.70 — 2026-08-31
+
+- Hardened background state persistence by rejecting symlink/junction aliases
+  before loading or writing task state.
+- Verification: alias-path regression, background tests, compileall, and
+  manual state-file checks passed.
+
 ## v0.8.69 — 2026-08-31
 
 - Hardened background task state persistence with unique temporary files and
