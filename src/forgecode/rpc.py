@@ -338,11 +338,16 @@ def _refresh_session_from_disk(handle: str, info: dict[str, Any]) -> dict[str, A
     restored = _load_session(handle, info.get("workspace"))
     if restored is None:
         return info
+    # A completed in-process run may have its result only in memory until the
+    # worker finalizer persists it.  Never let an older disk snapshot erase
+    # that durable-to-be-written result during a read request.
+    if info.get("result") is not None and restored.get("result") is None:
+        return info
     newer_sequence = int(restored.get("sequence", 0)) > int(info.get("sequence", 0))
     changed_same_sequence = any(
         restored.get(key) != info.get(key)
-        for key in ("state", "cancel_requested", "execution", "result")
-    ) or restored.get("events", []) != info.get("events", [])
+        for key in ("state", "cancel_requested", "execution")
+    ) or (restored.get("result") is not None and restored.get("result") != info.get("result")) or restored.get("events", []) != info.get("events", [])
     if not newer_sequence and not changed_same_sequence:
         return info
     restored["created_monotonic"] = info.get("created_monotonic", time.monotonic())
