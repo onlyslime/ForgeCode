@@ -730,6 +730,13 @@ class OpenAICompatibleProvider:
                                 attempt_finished(attempt_info, outcome="retry", error_category=f"stream_http_{status}")
                                 await self._retry(attempt, f"stream_http_{status}", f"HTTP {status}", response_headers.get("retry-after"), context=request_context, request_id=request_id)
                                 continue
+                        if status in {404, 405, 501} and not self.stream_required:
+                            # Some OpenAI-compatible gateways expose chat
+                            # completions but not SSE. In optional/auto mode,
+                            # treat this as a capability signal and fall back
+                            # to the bounded JSON request below.
+                            attempt_finished(attempt_info, outcome="fallback", error_category=f"stream_http_{status}")
+                            break
                         if status < 200 or status >= 300:
                             attempt_finished(attempt_info, outcome="error", error_category="http_error")
                             raise ProviderError(f"model returned HTTP {status}", category="http_error", retryable=status in {408, 429} or 500 <= status <= 599, status_code=status, attempt=attempt, request_id=request_id)

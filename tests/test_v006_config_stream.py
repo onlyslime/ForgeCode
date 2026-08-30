@@ -245,6 +245,20 @@ def test_stream_transport_not_implemented_falls_back_only_when_optional():
         asyncio.run(required.complete([Message("user", "hi")], []))
 
 
+def test_stream_http_capability_error_falls_back_to_json_when_optional():
+    import asyncio
+    from forgecode.models import OpenAICompatibleProvider
+    class NoSseTransport:
+        def post_stream(self, *_args):
+            return 405, iter(())
+        def post_json(self, *_args):
+            return 200, b'{"choices":[{"finish_reason":"stop","message":{"role":"assistant","content":"json fallback"}}]}'
+
+    provider = OpenAICompatibleProvider(api_key="key", base_url="https://example.test/v1", model="m", transport=NoSseTransport(), streaming=True, stream_required=False)
+    response = asyncio.run(provider.complete([Message("user", "hi")], []))
+    assert response.message.content == "json fallback"
+
+
 def test_stream_accepts_usage_only_terminal_frame_after_finish():
     events = [
         {"choices": [{"index": 0, "delta": {"content": "ok"}}]},

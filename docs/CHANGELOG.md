@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.7.14 — 2026-08-30
+
+- Optional streaming now falls back to JSON when a gateway returns HTTP 404,
+  405, or 501 for the SSE endpoint; required streaming remains fail-closed.
+- Added regression coverage for HTTP capability fallback.
+
 ## v0.7.13 — 2026-08-30
 
 - AgentLoop now fails fast when a provider is configured to require streaming
