@@ -1312,3 +1312,8 @@ session 级描述，不等价于 Codex 的 thread/turn 状态对象。
 `forgecode tools --json` 返回 31 个带 schema/category/side_effecting 元数据的工具；
 未配置 provider 时 doctor 正确报告 framework-only/offline-unconfigured，而不是伪造
 模型可用性。
+本轮进一步读取 OpenCode `lsp.ts` 与 `question.ts` 源码（GitHub raw，均 HTTP 200）：
+`lsp` 工具通过 language-server 客户端执行定义/引用/诊断等语义请求，`question` 工具
+通过会话请求等待用户回答并把结果回传模型；这不是简单的可执行文件探测。ForgeCode
+当前 `lsp_status` 只做 PATH 发现，交互层也没有模型可调用的 question 工具，因此这两
+项仍是 P1，需先设计进程生命周期、超时、用户输入和审批事件契约。
