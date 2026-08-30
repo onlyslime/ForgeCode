@@ -85,6 +85,11 @@ class ListFilesTool:
             for name in sorted(filenames, key=str.lower):
                 path = directory_path / name
                 visited += 1
+                if visited % 128 == 0:
+                    if context.cancelled:
+                        return ToolResult(False, "file listing cancelled during scan", {"error": "cancelled"})
+                    if context.remaining_seconds(10.0) <= 0:
+                        return ToolResult(False, "file listing stopped because the run deadline has expired", {"error": "deadline_exceeded"})
                 if visited > _MAX_LIST_FILES * 20:
                     break
                 try:

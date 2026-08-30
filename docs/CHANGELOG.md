@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.196 — 2026-08-31
+
+- **Responsive file listing:** `list_files` now polls cancellation and deadlines while traversing dense directories, reducing control latency when a single directory contains many entries.
+- **Verification:** command-boundary and security tests, compile, and diff checks passed.
+
 ## v0.8.195 — 2026-08-31
 
 - **Filesystem scan responsiveness:** `read_file` and `search` now enforce post-read deadline checks and poll cancellation/deadlines while matching lines in large files.
