@@ -1270,6 +1270,12 @@ compaction、message queue、skills、extensions、themes、prompt templates 和
 扩展包加载和成熟的跨进程 SDK 生态。这些列为 P1/P2，而不在当前安全与恢复主线中
 抢占优先级。
 
+Codex app-server v2 的协作 schema（GitHub raw，HTTP 200）还公开了
+`CollabAgentStatus`：`pendingInit/running/interrupted/completed/errored/shutdown/notFound`，
+以及带状态和消息的 `CollabAgentState`、包含 mode/model/reasoning_effort 的
+`CollaborationModeMask`。ForgeCode 当前没有多代理生命周期、协作模式协商或子代理
+权限隔离；这属于 P2，必须在 worktree ownership、审批和取消边界稳定后再实现。
+
 Pi 的消息队列章节还区分 steering（当前工具调用完成后注入）与 follow-up（整轮结束后
 注入），并支持 one-at-a-time/all 投递策略、Escape 中止后恢复队列、Alt+Up 取回待发
 消息。ForgeCode 当前队列是单一 FIFO：在当前 AgentLoop 返回后依次执行，Escape 会
