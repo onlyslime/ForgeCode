@@ -123,6 +123,10 @@ def test_embed_session_result_validates_handle():
     with pytest.raises(ValueError):
         session_events("x", after=-1)
     with pytest.raises(ValueError):
+        session_events("x", wait=31)
+    with pytest.raises(ValueError):
+        session_events("x", event_type="bad\nkind")
+    with pytest.raises(ValueError):
         session_inspect("x", workspace="bad\npath")
 
 

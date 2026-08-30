@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.8.24 — 2026-08-30
+
+- Exposed bounded `wait` and event `type` filtering in Python and Node
+  `session.events` SDK helpers, matching the underlying RPC contract.
+- Verification: Python/Node SDK contract tests, compileall, and diff checks passed.
+
 ## v0.8.23 — 2026-08-30
 
 - Refreshed top-level lifecycle metadata in `session.events` after long-poll

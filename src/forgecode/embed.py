@@ -173,11 +173,14 @@ def session_inspect(session: str, *, workspace: str | None = None, request_id: s
     return list(stream([request], raise_for_status=raise_for_status))
 
 
-def session_events(session: str, *, workspace: str | None = None, after: int = 0, limit: int = 100, request_id: str | int | None = None, raise_for_status: bool = False) -> list[dict[str, Any]]:
+def session_events(session: str, *, workspace: str | None = None, after: int = 0, limit: int = 100, wait: float = 0, event_type: str | None = None, request_id: str | int | None = None, raise_for_status: bool = False) -> list[dict[str, Any]]:
     if not isinstance(session, str) or not session or len(session) > 512 or any(ch in session for ch in "\r\n"): raise ValueError("session must be bounded newline-safe text")
     if isinstance(after, bool) or not isinstance(after, int) or after < 0: raise ValueError("after must be a non-negative integer")
     if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 100: raise ValueError("limit must be between 1 and 100")
-    params: dict[str, Any] = {"session": session, "after": after, "limit": limit}
+    if isinstance(wait, bool) or not isinstance(wait, (int, float)) or wait < 0 or wait > 30: raise ValueError("wait must be between 0 and 30 seconds")
+    if event_type is not None and (not isinstance(event_type, str) or not event_type or len(event_type) > 64 or any(ch in event_type for ch in "\r\n")): raise ValueError("event_type must be bounded newline-safe text")
+    params: dict[str, Any] = {"session": session, "after": after, "limit": limit, "wait": wait}
+    if event_type is not None: params["type"] = event_type
     if workspace is not None:
         if not isinstance(workspace, str) or not workspace or len(workspace) > 1_000 or any(ch in workspace for ch in "\r\n"): raise ValueError("workspace must be bounded newline-safe text")
         params["workspace"] = workspace
