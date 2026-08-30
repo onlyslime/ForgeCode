@@ -44,7 +44,7 @@ from ..security.workspace import WorkspaceGuard
 from ..security.trust import TrustError, TrustStore
 from ..telemetry import Telemetry
 from ..storage import Checkpoint, CheckpointStore, RecoveryConflict, SessionFormatError, SessionStore
-from ..tools import AgentMode, AllowAllApproval, DenyAllApproval, InteractiveApproval, ToolContext, build_default_registry
+from ..tools import AgentMode, AllowAllApproval, DenyAllApproval, InteractiveApproval, RiskScopedApproval, ToolContext, build_default_registry
 from ..hooks import Hook, HookRegistry
 from .review_service import ReviewService
 from .prompt_ui import run_prompt_ui
@@ -928,7 +928,7 @@ def main(argv: list[str] | None = None) -> int:
                     if effective_mode == "plan" and name in {"write_file", "apply_patch", "run_command"}: reasons.append("plan_mode_read_only"); enabled = False
                     if not trusted and effective_mode == "act" and name in {"write_file", "apply_patch", "run_command"}: reasons.append("workspace_trust_required"); enabled = False
                     rows.append({"tool": name, "enabled": enabled, "reasons": reasons or ["permitted_by_current_policy"], "approval": config.approval, "mode": effective_mode, "trust": trusted})
-                payload = {"profile": config.profile, "provider": config.provider, "mode": effective_mode, "configured_mode": config.default_mode, "approval": config.approval, "trust": trusted, "rules": {"fingerprint": rules.fingerprint, "sources": [{"path": item.path, "scope": item.scope, "priority": item.priority, "digest": item.digest} for item in rules.sources], "diagnostics": [item.to_dict() for item in rules.diagnostics]}, "config_policy": {"allow": list(effective_policy.allow), "deny": list(effective_policy.deny)}, "runtime_policy": None if runtime_policy is None else {"allow": list(runtime_policy.allow), "deny": list(runtime_policy.deny)}, "tools": rows}
+                payload = {"profile": config.profile, "provider": config.provider, "mode": effective_mode, "configured_mode": config.default_mode, "approval": config.approval, "approval_scopes": dict(config.approval_scopes), "trust": trusted, "rules": {"fingerprint": rules.fingerprint, "sources": [{"path": item.path, "scope": item.scope, "priority": item.priority, "digest": item.digest} for item in rules.sources], "diagnostics": [item.to_dict() for item in rules.diagnostics]}, "config_policy": {"allow": list(effective_policy.allow), "deny": list(effective_policy.deny)}, "runtime_policy": None if runtime_policy is None else {"allow": list(runtime_policy.allow), "deny": list(runtime_policy.deny)}, "tools": rows}
             elif args.config_action == "profiles":
                 profiles = ConfigLoader(workspace).profiles()
                 selected = getattr(args, "profile_name", None)
@@ -1816,6 +1816,8 @@ def main(argv: list[str] | None = None) -> int:
                 approval_waiting.clear()
         bypass = state["mode"] == AgentMode.BYPASS.value
         approval = AllowAllApproval() if bypass else (DenyAllApproval() if configured_approval == "deny" and not (args.auto_approve or args.demo) else InteractiveApproval(auto_approve=args.auto_approve or args.demo or configured_approval == "auto", input_fn=approval_input, output_fn=_approval_output(machine_json), prompt_to_output=machine_json, secrets=[api_key]))
+        if not bypass and settings.effective and settings.effective.approval_scopes:
+            approval = RiskScopedApproval(approval, settings.effective.approval_scopes)
         if args.demo and not any((workspace / name).exists() for name in ("demo_calculator.py", "demo_config.json")):
             # The demo fixture is a bounded, explicit offline setup action.
             # Prepare it before reading stdin so legacy scripted chat clients

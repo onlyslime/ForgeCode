@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.7.18 — 2026-08-30
+
+- Added optional `[approval_scopes]` configuration for per-domain `allow`,
+  `ask`, or `deny` decisions across changes, execution, and evidence tools.
+- Existing global approval modes remain compatible; scoped decisions are
+  exposed in policy diagnostics without exposing credentials.
+
 ## v0.7.17 — 2026-08-30
 
 - Background task metadata is persisted under `.forgecode` without commands or

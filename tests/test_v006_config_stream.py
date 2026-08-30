@@ -19,6 +19,22 @@ def test_config_precedence_cli_over_file_over_environment(monkeypatch, tmp_path:
     assert config.to_dict()["api_key"] == "<environment-only>"
 
 
+def test_config_loads_scoped_approval_decisions(tmp_path: Path):
+    directory = tmp_path / ".forgecode"
+    directory.mkdir()
+    (directory / "config.toml").write_text('[approval_scopes]\nchanges = "allow"\nexecution = "deny"\n', encoding="utf-8")
+    config = ConfigLoader(tmp_path).load()
+    assert config.approval_scopes == {"changes": "allow", "execution": "deny"}
+
+
+def test_config_rejects_invalid_scoped_approval_decision(tmp_path: Path):
+    directory = tmp_path / ".forgecode"
+    directory.mkdir()
+    (directory / "config.toml").write_text('[approval_scopes]\nexecution = "maybe"\n', encoding="utf-8")
+    with pytest.raises(ConfigError):
+        ConfigLoader(tmp_path).load()
+
+
 def test_config_named_profile_validation_and_secret_field_rejection(tmp_path: Path):
     directory = tmp_path / ".forgecode"
     directory.mkdir()

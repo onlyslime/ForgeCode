@@ -193,6 +193,7 @@ class EffectiveConfig:
     api_key_env: str = "FORGECODE_API_KEY"
     default_mode: str = "act"
     approval: str = "interactive"
+    approval_scopes: dict[str, str] = field(default_factory=dict)
     streaming: str = "auto"
     max_steps: int | None = None
     max_tool_calls: int = 512
@@ -223,6 +224,8 @@ class EffectiveConfig:
             raise ConfigError("default_mode must be plan or act")
         if self.approval not in {"interactive", "auto", "deny"}:
             raise ConfigError("approval must be interactive, auto, or deny")
+        if not isinstance(self.approval_scopes, dict) or set(self.approval_scopes) - {"changes", "execution", "evidence"} or any(value not in {"allow", "ask", "deny"} for value in self.approval_scopes.values()):
+            raise ConfigError("approval_scopes must map changes, execution, or evidence to allow, ask, or deny")
         if not isinstance(self.offline, bool):
             raise ConfigError("offline must be a boolean")
         if self.telemetry not in {"off", "local", "on"}:
@@ -403,14 +406,14 @@ class ConfigLoader:
 
     def load(self, overrides: Mapping[str, Any] | None = None, *, profile: str | None = None) -> EffectiveConfig:
         raw = self._read_file()
-        allowed = {"profile", "provider", "base_url", "model", "api_key_env", "default_mode", "approval", "streaming", "max_steps", "max_tool_calls", "context_budget_chars", "compact_threshold_chars", "provider_timeout_seconds", "run_timeout_seconds", "verification_command", "repair_attempts", "session_max_chars", "transaction_max_bytes", "offline", "telemetry", "tool_policy", "profiles"}
+        allowed = {"profile", "provider", "base_url", "model", "api_key_env", "default_mode", "approval", "approval_scopes", "streaming", "max_steps", "max_tool_calls", "context_budget_chars", "compact_threshold_chars", "provider_timeout_seconds", "run_timeout_seconds", "verification_command", "repair_attempts", "session_max_chars", "transaction_max_bytes", "offline", "telemetry", "tool_policy", "profiles"}
         unknown = set(raw) - allowed
         if unknown:
             raise ConfigError("unknown config fields: " + ", ".join(sorted(unknown)))
         _reject_secret_fields(raw)
         merged: dict[str, Any] = {
             "workspace": self.workspace, "profile": "default", "provider": "openai-compatible", "base_url": "https://api.openai.com/v1", "model": None,
-            "api_key_env": "FORGECODE_API_KEY", "default_mode": "act", "approval": "interactive", "streaming": "auto", "max_steps": None,
+            "api_key_env": "FORGECODE_API_KEY", "default_mode": "act", "approval": "interactive", "approval_scopes": {}, "streaming": "auto", "max_steps": None,
             "max_tool_calls": 512, "context_budget_chars": 60_000, "compact_threshold_chars": 48_000, "provider_timeout_seconds": 90.0,
             "run_timeout_seconds": 600.0, "verification_command": None, "repair_attempts": 2, "session_max_chars": 100_000, "transaction_max_bytes": 50_000_000, "offline": False, "telemetry": "off",
             "tool_policy": ToolPolicy(), "sources": ("defaults",),
