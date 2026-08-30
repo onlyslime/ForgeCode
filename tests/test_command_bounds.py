@@ -171,6 +171,9 @@ def test_registry_rejects_unknown_schema_fields(tmp_path: Path):
     assert non_string_key.ok is False
     assert non_string_key.metadata["error"] == "invalid_arguments"
     assert "keys must be strings" in non_string_key.output
+    malformed_name = registry.execute([], {}, ToolContext(WorkspaceGuard(tmp_path), AllowAllApproval()))
+    assert malformed_name.ok is False
+    assert malformed_name.metadata["error"] == "invalid_tool_name"
 
 
 def test_workspace_summary_rejects_non_object_arguments(tmp_path: Path):

@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.115 — 2026-08-31
+
+- **Tool name validation:** malformed or empty tool-call names now return a structured error instead of triggering unhashable-key or lookup failures.
+- **Verification:** command-bound regression tests and compile checks passed.
+
 ## v0.8.114 — 2026-08-31
 
 - **Tool argument key validation:** reject non-string JSON object keys before schema validation, returning a structured `invalid_arguments` error instead of raising a sorting exception.
