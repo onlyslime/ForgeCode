@@ -110,7 +110,7 @@ def test_stream_assembly_rejects_non_object_event():
 
 def test_provider_rejects_control_character_tool_call_id():
     with pytest.raises(ProviderError, match="no id"):
-        parse_chat_completion({"choices": [{"finish_reason": "tool_calls", "message": {"tool_calls": [{"id": "bad\\nid", "function": {"name": "read_file", "arguments": "{}"}}]}}]})
+        parse_chat_completion({"choices": [{"finish_reason": "tool_calls", "message": {"tool_calls": [{"id": "bad\nid", "function": {"name": "read_file", "arguments": "{}"}}]}}]})
 
 
 def test_provider_neutral_response_validation_rejects_nonfinite_usage_and_bad_finish_reason():

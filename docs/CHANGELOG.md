@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.8.120 — 2026-08-31
+
+- **Regression correction:** fixed the malformed-ID test fixture to exercise an actual newline and verified the new provider guard.
+
 ## v0.8.119 — 2026-08-31
 
 - **Tool-call ID safety:** reject empty, oversized, or control-character IDs in synchronous and streaming provider responses to preserve log/session correlation integrity.
