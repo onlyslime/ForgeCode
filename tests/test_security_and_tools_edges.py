@@ -240,7 +240,9 @@ def test_registry_schema_snapshot_resists_post_registration_mutation():
     assert "returned_mutation" not in registry.schemas()[0]["function"]["parameters"]["properties"]
     definition.name = "changed"
     definition.description = "changed"
+    definition.side_effecting = True
     assert registry.schemas()[0]["function"]["name"] == "mutable_schema"
+    assert registry.definitions("plan")
     definitions = registry.definitions()
     definitions[0].parameters["mutated"] = True
     assert "mutated" not in registry.schemas()[0]["function"]["parameters"]

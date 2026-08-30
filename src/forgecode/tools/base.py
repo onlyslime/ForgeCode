@@ -146,7 +146,7 @@ class ToolRegistry:
     def __init__(self, *, max_output_chars: int = 20_000):
         self._tools: dict[str, Tool] = {}
         self._schema_snapshots: dict[str, dict[str, Any]] = {}
-        self._definition_snapshots: dict[str, tuple[str, str]] = {}
+        self._definition_snapshots: dict[str, tuple[str, str, bool]] = {}
         self._unavailable_tools: set[str] = set()
         if isinstance(max_output_chars, bool) or not isinstance(max_output_chars, int) or not 1 <= max_output_chars <= 1_000_000:
             raise ValueError("max_output_chars must be an integer between 1 and 1000000")
@@ -174,7 +174,7 @@ class ToolRegistry:
             raise ValueError(f"duplicate tool: {tool.definition.name}")
         self._tools[name] = tool
         self._schema_snapshots[name] = schema_snapshot
-        self._definition_snapshots[name] = (name, description)
+        self._definition_snapshots[name] = (name, description, bool(getattr(definition, "side_effecting", False)))
 
     def filter(self, policy: Any | None = None) -> "ToolRegistry":
         """Return a registry narrowed by policy; policy cannot add tools."""
@@ -202,12 +202,10 @@ class ToolRegistry:
         active_mode = None if mode is None else AgentMode(mode)
         result: list[ToolDefinition] = []
         for name, tool in self._tools.items():
-            definition = tool.definition
-            side_effecting = bool(getattr(definition, "side_effecting", False))
-            if active_mode not in {None, AgentMode.ACT, AgentMode.BYPASS} and side_effecting:
+            if active_mode not in {None, AgentMode.ACT, AgentMode.BYPASS} and self._definition_snapshots[name][2]:
                 continue
-            snapshot_name, snapshot_description = self._definition_snapshots[name]
-            result.append(ToolDefinition(snapshot_name, snapshot_description, copy.deepcopy(self._schema_snapshots[name]), side_effecting))
+            snapshot_name, snapshot_description, snapshot_side_effecting = self._definition_snapshots[name]
+            result.append(ToolDefinition(snapshot_name, snapshot_description, copy.deepcopy(self._schema_snapshots[name]), snapshot_side_effecting))
         return tuple(result)
 
     def schemas(self, mode: AgentMode | str | None = None) -> list[dict[str, Any]]:
@@ -221,7 +219,7 @@ class ToolRegistry:
                 },
             }
             for name, tool in self._tools.items()
-            if mode is None or AgentMode(mode) in {AgentMode.ACT, AgentMode.BYPASS} or not getattr(tool.definition, "side_effecting", False)
+            if mode is None or AgentMode(mode) in {AgentMode.ACT, AgentMode.BYPASS} or not self._definition_snapshots[name][2]
         ]
 
     def execute(self, name: str, arguments: dict[str, Any], context: ToolContext) -> ToolResult:

@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.62 — 2026-08-31
+
+- Included `side_effecting` in registered tool definition snapshots so mode
+  filtering cannot drift when extensions mutate their definitions later.
+- Verification: registry/loop tests, manual side-effect mutation check,
+  compileall, and diff checks passed.
+
 ## v0.8.61 — 2026-08-31
 
 - Made `ToolRegistry.definitions()` return immutable-definition snapshots,
