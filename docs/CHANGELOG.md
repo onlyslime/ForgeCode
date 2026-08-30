@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.170 — 2026-08-31
+
+- **Worktree inspection deadlines:** Git worktree listing now honors cancellation and expired run budgets before reading ownership metadata or starting Git.
+- **Verification:** command-boundary tests, compile checks, and manual expired-worktree inspection passed.
+
 ## v0.8.169 — 2026-08-31
 
 - **Symbol navigation deadlines:** definition, reference, and hover tools now fail fast on cancellation or expired runs before scanning source files.

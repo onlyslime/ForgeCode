@@ -161,6 +161,10 @@ class GitWorktreeListTool:
     def execute(self, arguments, context):
         if not isinstance(arguments, dict):
             raise ValueError("arguments must be an object")
+        if context.cancelled:
+            return ToolResult(False, "git worktree listing cancelled before execution", {"error": "cancelled"})
+        if context.remaining_seconds(15.0) <= 0:
+            return ToolResult(False, "git worktree listing skipped because the run deadline has expired", {"error": "deadline_exceeded"})
         try:
             records = _worktree_records(context.guard)
         except (OSError, ValueError):
