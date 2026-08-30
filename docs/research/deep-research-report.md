@@ -691,7 +691,7 @@ CLI/TUI
 | 验证 | 测试 profile、有限修复、review/export、轨迹评估 | 缺少语言服务和调试器集成 | P1 |
 | 扩展发布 | Skills、hooks、SDK、JSONL RPC、工具收窄、uv/独立二进制布局 | 缺少 MCP、插件市场、跨平台一键安装 | P2 |
 
-截至当前 v0.7.15，正常交互工作流还提供 `/context`（有界索引健康度）和
+截至当前 v0.7.16，正常交互工作流还提供 `/context`（有界索引健康度）和
 `/events [limit] [kind]`（可筛选、带相对耗时和错误码的持久化事件尾部）。
 这些能力不改变工具权限，只把已有审计证据暴露给用户；对应交互、机器契约和
 provider 回归测试均已通过。
@@ -840,6 +840,19 @@ Codex 官方页面或未实现的竞品特性当作本项目已完成能力。
 - **非目标**：不改变无 hooks 场景的只读并行，不并行任何副作用工具，不引入锁来
   掩盖 hook 本身的非线程安全实现。
 - **验证**：定向测试通过并发计数确认 hook-enabled 批次最大同时执行数为 1。
+
+### 0.7.16 实施审计：CLI 风险组工具策略（2026-08-30）
+
+- **范围**：`--tools` 与 `--exclude-tools` 支持 `read_only`、`changes`、
+  `execution`、`evidence` 四个经过审计的风险组，并按当前工具注册表展开为
+  稳定的精确工具名；展开后继续执行既有的未知、重复、重叠和注册表收窄检查。
+- **非目标**：不改变 TOML 配置中仅允许精确工具名的语义；不声称实现 Codex
+  granular approval profile，也不改变审批、WorkspaceGuard 或副作用执行边界。
+- **受影响文件**：`src/forgecode/config.py`、`tests/test_v012_tool_policy.py`，
+  以及版本和变更记录文件。
+- **完成条件**：组名在 CLI 中可用，缺失工具安全忽略，策略结果可审计且顺序稳定。
+- **验证**：工具策略定向测试 10 passed；发布前执行完整 pytest、doctor、compileall
+  与 diff 检查。
 
 ### 外部资料复核（2026-08-30）
 

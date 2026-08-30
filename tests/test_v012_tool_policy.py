@@ -36,6 +36,12 @@ def test_cli_tool_policy_parser_is_bounded_and_fail_closed() -> None:
         parse_tool_policy_options("read_file", None, no_tools=True, available=available)
 
 
+def test_cli_tool_policy_supports_audited_risk_groups() -> None:
+    available = ("read_file", "search", "write_file", "run_command")
+    assert parse_tool_policy_options("read_only", available=available) == ToolPolicy(allow=("read_file", "search"))
+    assert parse_tool_policy_options(None, "execution", available=available) == ToolPolicy(deny=("run_command",))
+
+
 def test_registry_policy_intersection_preserves_stable_unavailable_result(tmp_path: Path) -> None:
     guard = WorkspaceGuard(tmp_path)
     base = build_default_registry(guard)

@@ -144,6 +144,12 @@ def parse_tool_policy_options(
         return None
     known = tuple(str(name) for name in available)
     known_set = set(known)
+    groups = {
+        "read_only": {name for name in known if name in {"list_files", "read_file", "search", "workspace_summary", "repository_map", "find_files", "diagnostics", "read_range", "list_symbols", "file_metadata", "find_definition", "find_references", "process_status", "poll_process", "list_processes", "git_status", "git_diff", "git_log"}},
+        "changes": {name for name in known if name in {"write_file", "apply_patch", "git_commit"}},
+        "execution": {name for name in known if name in {"run_command", "run_background", "kill_process"}},
+        "evidence": {name for name in known if name in {"review", "test", "diagnostics", "git_status", "git_diff", "git_log"}},
+    }
 
     def parse(value: str | None, option: str) -> tuple[str, ...]:
         if value is None:
@@ -157,10 +163,13 @@ def parse_tool_policy_options(
             raise ConfigError(f"{option} contains an empty tool name")
         if len(set(names)) != len(names):
             raise ConfigError(f"{option} contains duplicate tool names")
-        unknown = tuple(item for item in names if item not in known_set)
+        unknown = tuple(item for item in names if item not in known_set and item not in groups)
         if unknown:
             raise ConfigError(f"{option} contains unknown tools: {', '.join(unknown)}")
-        return names
+        expanded = []
+        for item in names:
+            expanded.extend(sorted(groups[item]) if item in groups else [item])
+        return tuple(dict.fromkeys(expanded))
 
     selected = parse(tools, "--tools")
     excluded = parse(exclude_tools, "--exclude-tools")

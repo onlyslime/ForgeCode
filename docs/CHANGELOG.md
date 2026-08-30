@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.7.16 — 2026-08-30
+
+- CLI tool policy now accepts audited risk groups (`read_only`, `changes`,
+  `execution`, and `evidence`) and expands them to the available exact tools.
+- Group expansion preserves existing unknown-tool, duplicate, overlap, and
+  registry-narrowing checks; configuration files continue to use exact names.
+- Added parser regression coverage for allow and deny group usage.
+
 ## v0.7.15 — 2026-08-30
 
 - Read-only batch scheduling now stays serial whenever lifecycle hooks are
