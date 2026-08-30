@@ -173,6 +173,17 @@ def session_inspect(session: str, *, workspace: str | None = None, request_id: s
     return list(stream([request], raise_for_status=raise_for_status))
 
 
+def session_status(session: str, *, workspace: str | None = None, request_id: str | int | None = None, raise_for_status: bool = False) -> list[dict[str, Any]]:
+    if not isinstance(session, str) or not session or len(session) > 512 or any(ch in session for ch in "\r\n"): raise ValueError("session must be bounded newline-safe text")
+    params: dict[str, Any] = {"session": session}
+    if workspace is not None:
+        if not isinstance(workspace, str) or not workspace or len(workspace) > 1_000 or any(ch in workspace for ch in "\r\n"): raise ValueError("workspace must be bounded newline-safe text")
+        params["workspace"] = workspace
+    request = {"method": "session.status", "params": params}
+    if request_id is not None: request["id"] = request_id
+    return list(stream([request], raise_for_status=raise_for_status))
+
+
 def session_events(session: str, *, workspace: str | None = None, after: int = 0, limit: int = 100, wait: float = 0, event_type: str | None = None, request_id: str | int | None = None, raise_for_status: bool = False) -> list[dict[str, Any]]:
     if not isinstance(session, str) or not session or len(session) > 512 or any(ch in session for ch in "\r\n"): raise ValueError("session must be bounded newline-safe text")
     if isinstance(after, bool) or not isinstance(after, int) or after < 0: raise ValueError("after must be a non-negative integer")

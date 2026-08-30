@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.8.26 — 2026-08-30
+
+- Added the missing Python `session_status()` embedding helper and package-level
+  export, aligning Python SDK coverage with the Node SDK and RPC contract.
+- Verification: Python embed contract tests, compileall, and diff checks passed.
+
 ## v0.8.25 — 2026-08-30
 
 - Added bounded finite timeout validation to the Node `sessionWait` helper,

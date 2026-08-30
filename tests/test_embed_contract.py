@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from forgecode.embed import ForgeCodeError, config_profiles, provider_list, provider_health, config_policy, invoke, rpc_describe, login, session_open, session_run, session_inspect, session_events, session_result, session_wait, session_tree, session_cancel, session_pause, session_resume, session_approval, stream
+from forgecode.embed import ForgeCodeError, config_profiles, provider_list, provider_health, config_policy, invoke, rpc_describe, login, session_open, session_run, session_inspect, session_status, session_events, session_result, session_wait, session_tree, session_cancel, session_pause, session_resume, session_approval, stream
 
 
 def test_rpc_describe_embedding_returns_capabilities() -> None:
@@ -90,6 +90,7 @@ def test_embed_session_result_validates_handle():
     assert forgecode.session_open_embedded is session_open
     assert forgecode.session_run_embedded is session_run
     assert forgecode.session_inspect_embedded is session_inspect
+    assert forgecode.session_status_embedded is session_status
     assert forgecode.session_events_embedded is session_events
     assert forgecode.session_wait_embedded is session_wait
     assert forgecode.session_tree_embedded is session_tree
