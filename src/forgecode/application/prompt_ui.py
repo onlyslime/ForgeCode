@@ -14,7 +14,7 @@ def run_prompt_ui(session, *, mode: Callable[[], str]) -> None:
     from prompt_toolkit.styles import Style
     from prompt_toolkit.completion import Completer, Completion
 
-    slash_commands = ("/help", "/introdece", "/status", "/queue", "/tools", "/model", "/plan", "/mode", "/connect", "/login", "/rules", "/files", "/skills", "/tree", "/diff", "/context", "/events", "/review", "/test", "/compact", "/undo", "/pause", "/resume", "/cancel", "/clear", "/quit", "/exit")
+    slash_commands = ("/help", "/introduce", "/status", "/queue", "/tools", "/model", "/plan", "/mode", "/connect", "/login", "/rules", "/files", "/skills", "/tree", "/diff", "/context", "/events", "/review", "/test", "/compact", "/undo", "/pause", "/resume", "/cancel", "/clear", "/quit", "/exit")
     argument_choices = {
         "/mode": ("plan", "act", "bypass"),
         "/plan": ("show", "refresh"),

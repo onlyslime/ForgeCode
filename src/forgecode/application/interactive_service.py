@@ -618,7 +618,7 @@ class InteractiveSession:
     stopped: bool = False
     controller: InteractiveRunController | None = None
 
-    COMMANDS = ("help", "introdece", "status", "queue", "tools", "plan", "mode", "model", "connect", "login", "rules", "files", "skills", "skill", "tree", "diff", "context", "events", "review", "test", "compact", "undo", "cancel", "pause", "resume", "clear", "quit", "exit")
+    COMMANDS = ("help", "introduce", "introdece", "status", "queue", "tools", "plan", "mode", "model", "connect", "login", "rules", "files", "skills", "skill", "tree", "diff", "context", "events", "review", "test", "compact", "undo", "cancel", "pause", "resume", "clear", "quit", "exit")
 
     def header(self, *, run_id: str = "", mode: str = "plan", profile: str = "default", rules_count: int = 0, budget: int = 60_000) -> str:
         return f"ForgeCode session run={run_id or '<new>'} workspace=. mode={mode} profile={profile} rules={rules_count} budget={budget}"
@@ -628,7 +628,7 @@ class InteractiveSession:
             "Commands\n"
             "────────\n"
             "/help                 show this command guide\n"
-            "/introdece            介绍 ForgeCode 的定位、能力与项目地址\n"
+            "/introduce            介绍 ForgeCode 的定位、能力与项目地址\n"
             "/status               show live worker, phase, and timing\n"
             "/queue                show pending follow-up queue capacity\n"
             "/tools                list available tools and safety categories\n"
@@ -678,8 +678,8 @@ class InteractiveSession:
         if command == "help":
             if args: raise SlashCommandError("usage: /help")
             return self.help_text()
-        if command == "introdece":
-            if args: raise SlashCommandError("usage: /introdece")
+        if command in {"introduce", "introdece"}:
+            if args: raise SlashCommandError("usage: /introduce")
             return self.introduction_text()
         if command == "status":
             if args: raise SlashCommandError("usage: /status")
