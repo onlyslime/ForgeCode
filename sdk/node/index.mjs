@@ -77,7 +77,10 @@ export function invokeStream(argv = [], options = {}) {
   return new Promise((resolve, reject) => {
     const rpc = options.method !== undefined;
     const child = spawn(options.executable ?? "forgecode", rpc ? ["rpc"] : [...argv, "--jsonl"], { cwd: options.cwd, stdio: ["pipe", "pipe", "pipe"] });
-    if (rpc) { child.stdin.write(JSON.stringify({ argv: [], method: options.method, params: options.params ?? {}, ...(options.id === undefined ? {} : { id: options.id }) }) + "\n"); child.stdin.end(); }
+    if (rpc) child.stdin.write(JSON.stringify({ argv: [], method: options.method, params: options.params ?? {}, ...(options.id === undefined ? {} : { id: options.id }) }) + "\n");
+    // CLI JSONL commands also read stdin until EOF. Always close the pipe
+    // after the optional RPC request so stream callers cannot wait forever.
+    child.stdin.end();
     let buffer = ""; const events = []; let err = ""; let bytes = 0; let settled = false;
     const onAbort = () => { if (!settled) { child.kill(); settled = true; clearTimeout(timer); options.signal?.removeEventListener?.("abort", onAbort); reject(new ForgeCodeError("request cancelled", { code: "cancelled" })); } };
     const timer = setTimeout(() => { if (!settled) { child.kill(); settled = true; options.signal?.removeEventListener?.("abort", onAbort); reject(new ForgeCodeError("request timed out", { code: "timeout" })); } }, Math.max(1, options.timeoutMs ?? 30000));

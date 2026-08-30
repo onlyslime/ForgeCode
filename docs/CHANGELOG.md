@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.29 — 2026-08-30
+
+- Fixed Node `invokeStream()` to close stdin for both RPC and CLI JSONL modes,
+  preventing child processes from waiting indefinitely for EOF.
+- Verification: Node SDK contract test and manual child-process lifecycle
+  inspection passed.
+
 ## v0.8.28 — 2026-08-30
 
 - Rejected negative usage counters at the provider-neutral response boundary,
