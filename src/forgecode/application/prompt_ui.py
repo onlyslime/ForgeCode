@@ -1,116 +1,97 @@
-"""Full-screen prompt-toolkit terminal interface."""
+"""Prompt-toolkit based interactive chat surface."""
 from __future__ import annotations
 
-import re
-import threading
-from contextlib import redirect_stdout
 from typing import Callable
-
 from .interactive_service import SlashCommandError, _human_result
-
-_ANSI = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
 
 
 def run_prompt_ui(session, *, mode: Callable[[], str]) -> None:
-    """Run ForgeCode in a full-screen TUI with a scrolling transcript."""
-    from prompt_toolkit import Application
-    from prompt_toolkit.completion import Completer, Completion
+    """Run a fixed-footer multiline prompt with output-safe repainting."""
+    from prompt_toolkit import PromptSession
+    from prompt_toolkit.patch_stdout import patch_stdout
     from prompt_toolkit.formatted_text import HTML
     from prompt_toolkit.key_binding import KeyBindings
-    from prompt_toolkit.layout import HSplit, Layout, Window
-    from prompt_toolkit.layout.controls import FormattedTextControl
-    from prompt_toolkit.widgets import TextArea
     from prompt_toolkit.styles import Style
+    from prompt_toolkit.completion import Completer, Completion
 
-    commands = ("/help", "/status", "/queue", "/tools", "/model", "/plan", "/mode", "/connect", "/login", "/rules", "/files", "/skills", "/tree", "/diff", "/context", "/events", "/review", "/test", "/compact", "/undo", "/pause", "/resume", "/cancel", "/clear", "/quit", "/exit")
-    choices = {"/mode": ("plan", "act", "bypass"), "/plan": ("show", "refresh"), "/model": ("show", "list", "select"), "/undo": ("latest",)}
+    slash_commands = ("/help", "/status", "/queue", "/tools", "/model", "/plan", "/mode", "/connect", "/login", "/rules", "/files", "/skills", "/tree", "/diff", "/context", "/events", "/review", "/test", "/compact", "/undo", "/pause", "/resume", "/cancel", "/clear", "/quit", "/exit")
+    argument_choices = {
+        "/mode": ("plan", "act", "bypass"),
+        "/plan": ("show", "refresh"),
+        "/model": ("show", "list", "select"),
+        "/undo": ("latest",),
+        "/events": ("run_created", "model_request", "provider_retry", "tool_call", "tool_result", "error", "verification_result"),
+    }
 
     class SlashCompleter(Completer):
         def get_completions(self, document, complete_event):
-            words = document.text_before_cursor.split()
+            before = document.text_before_cursor
+            words = before.split()
             if not words:
                 return
             command = words[0].lower()
-            if command in choices and (len(words) > 1 or document.text_before_cursor.endswith(" ")):
-                prefix = words[-1] if not document.text_before_cursor.endswith(" ") else ""
-                for item in choices[command]:
-                    if item.startswith(prefix):
-                        yield Completion(item, start_position=-len(prefix))
-            elif words[-1].startswith("/"):
-                for item in commands:
-                    if item.startswith(words[-1]):
-                        yield Completion(item, start_position=-len(words[-1]))
+            if command in argument_choices and (len(words) > 1 or before.endswith((" ", "\t"))):
+                prefix = words[-1]
+                if before.endswith((" ", "\t")):
+                    prefix = ""
+                for choice in argument_choices[command]:
+                    if choice.startswith(prefix):
+                        yield Completion(choice, start_position=-len(prefix), display=choice)
+                return
+            word = words[-1]
+            if not word.startswith("/"):
+                return
+            for candidate in slash_commands:
+                if candidate.startswith(word):
+                    yield Completion(candidate, start_position=-len(word), display=candidate)
 
-    transcript: list[str] = []
-    lock = threading.Lock()
-    app = None
-
-    def append_output(value: str) -> None:
-        clean = _ANSI.sub("", str(value)).replace("\r", "")
-        with lock:
-            transcript.extend(clean.splitlines() or ([clean] if clean else []))
-            del transcript[:-2000]
-        if app is not None:
-            app.invalidate()
-
-    class Capture:
-        def write(self, value: str) -> int:
-            append_output(value)
-            return len(value)
-        def flush(self) -> None:
-            pass
-
-    input_area = TextArea(height=3, multiline=True, prompt=HTML("<b>❯ </b>"), completer=SlashCompleter(), complete_while_typing=True)
-    transcript_control = FormattedTextControl(lambda: [("", "\n".join(transcript[-2000:]))], focusable=False)
-    status_control = FormattedTextControl(lambda: HTML(f"<b> ForgeCode </b>  {mode()}  │  Tab complete · Esc cancel · Ctrl-C quit"))
     bindings = KeyBindings()
 
-    def submit() -> None:
-        text = input_area.text
-        input_area.buffer.reset()
-        if not text.strip():
-            return
-        def worker() -> None:
-            # Capture production renderer output only while dispatching.  The
-            # TUI application's own stdout must remain connected to the
-            # terminal or prompt-toolkit cannot repaint the screen.
-            with redirect_stdout(Capture()):
-                try:
-                    value = session.dispatch(text)
-                except SlashCommandError as exc:
-                    value = {"error": str(exc)}
+    @bindings.add("enter")
+    def _(event) -> None:
+        # Enter submits, matching Codex-style chat.
+        event.current_buffer.validate_and_handle()
+
+    @bindings.add("escape", "enter")
+    def _(event) -> None:
+        # Most terminals encode Shift+Enter as the Escape+Enter sequence.
+        event.current_buffer.insert_text("\n")
+
+    @bindings.add("escape")
+    def _(event) -> None:
+        # A standalone Esc cancels the active agent run without closing chat.
+        # Keep the buffer intact so the user can edit or submit a follow-up.
+        result = session.cancel()
+        rendered = _human_result(result)
+        if rendered:
+            session.output(rendered)
+        event.app.invalidate()
+
+    style = Style.from_dict({
+        "prompt": "bg:#202123 #f5f5f5 bold",
+        "continuation": "bg:#202123 #f5f5f5",
+        "bottom-toolbar": "bg:#202123 #f5f5f5",
+    })
+    prompt_session = PromptSession(multiline=True, key_bindings=bindings, style=style, completer=SlashCompleter(), complete_while_typing=True)
+
+    def prompt() -> HTML:
+        return HTML(f"<prompt>╭─ forgecode │ {mode()}\n╰─❯ </prompt>")
+
+    with patch_stdout(raw=True):
+        while not session.stopped:
+            try:
+                text = prompt_session.prompt(prompt, prompt_continuation=lambda width, line, wrap_count: HTML("<continuation>│ </continuation>"))
+            except (EOFError, KeyboardInterrupt):
+                session.cancel()
+                break
+            if session.approval_pending():
+                session.submit_approval(text.strip())
+                continue
+            try:
+                value = session.dispatch(text)
+            except SlashCommandError as exc:
+                value = {"error": str(exc)}
             if value is not None:
                 rendered = _human_result(value)
                 if rendered:
-                    append_output(rendered)
-            if session.stopped and app is not None:
-                app.exit()
-        threading.Thread(target=worker, daemon=True).start()
-
-    @bindings.add("enter")
-    def _(event):
-        submit()
-
-    @bindings.add("escape")
-    def _(event):
-        rendered = _human_result(session.cancel())
-        if rendered:
-            append_output(rendered)
-
-    @bindings.add("c-c")
-    def _(event):
-        session.quit()
-        event.app.exit()
-
-    root = HSplit([
-        Window(FormattedTextControl(lambda: "  FORGECODE // LIVE"), height=1, style="class:header"),
-        Window(transcript_control, wrap_lines=True, always_hide_cursor=True),
-        Window(FormattedTextControl(lambda: "─" * 80), height=1, style="class:rule"),
-        input_area,
-        Window(status_control, height=1, style="class:status"),
-    ])
-    app = Application(layout=Layout(root, focused_element=input_area), key_bindings=bindings, style=Style.from_dict({"header": "bold fg:#00d7ff bg:#202123", "rule": "fg:#444444", "status": "fg:#ffffff bg:#303030"}), full_screen=True)
-    session.output = append_output
-    session.raw_output = append_output
-    session.input_bar = lambda: None
-    app.run()
+                    session.output(rendered)
