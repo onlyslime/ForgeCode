@@ -3253,6 +3253,8 @@ def main(argv: list[str] | None = None) -> int:
         machine_json = bool(args.json or getattr(args, "jsonl", False))
         configured_approval = settings.effective.approval if settings.effective else "interactive"
         approval = DenyAllApproval() if configured_approval == "deny" and not (args.auto_approve or args.demo) else InteractiveApproval(auto_approve=args.auto_approve or args.demo or configured_approval == "auto", output_fn=_approval_output(machine_json), prompt_to_output=machine_json, secrets=[api_key])
+        if not getattr(args, "bypass", False) and settings.effective and settings.effective.approval_scopes:
+            approval = RiskScopedApproval(approval, settings.effective.approval_scopes)
         new_run_id = uuid.uuid4().hex
         try:
             if args.resume:
