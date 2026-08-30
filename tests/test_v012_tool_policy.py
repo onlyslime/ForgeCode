@@ -32,6 +32,12 @@ def test_risk_scoped_approval_rejects_invalid_decisions() -> None:
         RiskScopedApproval(AllowAllApproval(), {"execution": "maybe"})
 
 
+def test_risk_scoped_ask_delegates_without_silent_permission() -> None:
+    policy = RiskScopedApproval(AllowAllApproval(), {"execution": "ask"})
+    assert policy.approve("run_command", {}) is True
+    assert policy.last_decision == "fallback"
+
+
 def _available() -> tuple[str, ...]:
     return build_default_registry(WorkspaceGuard(Path.cwd())).names()
 
