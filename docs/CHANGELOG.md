@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.193 — 2026-08-31
+
+- **Git inspection deadline consistency:** status, diff, and log tools now discard subprocess output if the run deadline expires during command execution, preventing stale success results after timeout.
+- **Verification:** targeted command-boundary tests, compile, and diff checks passed.
+
 ## v0.8.192 — 2026-08-31
 
 - **Bounded source navigation scans:** definition, reference, and hover tools now exclude source files above the shared 2 MiB safety limit before loading them, preventing unbounded memory use during repository-wide scans.
