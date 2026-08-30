@@ -447,6 +447,8 @@ def assemble_chat_stream(events: Iterable[dict[str, Any]], *, max_content_chars:
     for event in events:
         if _is_cancelled(cancellation):
             raise ProviderError("stream assembly cancelled", category="cancelled", retryable=False)
+        if not isinstance(event, dict):
+            raise ProviderError("stream event must be a JSON object", category="stream_protocol_error")
         choices = event.get("choices")
         # OpenAI-compatible providers may send a final usage-only frame with
         # choices=[] before [DONE]. It carries no delta and cannot complete a

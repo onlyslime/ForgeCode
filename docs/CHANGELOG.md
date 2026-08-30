@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.118 — 2026-08-31
+
+- **Streaming protocol guard:** reject non-object SSE events during chat-stream assembly with a structured protocol error.
+- **Verification:** provider regression tests and compile checks passed.
+
 ## v0.8.117 — 2026-08-31
 
 - **Tool-name log safety:** reject oversized or control-character tool names before lookup, preventing malformed model data from polluting structured logs.

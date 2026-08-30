@@ -3,7 +3,7 @@ import json
 
 import pytest
 
-from forgecode.models import Message, ModelResponse, OpenAICompatibleProvider, ProviderError, ToolCall, is_valid_response, parse_chat_completion
+from forgecode.models import Message, ModelResponse, OpenAICompatibleProvider, ProviderError, ToolCall, is_valid_response, parse_chat_completion, assemble_chat_stream
 
 
 class RecordingTransport:
@@ -101,6 +101,11 @@ def test_provider_rejects_non_string_finish_reason():
 def test_provider_rejects_non_object_payload():
     with pytest.raises(ProviderError, match="JSON object"):
         parse_chat_completion([])
+
+
+def test_stream_assembly_rejects_non_object_event():
+    with pytest.raises(ProviderError, match="event must be a JSON object"):
+        assemble_chat_stream([None])
 
 
 def test_provider_neutral_response_validation_rejects_nonfinite_usage_and_bad_finish_reason():
