@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.7.24 — 2026-08-30
+
+- Exposed `rpc_describe()` through the Python embedding API and package-level
+  exports, matching the JSONL `rpc.describe` capability discovery method.
+- Added embedding contract coverage without changing session execution.
+
 ## v0.7.23 — 2026-08-30
 
 - Added read-only `rpc.describe` capability discovery with protocol version,

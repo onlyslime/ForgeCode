@@ -50,6 +50,14 @@ def invoke(argv: list[str], *, request_id: str | int | None = None, raise_for_st
     return envelopes
 
 
+def rpc_describe(*, request_id: str | int | None = None, raise_for_status: bool = False) -> list[dict[str, Any]]:
+    """Discover the versioned JSONL RPC surface without starting a session."""
+    request: dict[str, Any] = {"method": "rpc.describe", "params": {}}
+    if request_id is not None:
+        request["id"] = request_id
+    return list(stream([request], raise_for_status=raise_for_status))
+
+
 def session_result(session: str, *, workspace: str | None = None, request_id: str | int | None = None, raise_for_status: bool = False, max_response_bytes: int = 2_000_000) -> list[dict[str, Any]]:
     """Retrieve a bounded background-session result through the RPC contract."""
     if not isinstance(session, str) or not session or len(session) > 512 or any(ch in session for ch in "\r\n"):
@@ -290,7 +298,7 @@ def stream(requests: Iterable[dict[str, Any]], *, raise_for_status: bool = False
         yield envelope
 
 
-__all__ = ["ForgeCodeError", "invoke", "login", "session_open", "session_run", "session_inspect", "session_events", "session_result", "session_wait", "session_list", "session_tree", "session_cancel", "session_pause", "session_resume", "session_approval", "config_profiles", "provider_list", "provider_health", "config_policy", "stream"]
+__all__ = ["ForgeCodeError", "invoke", "rpc_describe", "login", "session_open", "session_run", "session_inspect", "session_events", "session_result", "session_wait", "session_list", "session_tree", "session_cancel", "session_pause", "session_resume", "session_approval", "config_profiles", "provider_list", "provider_health", "config_policy", "stream"]
 
 
 class EmbeddedSession:
