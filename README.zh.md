@@ -1,140 +1,122 @@
 # ForgeCode
 
-> 一个从协议开始自己造的本地 coding agent。
+> 一个能检查、修改、验证并解释工作的本地 coding agent。
 
-ForgeCode 是一个简洁、可审计的终端工具。它自己处理模型消息、工具、AgentLoop、工作区、审批、会话记录和验证流程；代码保持开放、直接、方便改造。
+[English](README.md) · [更新日志](docs/CHANGELOG.md) · [示例](docs/demo-script.md)
 
-## 安装与开始
+ForgeCode 是一个自建、可审计的 coding agent，面向真实的软件开发工作。它把自然语言任务转换为透明的模型决策、本地工具调用、文件变更和验证流程。协议、AgentLoop、工具、工作区边界、审批和会话证据都在本仓库中实现，而不是隐藏在某个 agent SDK 后面。
 
-推荐使用 `fcc`。下面分别说明空白电脑和 GitHub ZIP 两种情况。
+`本地优先` · `工具调用` · `流式输出` · `工作区安全` · `会话审计`
 
-### 空白 Windows 电脑
+<p align="center">
+  <img src="show/introduce.gif" alt="ForgeCode 交互式终端演示" width="900">
+</p>
 
-在 PowerShell 安装 [uv](https://docs.astral.sh/uv/)：
+## 一分钟开始
+
+在 Windows PowerShell 中安装 `uv`，然后将 ForgeCode 安装为全局工具：
 
 ```powershell
 irm https://astral.sh/uv/install.ps1 | iex
-```
-
-重新打开 PowerShell，直接从 GitHub 安装 ForgeCode：
-
-```powershell
 uv tool install "git+https://github.com/onlyslime/ForgeCode.git"
 uv tool update-shell
-```
-
-再次打开 PowerShell 后，`fcc` 可在任意目录使用：
-
-```powershell
-fcc --version
 fcc
 ```
 
-### 已下载 GitHub ZIP
+在聊天中使用 `/login` 输入服务商 URL、模型 ID 和 API key。凭据只保存在本地，不会进入仓库。
 
-解压 ZIP，在解压后的项目目录打开 PowerShell，直接安装全局命令：
+## 一次真实运行
 
-```powershell
-uv tool install .
-uv tool update-shell
+给 ForgeCode 一个普通的软件工程任务，例如：
+
+```text
+阅读这个 Python 项目，找出失败的边界情况，修复实现，
+添加回归测试，并运行测试套件。
 ```
 
-重新打开 PowerShell 后，`fcc` 就能在任意目录使用：
+交互过程是透明的，而不是黑盒：
 
-```powershell
-fcc --version
-fcc
+```text
+◆ assistant
+我会检查项目结构和现有测试。
+
+▸ 读取 src/calculator.py
+✓ 读取 · 42 行
+▸ 搜索 "divide"
+✓ 搜索 · 4 个匹配
+
+◆ assistant
+我找到了边界情况，现在添加回归测试。
+
+▸ 应用补丁
+  - 旧行为
+  + 修正后的行为
+✓ 应用补丁
+▸ 运行测试
+✓ 运行 · exit 0
+
+完成 · 验证通过 · 用时 18.4 秒 · 4 个工具步骤
 ```
-
-配置模型时，在 `fcc` 中输入 `/login`，填写服务商提供的 URL、ID 和 KEY：
-
-```powershell
-fcc --act
-/login
-# URL、ID、KEY
-```
-
-在 Act 或 Bypass 模式打开未信任的工作区时，ForgeCode 会询问是否信任该目录
-以执行副作用。输入 `y` 会保存本地信任记录，直接回车则继续但拒绝副作用。
-
-需要收窄一次运行时的工具范围时，可以使用风险组，例如
-`fcc --tools read_only` 或 `fcc --exclude-tools execution`。组名会根据当前模式实际
-注册的工具展开；它们只是运行时策略，不等同于操作系统沙箱。
-
-也可以在 `.forgecode/config.toml` 中按风险域配置审批：
-
-```toml
-[approval_scopes]
-changes = "ask"
-execution = "deny"
-evidence = "allow"
-```
-
-未填写的风险域继续遵循全局审批模式；Bypass 仍是明确的操作者选择。
-也可以使用显式命令：`forgecode trust grant`。
 
 ## 它能做什么
 
-你提出任务，ForgeCode 会查看相关文件，调用工具，修改代码，运行测试，处理失败，并给出有证据的结果。
+| 领域 | 能力 |
+| --- | --- |
+| 理解 | 列出和读取文件、文本/正则搜索、仓库概览、符号、定义、引用、元数据 |
+| 修改 | 创建文件、原子写入、统一补丁、红绿预览、事务记录 |
+| 验证 | 测试、诊断、有界 shell 命令、标准输出/错误、退出码、修复尝试 |
+| 控制 | Plan、Act、Bypass、暂停、恢复、取消/Esc、后续任务队列 |
+| 上下文 | `AGENTS.md` 规则、显式引用、增量索引、上下文搜索、压缩、健康诊断 |
+| Git | status、diff、log、worktree、review、撤销和恢复检查 |
+| 进程 | 后台命令、状态轮询、输出限制、安全终止 |
+| 自动化 | JSON、JSONL、RPC、Python 嵌入 API、Node JSONL 客户端 |
 
-- 列文件、读取、搜索、写入和 unified `apply_patch`
-- Plan、Act、Bypass 三种工作模式
-- 带超时、取消和输出限制的命令与测试执行
-- 规则、引用、仓库上下文、上下文健康度、事件时间线和上下文压缩
-- session、checkpoint、事务撤销、review、eval 和 JSONL 审计
-- skills、hooks、Node/Python SDK 和 JSONL RPC
-- 固定输入栏、多行粘贴、实时进度、事件筛选和 Esc 取消
-
-集成程序可以调用只读 JSONL RPC 方法 `rpc.describe`（或
-`forgecode.embed.rpc_describe()`），在创建会话前发现协议版本、会话控制方法和安全保证。
-
-## 交互命令
-
-在 `fcc` 中输入 `/help` 查看全部命令。常用命令包括 `/mode`、`/tools`、`/files`、`/skills`、`/rules`、`/tree`、`/diff`、`/context`、`/events`、`/review`、`/compact`、`/cancel`、`/quit` 和 `/exit`。`/events 20 error` 可筛选最近的错误事件。
-
-## 架构
-
-ForgeCode 将 agent 的完整边界保留在本仓库中：
+## 边界如何工作
 
 ```text
-CLI / 交互界面
-  -> 应用服务与类型化配置
-  -> rules、references、任务计划
-  -> AgentLoop
-       -> 模型适配器（OpenAI 兼容或离线 demo）
-       -> ContextBuilder 与有界历史
-       -> ToolRegistry（schema、校验、模式策略）
-            -> WorkspaceGuard -> 文件工具与结构化 patch
-            -> 命令/测试执行器（风险、审批、超时）
-       -> session、checkpoint、transaction、review、JSONL 审计
+用户提示
+    ↓
+AgentLoop + 服务商适配器
+    ↓
+经过校验的统一工具调用
+    ↓
+ToolRegistry
+    ↓
+WorkspaceGuard + 模式 + 风险 + 审批
+    ↓
+本地文件、命令、测试
+    ↓
+会话事件、审计、验证
 ```
 
-每轮模型响应都会转换为统一消息并校验 tool call。工具结果、错误、审批、
-超时、取消和验证证据都会回传模型，并以匹配的调用 ID 持久化。Plan 只读；
-Act 的副作用需要审批；Bypass 是明确的可信工作区选择。所有路径经过
-`WorkspaceGuard`，写入采用原子替换，patch 会预览且可撤销，危险命令会硬拦截。
-命令分类器是策略边界，不是操作系统沙箱。
+模型只提出动作，真正执行由本地代码完成。每个路径都会经过工作区校验。写入和命令执行有边界、按策略审批、可取消，并记录结果。Plan 是只读模式，Act 允许经过批准的副作用，Bypass 需要明确选择信任工作区。WorkspaceGuard 是应用层边界，不是操作系统沙箱。
 
-## 能力清单
+## 常用命令
 
-- 与供应商无关的 tool calling，支持 OpenAI 兼容和确定性的离线 provider，
-  以及重试、截止时间、SSE 校验和取消。
-- 工作区文件列表、UTF-8 读取、搜索、仓库摘要、多文件 patch、原子写入和
-  脱敏的有界输出。
-- Plan、Act、Bypass 三种模式；风险分类、审批、超时/输出限制、进程树终止
-  和运行时工具收窄。
-- scoped `AGENTS.md` 规则、显式上下文引用、增量索引、skills，以及带校验
-  和配额的生命周期 hooks。
-- 持久化 session/checkpoint、哈希冲突事务与 undo、暂停/恢复/取消/Escape、
-  上下文压缩、session tree/import 和恢复检查。
-- 命名测试、有界验证与修复、证据驱动 review/export、轨迹评估、provider 诊断、
-  telemetry 状态和 Python/Node JSONL SDK。
-- 人类 REPL 与严格 JSON/JSONL 接口共用安全契约；进度、错误、退出码及审计
-  元数据保持可见。
+在 `fcc` 中可以从 `/help`、`/tools`、`/status`、`/files`、`/rules`、`/tree`、`/review`、`/context`、`/compact`、`/events`、`/cancel` 和 `/exit` 开始。使用 `!command` 将有界命令结果发送给模型，使用 `!!command` 则只在本地执行。脚本和 CI 可使用：
+
+```powershell
+fcc --print "review this project" --jsonl
+fcc --jsonl
+```
 
 ## 文档
 
-- [示例](docs/demo-script.md)
+- [英文文档](README.md)
+- [示例脚本](docs/demo-script.md)
 - [更新日志](docs/CHANGELOG.md)
+- [文档导航](docs/README.md)
+- [架构说明](docs/architecture.md)
+- [已实现能力](docs/implemented-features.md)
+- [考核材料](docs/assignment/)
 
-当前版本：`v0.7.0`。许可证：MIT。
+## 仓库结构
+
+```text
+src/forgecode/   协议、AgentLoop、服务商、工具、安全、存储、CLI
+tests/            确定性的回归测试套件
+docs/             架构说明、示例、研究资料和历史记录
+sdk/node/         简洁的 JSONL 客户端
+```
+
+MIT 许可证。当前版本：`v0.8.1`。
