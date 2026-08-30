@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.7.34 — 2026-08-30
+
+- Added a 256 KiB bound and strict key/value validation when reading managed
+  worktree ownership metadata.
+- Oversized or malformed state now fails closed with a structured tool error
+  before JSON parsing can consume unbounded input.
+
 ## v0.7.33 — 2026-08-30
 
 - Worktree listing and removal now convert invalid or aliased ownership

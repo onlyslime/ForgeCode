@@ -165,6 +165,16 @@ def test_worktree_metadata_alias_fails_as_structured_result(tmp_path: Path) -> N
     assert not result.ok and result.metadata["error"] == "worktree_metadata_unavailable"
 
 
+def test_worktree_metadata_oversize_fails_closed(tmp_path: Path) -> None:
+    from forgecode.tools import GitWorktreeListTool
+    guard = WorkspaceGuard(tmp_path)
+    state_dir = tmp_path / ".forgecode"
+    state_dir.mkdir()
+    (state_dir / "worktrees.json").write_text("x" * 300_000, encoding="utf-8")
+    result = GitWorktreeListTool(guard).execute({}, ToolContext(guard))
+    assert not result.ok and result.metadata["error"] == "worktree_metadata_unavailable"
+
+
 def test_worktree_lifecycle_rejects_unsafe_names_and_plan_mode(tmp_path: Path) -> None:
     from forgecode.tools import GitWorktreeCreateTool
     guard = WorkspaceGuard(tmp_path)

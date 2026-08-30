@@ -15,6 +15,7 @@ from .base import ToolContext, ToolDefinition, ToolResult
 
 _WORKTREE_STATE = Path(".forgecode") / "worktrees.json"
 _MAX_WORKTREE_RECORDS = 64
+_MAX_WORKTREE_STATE_BYTES = 256_000
 _WORKTREE_STATE_LOCK = threading.RLock()
 
 
@@ -24,13 +25,25 @@ def _worktree_records(guard) -> dict[str, dict[str, str]]:
     if not path.is_file():
         return {}
     try:
+        if path.stat().st_size > _MAX_WORKTREE_STATE_BYTES:
+            raise ValueError("ownership metadata exceeds size limit")
         value = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError, UnicodeError):
-        return {}
+    except (OSError, ValueError, UnicodeError) as exc:
+        raise ValueError("invalid worktree ownership metadata") from exc
     records = value.get("worktrees") if isinstance(value, dict) else None
     if not isinstance(records, dict):
+        raise ValueError("worktree ownership records must be an object")
+    if len(records) > _MAX_WORKTREE_RECORDS:
         return {}
-    return {str(k): {str(f): str(v) for f, v in item.items() if f in {"run_id", "branch", "path"} and isinstance(v, str)} for k, item in list(records.items())[:_MAX_WORKTREE_RECORDS] if isinstance(k, str) and isinstance(item, dict)}
+    cleaned = {}
+    for key, item in records.items():
+        if not isinstance(key, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}", key) or not isinstance(item, dict):
+            raise ValueError("invalid worktree ownership record")
+        fields = {str(field): value for field, value in item.items() if field in {"run_id", "branch", "path"}}
+        if any(not isinstance(value, str) or len(value) > 256 for value in fields.values()):
+            raise ValueError("invalid worktree ownership field")
+        cleaned[key] = fields
+    return cleaned
 
 
 def _save_worktree_records(guard, records: dict[str, dict[str, str]]) -> None:
