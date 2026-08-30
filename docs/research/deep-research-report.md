@@ -1291,3 +1291,8 @@ session 级描述，不等价于 Codex 的 thread/turn 状态对象。
 此前一次完整回归曾出现既有的 pause/approval 时序失败；本轮在同一环境下单独连续
 20 次运行该用例全部通过，随后完整门禁也通过 `528 passed, 9 skipped, 2 warnings`。
 当前没有可稳定复现的失败；仍保留该时序用例作为后续共享核心改动的重点回归项。
+
+当前 CLI 冒烟检查（v0.7.50）也通过：`forgecode --help` 列出完整命令面，
+`forgecode tools --json` 返回 31 个带 schema/category/side_effecting 元数据的工具；
+未配置 provider 时 doctor 正确报告 framework-only/offline-unconfigured，而不是伪造
+模型可用性。
