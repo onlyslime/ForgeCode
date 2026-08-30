@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.140 — 2026-08-31
+
+- **Transport body strictness:** custom transport results now require bytes-like response bodies instead of accepting implicit integer-to-zero-byte conversions.
+- **Verification:** provider tests, compile checks, and manual transport coercion inspection passed.
+
 ## v0.8.139 — 2026-08-31
 
 - **Transport request boundary:** validate URL and header mapping types before provider-specific rewriting, preventing malformed custom calls from leaking attribute errors.

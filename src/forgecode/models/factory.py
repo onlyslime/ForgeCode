@@ -18,6 +18,8 @@ def _json_result(result: Any) -> tuple[int, bytes, dict[str, str]]:
         raise ValueError("transport returned invalid tuple")
     try:
         status = int(result[0])
+        if not isinstance(result[1], (bytes, bytearray)):
+            raise TypeError("body must be bytes")
         body = bytes(result[1])
         headers = dict(result[2]) if len(result) == 3 else {}
     except (TypeError, ValueError, OverflowError) as exc:
