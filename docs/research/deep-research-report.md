@@ -1317,3 +1317,19 @@ session 级描述，不等价于 Codex 的 thread/turn 状态对象。
 通过会话请求等待用户回答并把结果回传模型；这不是简单的可执行文件探测。ForgeCode
 当前 `lsp_status` 只做 PATH 发现，交互层也没有模型可调用的 question 工具，因此这两
 项仍是 P1，需先设计进程生命周期、超时、用户输入和审批事件契约。
+
+### v0.7.51–v0.7.58 实施记录（2026-08-30）
+
+这一阶段优先处理普通工作流中可直接观察、且不会扩大安全边界的协议与可靠性问题：
+
+| 版本 | 范围与完成条件 | 非目标 | 主要文件与证据 |
+| --- | --- | --- | --- |
+| v0.7.51 | 为同一模型轮次的 progress/request/message 事件提供稳定 `turn_id` | 不声称已实现 Codex 完整 Thread/Turn daemon | `agent/loop.py`、`tests/test_loop.py`；完整 pytest 通过 |
+| v0.7.52 | `rpc.describe` 声明实际 `session.events` 的完整事件目录 | 不把事件目录当成权限授予 | `rpc.py`、`tests/test_cli_machine_contract.py`；RPC 定向测试通过 |
+| v0.7.53–v0.7.58 | 修复 Anthropic、Google、Ollama 默认 transport、文本/工具流、多轮 tool history 的协议归一化 | 不引入厂商 SDK，不猜测不完整工具参数 | `models/factory.py`、`tests/test_v013_provider_protocols.py`；每阶段完整门禁通过 |
+
+这些切片的共同完成条件是：provider-neutral `ModelResponse` 不变、工具调用在
+AgentLoop 副作用边界前完成校验、凭据不进入事件或错误文本、旧的 OpenAI-compatible
+transport 继续可用。当前仍需优先推进的差距为真正的 LSP client、结构化 question/todo
+工具、steering/follow-up 队列语义，以及 Codex/Pi 风格长期 RPC daemon；它们分别涉及
+进程生命周期、用户交互或跨进程状态，暂不与本轮协议修复混合实现。
