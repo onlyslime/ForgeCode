@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.7.13 — 2026-08-30
+
+- AgentLoop now fails fast when a provider is configured to require streaming
+  but explicitly reports streaming unsupported, with a bounded capability
+  mismatch result and audit event.
+- Added regression coverage for required-stream capability negotiation.
+
 ## v0.7.12 — 2026-08-30
 
 - Tool inventory output now shows an explicit total count in human and machine

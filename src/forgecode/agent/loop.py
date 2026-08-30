@@ -808,6 +808,13 @@ class AgentLoop:
                 result = LoopResult(tuple(messages), "capability_mismatch", error_text, verification_ok, self.context.mode.value, explored=tuple(explored), state=self.lifecycle.state.value, run_id=self.run_id, audit_complete=self.audit_complete)
                 self._record("final", {"stopped_reason": result.stopped_reason, "error": error_text})
                 return result
+            if bool(getattr(self.provider, "stream_required", False)) and capabilities is not None and getattr(capabilities, "streaming", True) is False:
+                error_text = "configured provider requires streaming but does not support it"
+                self._record("error", {"category": "capability_mismatch", "capability": "streaming", "required": True, "message": error_text})
+                self._fail_state("provider capability mismatch")
+                result = LoopResult(tuple(messages), "capability_mismatch", error_text, verification_ok, self.context.mode.value, explored=tuple(explored), state=self.lifecycle.state.value, run_id=self.run_id, audit_complete=self.audit_complete)
+                self._record("final", {"stopped_reason": result.stopped_reason, "error": error_text})
+                return result
             self._record("model_request", {"step": step, "message_count": len(request_messages), "context_chars": sum(len(message.content) for message in request_messages), "tool_count": len(request_tools), "capabilities": capabilities.to_dict() if hasattr(capabilities, "to_dict") else None})
             provider_started = time.monotonic()
             try:

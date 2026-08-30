@@ -37,3 +37,17 @@ def test_agent_loop_fails_fast_on_explicit_provider_tool_capability_mismatch(tmp
     result = asyncio.run(loop.run("create an answer file"))
     assert result.stopped_reason == "capability_mismatch"
     assert result.error == "configured provider does not support tool calling"
+
+
+def test_agent_loop_fails_fast_on_required_stream_capability_mismatch(tmp_path: Path):
+    class NoStreamProvider(FakeProvider):
+        stream_required = True
+        @property
+        def capabilities(self):
+            return ModelCapabilities(streaming=False)
+
+    guard = WorkspaceGuard(tmp_path)
+    loop = AgentLoop(NoStreamProvider(), build_default_registry(guard), ToolContext(guard, AllowAllApproval()))
+    result = asyncio.run(loop.run("hello"))
+    assert result.stopped_reason == "capability_mismatch"
+    assert result.error == "configured provider requires streaming but does not support it"

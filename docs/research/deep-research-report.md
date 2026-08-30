@@ -691,7 +691,7 @@ CLI/TUI
 | 验证 | 测试 profile、有限修复、review/export、轨迹评估 | 缺少语言服务和调试器集成 | P1 |
 | 扩展发布 | Skills、hooks、SDK、JSONL RPC、工具收窄、uv/独立二进制布局 | 缺少 MCP、插件市场、跨平台一键安装 | P2 |
 
-截至当前 v0.7.12，正常交互工作流还提供 `/context`（有界索引健康度）和
+截至当前 v0.7.13，正常交互工作流还提供 `/context`（有界索引健康度）和
 `/events [limit] [kind]`（可筛选、带相对耗时和错误码的持久化事件尾部）。
 这些能力不改变工具权限，只把已有审计证据暴露给用户；对应交互、机器契约和
 provider 回归测试均已通过。
@@ -817,6 +817,13 @@ Codex 官方页面或未实现的竞品特性当作本项目已完成能力。
 - `/tools` human 输出显示 `Available tools (N)`，machine envelope 增加 `count`，
   两者都直接来源于当前注册/策略过滤后的工具集合。
 - 该计数不授予新权限，也不暴露参数或凭据；定向 CLI 契约测试验证字段和分类同步。
+
+### 0.7.13 实施审计：streaming capability negotiation（2026-08-30）
+
+- **范围**：当 provider 显式 `stream_required=true` 且 capabilities 报告
+  `streaming=false` 时，AgentLoop 在 transport 前返回 `capability_mismatch`。
+- **非目标**：不探测远端能力、不改变 streaming=auto/on 的既有降级行为。
+- **验证**：定向 AgentLoop 测试确认请求不会调用 provider completion，完整门禁后发布。
 
 ### 外部资料复核（2026-08-30）
 
