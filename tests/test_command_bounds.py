@@ -28,9 +28,19 @@ def test_command_output_is_bounded_and_metadata_complete(tmp_path: Path):
     result = registry.execute("run_command", {"command": "python -c \"print('x'*50000)\""}, ToolContext(WorkspaceGuard(tmp_path), AllowAllApproval()))
     assert result.ok
     assert result.metadata["command_id"] and result.metadata["cwd"] == "."
+    assert result.metadata["mutation_possible"] is False
+    assert result.metadata["mutated"] is False
     assert result.metadata["truncated"] is True
     assert len(result.metadata["stdout"]) <= 20_020
     assert result.metadata["started_at"] and result.metadata["ended_at"]
+
+
+def test_command_risk_is_reflected_in_mutation_audit(tmp_path: Path):
+    registry = build_default_registry(WorkspaceGuard(tmp_path))
+    result = registry.execute("run_command", {"command": "git restore --staged ."}, ToolContext(WorkspaceGuard(tmp_path), AllowAllApproval()))
+    assert result.metadata["risk"] == "repository_irreversible"
+    assert result.metadata["mutation_possible"] is True
+    assert result.metadata["mutated"] is True
 
 
 def test_command_honors_run_deadline(tmp_path: Path):

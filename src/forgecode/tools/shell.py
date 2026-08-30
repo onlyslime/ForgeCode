@@ -169,7 +169,12 @@ class ShellTool:
         risk, reasons, hard_blocked = classify_command(command)
         command_id = uuid.uuid4().hex
         started_at = datetime.now(timezone.utc).isoformat()
-        risk_metadata = {"command_id": command_id, "risk": risk, "risk_reasons": list(reasons), "hard_blocked": hard_blocked, "cwd": "."}
+        # A shell command cannot be inspected reliably enough to prove that
+        # it left the workspace untouched (even tests may write caches).
+        # Keep the audit signal conservative: a classified mutation risk is
+        # explicitly reported as potentially mutating instead of claiming
+        # the command was harmless.
+        risk_metadata = {"command_id": command_id, "risk": risk, "risk_reasons": list(reasons), "hard_blocked": hard_blocked, "cwd": ".", "mutation_possible": risk != "normal"}
         if hard_blocked:
             return ToolResult(False, f"command blocked by safety policy ({'; '.join(reasons)})", {"error": "risk_blocked", **risk_metadata, "command": command})
         approval = context.approval or self.approval
@@ -272,7 +277,7 @@ class ShellTool:
         stdout, stdout_truncated = _bounded(_text(stdout_value))
         stderr, stderr_truncated = _bounded(_text(stderr_value))
         output = f"[stdout]\n{stdout}\n[stderr]\n{stderr}"
-        return ToolResult(process.returncode == 0, output, {"command": command, "exit_code": process.returncode, "approval": "approved", "mutated": False, "stdout": stdout, "stderr": stderr, "duration_seconds": round(time.monotonic() - started, 3), "started_at": started_at, "ended_at": datetime.now(timezone.utc).isoformat(), "truncated": stdout_truncated or stderr_truncated, **risk_metadata})
+        return ToolResult(process.returncode == 0, output, {"command": command, "exit_code": process.returncode, "approval": "approved", "mutated": risk != "normal", "stdout": stdout, "stderr": stderr, "duration_seconds": round(time.monotonic() - started, 3), "started_at": started_at, "ended_at": datetime.now(timezone.utc).isoformat(), "truncated": stdout_truncated or stderr_truncated, **risk_metadata})
 
 
 class InteractiveApproval:

@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.156 — 2026-08-31
+
+- **Conservative command mutation audit:** command results now mark classified filesystem/repository/system-risk commands as potentially mutating, and expose a bounded `mutation_possible` signal instead of reporting every successful command as unchanged.
+- **Verification:** command-boundary tests, compile checks, and manual risk-metadata inspection passed.
+
 ## v0.8.155 — 2026-08-31
 
 - **Session-error callback isolation:** callbacks invoked while reporting session append failures are now guarded against recursive callback exceptions.
