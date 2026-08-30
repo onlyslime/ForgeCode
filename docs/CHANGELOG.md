@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.66 — 2026-08-31
+
+- Serialized in-process `MemoryStore` read-modify-write mutations so concurrent
+  callers cannot silently lose user-managed memory entries.
+- Verification: concurrent thread regression, full pytest suite, compileall,
+  manual filesystem inspection, and diff checks passed.
+
 ## v0.8.65 — 2026-08-31
 
 - Hardened `ToolRegistry.filter()` to preserve validated source snapshots

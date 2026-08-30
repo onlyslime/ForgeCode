@@ -1,4 +1,5 @@
 from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
@@ -26,6 +27,15 @@ def test_memory_store_bounds_duplicates_and_clear(tmp_path: Path):
     with pytest.raises(MemoryError, match="identical"):
         store.add("Keep changes small")
     assert store.clear() == 1
+
+
+def test_memory_store_serializes_concurrent_read_modify_write(tmp_path: Path):
+    store = MemoryStore(WorkspaceGuard(tmp_path))
+    values = [f"fact-{index}" for index in range(12)]
+    with ThreadPoolExecutor(max_workers=len(values)) as pool:
+        entries = list(pool.map(store.add, values))
+    assert {entry.text for entry in entries} == set(values)
+    assert {entry.text for entry in store.read()} == set(values)
 
 
 def test_memory_store_rejects_tampered_schema(tmp_path: Path):
