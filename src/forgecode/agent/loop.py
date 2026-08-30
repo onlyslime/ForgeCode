@@ -821,7 +821,11 @@ class AgentLoop:
             request_messages = self._maybe_auto_compact(messages, step=step)
             request_messages = self.context_builder.fit(request_messages)
             self._last_context_summary = "\n".join(message.content for message in request_messages[-8:])[:8_000]
-            self._record("model_progress", {"step": step, "message": "Analyzing the task and deciding the next safe action…" if step == 0 else "Reviewing the latest tool result and continuing…"})
+            # ``step`` is one-based (incremented immediately before this
+            # boundary), so the first provider turn must use the initial
+            # progress message.  The old ``step == 0`` check was unreachable
+            # and made every run look like a continuation in the UI.
+            self._record("model_progress", {"step": step, "message": "Analyzing the task and deciding the next safe action…" if step == 1 else "Reviewing the latest tool result and continuing…"})
             request_tools = self.registry.schemas(self.context.mode)
             capabilities = getattr(self.provider, "capabilities", None)
             if callable(capabilities):
