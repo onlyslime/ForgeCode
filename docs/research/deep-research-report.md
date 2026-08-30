@@ -1200,6 +1200,12 @@ pytest collection warning。
 每项实现都需要源码入口、定向测试、CLI 可观察证据和 changelog 条目；不以
 “功能数量”替代可靠性、安全边界或可解释的失败结果。
 
+### 回归门禁时序记录（2026-08-30）
+
+一次完整回归出现既有的 pause/approval 时序失败（`1 failed, 527 passed`）；失败
+用例随后单独连续 4 次通过，确认是非确定性竞态而非本轮交互渲染逻辑失败。该证据
+已保留，后续共享核心改动必须同时满足独立回归和完整门禁，不能将组合失败描述为绿色。
+
 v0.7.47 将审批事件结构化为 `scope`、`decision` 与 `policy_decision` 字段，
 使 RPC/会话审计无需解析文本即可区分 changes、execution、evidence 等风险域。
 这是对 Codex/OpenCode“权限决定作为协议数据”方向的增量兼容，不改变实际授权路径。
@@ -1282,3 +1288,7 @@ streaming 时为 `json+sse`；不宣称 WebSocket。相比 Pi 的多传输 auto 
 v0.7.50 在 RPC session status 中增加受限 `active_flags`，用于表达执行中、暂停和
 需要恢复三种活动原因。这与 Codex ThreadStatus 的 active flags 方向一致，但仍是
 session 级描述，不等价于 Codex 的 thread/turn 状态对象。
+v0.7.48 发布后的完整回归一次出现既有的 pause/approval 时序失败：
+`1 failed, 527 passed, 9 skipped, 2 warnings`；该用例随后单独连续 4 次通过，
+确认是已知非确定性竞态而非 `/queue` 渲染失败。后续共享核心改动仍需以独立测试和
+完整门禁双重证据判断，不将这次组合失败标记为绿色发布证据。
