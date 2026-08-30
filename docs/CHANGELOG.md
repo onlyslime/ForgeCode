@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.83 — 2026-08-31
+
+- Validated `ProcessManager.start()` working directories as existing,
+  path-like, non-alias directories before spawning child processes.
+- Verification: invalid-root regression, manual directory boundary check,
+  compileall, and diff checks passed.
+
 ## v0.8.82 — 2026-08-31
 
 - Added object-argument validation to `list_processes`, completing consistent

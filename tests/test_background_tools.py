@@ -75,6 +75,15 @@ def test_background_manager_blocks_destructive_commands(tmp_path):
         ProcessManager().start("git clean -xfd", tmp_path, "unsafe")
 
 
+def test_background_manager_validates_root_directory(tmp_path):
+    manager = ProcessManager()
+    for root in (None, tmp_path / "missing", tmp_path / "file.txt"):
+        if root == tmp_path / "file.txt":
+            root.write_text("x", encoding="utf-8")
+        with pytest.raises(ValueError, match="root"):
+            manager.start("python -c \"print('x')\"", root, "root-check")
+
+
 def test_background_manager_filters_sensitive_environment(tmp_path, monkeypatch):
     monkeypatch.setenv("FORGECODE_BG_SECRET", "hidden-value")
     manager = ProcessManager()

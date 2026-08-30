@@ -100,6 +100,15 @@ class ProcessManager:
         risk, reasons, hard_blocked = classify_command(command)
         if hard_blocked:
             raise ValueError(f"command blocked by safety policy ({'; '.join(reasons)})")
+        if not isinstance(root, (str, os.PathLike)):
+            raise ValueError("root must be a path-like directory")
+        root_path = Path(root)
+        try:
+            safe_root = assert_no_path_alias(root_path, message="background root is a symlink or junction alias")
+        except WorkspaceViolation as exc:
+            raise ValueError(str(exc)) from exc
+        if not safe_root.is_dir():
+            raise ValueError("root must be an existing directory")
         if not isinstance(task_id, str) or not 0 < len(task_id) <= _MAX_TASK_ID_CHARS or any(ch in task_id for ch in "\r\n"):
             raise ValueError("task_id must be bounded newline-safe text")
         with self._lock:
@@ -116,7 +125,7 @@ class ProcessManager:
                 for name, value in os.environ.items()
                 if not any(marker in name.upper() for marker in ("API_KEY", "APIKEY", "TOKEN", "SECRET", "PASSWORD", "COOKIE"))
             }
-            process = subprocess.Popen(command, cwd=root, shell=True, env=environment, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
+            process = subprocess.Popen(command, cwd=safe_root, shell=True, env=environment, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
             item = _Process(process, command, time.monotonic())
             self._items[task_id] = item
             self._stale.pop(task_id, None)
