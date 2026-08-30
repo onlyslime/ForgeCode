@@ -108,7 +108,6 @@ fcc --jsonl
 - [文档导航](docs/README.md)
 - [架构说明](docs/architecture.md)
 - [已实现能力](docs/implemented-features.md)
-- [考核材料](docs/assignment/)
 
 ## 仓库结构
 

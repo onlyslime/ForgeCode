@@ -120,7 +120,6 @@ fcc --jsonl
 - [Documentation guide](docs/README.md)
 - [Architecture](docs/architecture.md)
 - [Implemented capabilities](docs/implemented-features.md)
-- [Assignment materials](docs/assignment/)
 
 ## Repository layout
 

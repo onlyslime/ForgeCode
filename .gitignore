@@ -38,6 +38,9 @@ docs/strategy/
 # Historical release roadmaps and acceptance reports (kept locally, never committed)
 docs/releases/
 
+# Assessment material is local-only and excluded from public releases
+docs/assignment/
+
 # OS and editor files
 .DS_Store
 Thumbs.db
