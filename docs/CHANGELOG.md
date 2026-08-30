@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.76 — 2026-08-31
+
+- Applied the shared command risk classifier to test and diagnostics tools,
+  blocking destructive commands before approval or execution.
+- Verification: hard-block regression, manual destructive-command check,
+  targeted command tests, compileall, and diff checks passed.
+
 ## v0.8.75 — 2026-08-31
 
 - Tightened explicit command validation for test and diagnostics tools so

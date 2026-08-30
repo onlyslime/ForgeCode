@@ -52,3 +52,12 @@ def test_quality_tools_reject_empty_explicit_commands(tmp_path: Path):
     for tool in (QualityCheckTool(tmp_path), DiagnosticsTool(tmp_path)):
         with pytest.raises(ValueError, match="non-empty"):
             tool.execute({"command": "   "}, context)
+
+
+def test_quality_tools_apply_command_safety_classification(tmp_path: Path):
+    context = ToolContext(WorkspaceGuard(tmp_path), AllowAllApproval())
+    for tool in (QualityCheckTool(tmp_path), DiagnosticsTool(tmp_path)):
+        result = tool.execute({"command": "git reset --hard HEAD"}, context)
+        assert result.ok is False
+        assert result.metadata["error"] == "risk_blocked"
+        assert result.metadata["hard_blocked"] is True

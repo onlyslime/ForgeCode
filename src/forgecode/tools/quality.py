@@ -4,6 +4,7 @@ import subprocess
 from typing import Any
 from .base import ToolContext, ToolDefinition, ToolResult
 from .filesystem import ListFilesTool
+from .shell import classify_command
 
 class FindFilesTool:
     definition = ToolDefinition("find_files", "Find workspace files by glob pattern.", {"type":"object","properties":{"pattern":{"type":"string"},"max_files":{"type":"integer"}},"required":["pattern"]})
@@ -18,7 +19,11 @@ class _CheckTool:
         denied = context.deny_if_plan(self.definition.name)
         if denied:
             return denied
-        if not context.request_approval(self.definition.name, {"command": command}):
+        risk, reasons, hard_blocked = classify_command(command)
+        risk_metadata = {"risk": risk, "risk_reasons": list(reasons), "hard_blocked": hard_blocked}
+        if hard_blocked:
+            return ToolResult(False, "command blocked by safety policy", {"error": "risk_blocked", **risk_metadata})
+        if not context.request_approval(self.definition.name, {"command": command, "_risk": risk, "_risk_reasons": list(reasons)}):
             return ToolResult(False, f"{self.definition.name} denied by approval policy", {"error": "approval_denied"})
         if context.cancelled:
             return ToolResult(False, f"{self.definition.name} cancelled before execution", {"error": "cancelled"})
@@ -27,7 +32,7 @@ class _CheckTool:
         except (OSError, subprocess.TimeoutExpired) as exc:
             return ToolResult(False, f"check failed: {type(exc).__name__}", {"error": "check_failed"})
         output = (p.stdout + ("\n" + p.stderr if p.stderr else "")).strip()[:20_000]
-        return ToolResult(p.returncode == 0, output or ("passed" if p.returncode == 0 else "failed"), {"exit_code": p.returncode})
+        return ToolResult(p.returncode == 0, output or ("passed" if p.returncode == 0 else "failed"), {"exit_code": p.returncode, **risk_metadata})
 
 class TestTool(_CheckTool):
     definition = ToolDefinition("test", "Run the project's tests using its detected test runner.", {"type":"object","properties":{"command":{"type":"string"}},"additionalProperties":False}, side_effecting=True)
