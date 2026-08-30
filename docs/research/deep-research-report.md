@@ -1244,3 +1244,12 @@ v0.7.42 在此基础上为 `session.events` 增加有界 `type` 过滤；客户�
 本轮对 Cline 官方文档旧版工具与 Plan/Act URL 的直接请求返回 HTTP 404，未把页面
 内容当作当前能力证据；OpenCode 权限页仍返回 HTTP 200。后续比较 Cline 时仅采用
 可重新访问的官方入口或源码，不用搜索摘要替代证据。
+
+### 流式协议复核（2026-08-30）
+
+源码审计确认 OpenAI-compatible provider 对 SSE 做了有界 fail-closed 处理：拒绝重复
+数据帧、`[DONE]` 后数据、不完整 JSON/UTF-8、异常 finish reason 和未闭合工具参数；
+在模型工具调用交给 AgentLoop 前，`stream_protocol_error`/`stream_incomplete` 会按
+配置的有限重试预算处理。相关回归覆盖重复帧、越界片段、取消和未完成参数。
+与 Codex/成熟网关相比，ForgeCode 仍缺少跨 provider 的 capability negotiation 和
+可恢复的流式通知序列；当前安全策略是宁可返回结构化错误，也不猜测或执行不完整参数。
