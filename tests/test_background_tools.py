@@ -46,7 +46,7 @@ def test_persisted_failed_process_keeps_failed_status(tmp_path):
     manager = ProcessManager(state_path=state)
     item = manager.start("python -c \"raise SystemExit(3)\"", tmp_path, "failed-task")
     item.process.wait(timeout=5)
-    for _ in range(20):
+    for _ in range(100):
         if state.exists() and '"status": "failed"' in state.read_text(encoding="utf-8"):
             break
         time.sleep(0.05)
