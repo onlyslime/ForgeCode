@@ -121,5 +121,11 @@ class KillProcessTool(ProcessStatusTool):
         task_id = str(arguments.get("task_id", "")); item = self.manager.get(task_id)
         if item is None: return ToolResult(False, "unknown background task", {"error":"unknown_task"})
         if not context.request_approval(self.definition.name, {"task_id":task_id}): return ToolResult(False, "kill_process denied by approval policy", {"error":"approval_denied"})
-        if item.process.poll() is None: item.process.terminate()
-        return ToolResult(True, f"background task stopped: {task_id}", {"task_id":task_id, "status":"cancelled"})
+        if item.process.poll() is not None:
+            return ToolResult(True, f"background task already exited: {task_id}", {"task_id": task_id, "status": "already_exited", "exit_code": item.process.returncode, "termination_result": "already_exited"})
+        item.process.terminate()
+        try:
+            item.process.wait(timeout=min(0.5, context.remaining_seconds(0.5)))
+        except subprocess.TimeoutExpired:
+            return ToolResult(False, f"background task termination unresolved: {task_id}", {"task_id": task_id, "status": "running", "termination_result": "unresolved", "error": "termination_unresolved", "pid": item.process.pid})
+        return ToolResult(True, f"background task stopped: {task_id}", {"task_id": task_id, "status": "cancelled", "exit_code": item.process.returncode, "termination_result": "confirmed"})

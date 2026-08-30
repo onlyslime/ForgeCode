@@ -1,6 +1,6 @@
 import time
 from forgecode.security import WorkspaceGuard
-from forgecode.tools import AllowAllApproval, ListProcessesTool, ProcessManager, PollProcessTool, RunBackgroundTool, ToolContext
+from forgecode.tools import AllowAllApproval, KillProcessTool, ListProcessesTool, ProcessManager, PollProcessTool, RunBackgroundTool, ToolContext
 
 def test_background_task_can_be_started_and_polled(tmp_path):
     guard = WorkspaceGuard(tmp_path); context = ToolContext(guard, AllowAllApproval())
@@ -58,3 +58,10 @@ def test_background_history_is_bounded_without_evicting_active_tasks(tmp_path):
     third = RunBackgroundTool(guard, manager).execute({"command": "python -c \"import time; time.sleep(0.3)\""}, context)
     assert manager.get(third.metadata["task_id"]) is not None
     assert len(manager.list()) <= 2
+
+def test_kill_process_reports_confirmed_termination(tmp_path):
+    guard = WorkspaceGuard(tmp_path); context = ToolContext(guard, AllowAllApproval())
+    manager = ProcessManager()
+    started = RunBackgroundTool(guard, manager).execute({"command": "python -c \"import time; time.sleep(10)\""}, context)
+    result = KillProcessTool(guard, manager).execute({"task_id": started.metadata["task_id"]}, context)
+    assert result.ok and result.metadata["termination_result"] in {"confirmed", "already_exited"}

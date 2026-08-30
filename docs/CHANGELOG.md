@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.7.11 — 2026-08-30
+
+- `kill_process` now distinguishes already-exited, confirmed termination, and
+  unresolved termination after a bounded wait instead of reporting cancellation
+  optimistically.
+- Added regression coverage for confirmed termination metadata.
+
 ## v0.7.10 — 2026-08-30
 
 - Removed the full command from successful `run_background` tool metadata;
