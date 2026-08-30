@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.7.36 — 2026-08-30
+
+- Added read-only `git_worktree_reconcile` to compare actual Git worktrees with
+  ForgeCode ownership records and report healthy, unmanaged, missing-path, or
+  mismatched entries without mutating either source.
+- Registered the tool in the read-only policy, RPC capability catalog, and
+  AgentLoop parallel allowlist.
+
 ## v0.7.35 — 2026-08-30
 
 - `rpc.describe` now exposes a bounded built-in tool capability catalog with

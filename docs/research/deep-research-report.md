@@ -675,7 +675,7 @@ CLI/TUI
 - [x] 每个 P0/P1 能力都有可执行验收标准或演示场景。
 - [x] 已明确竞品参考与本题自研实现的边界，避免误用现成 agent 框架。
 
-## ForgeCode 当前差距复核（2026-08-30，v0.7.35）
+## ForgeCode 当前差距复核（2026-08-30，v0.7.36）
 
 本节以当前仓库源码、定向测试和正常 `fcc` 工作流为准；竞品能力只作为产品
 形态基线，不把未能直接访问的页面当作已验证事实。OpenAI 官方 Codex 页面在
@@ -687,12 +687,12 @@ CLI/TUI
 | 交互反馈 | 阶段标题、工具时间线、耗时、文件预览、红绿 diff、文本 delta、结果卡 | 仍可加强长任务状态聚合 | P0 |
 | 工具协议 | 自研 schema、完整 JSON 校验、SSE 防重复/不完整调用，流中断有界重试；同轮全只读调用受控并行 | 更完整 capability negotiation/fallback | P1 |
 | 上下文 | 仓库 map、引用解析、增量索引、压缩、有界历史；静态 definition/reference/hover 导航 | 仍缺少真正 LSP、跨语言精确解析和长期记忆 | P1 |
-| 会话恢复 | JSONL、checkpoint、transaction、undo、tree/import、冲突检测；worktree 有界 owner 元数据 | 缺少自动恢复/调度和后台多任务界面 | P1 |
+| 会话恢复 | JSONL、checkpoint、transaction、undo、tree/import、冲突检测；worktree 有界 owner 元数据与 reconcile | 缺少自动恢复/调度和后台多任务界面 | P1 |
 | 安全 | Plan/Act/Bypass、启动信任、风险分类、审批、硬拦截、脱敏 | 不是操作系统级沙箱，需持续明确边界 | P0 |
 | 验证 | 测试 profile、有限修复、review/export、轨迹评估 | 缺少语言服务和调试器集成 | P1 |
 | 扩展发布 | Skills、hooks、SDK、JSONL RPC、工具收窄、uv/独立二进制布局 | 缺少 MCP、插件市场、跨平台一键安装 | P2 |
 
-截至当前 v0.7.35，正常交互工作流还提供 `/context`（有界索引健康度）和
+截至当前 v0.7.36，正常交互工作流还提供 `/context`（有界索引健康度）和
 `/events [limit] [kind]`（可筛选、带相对耗时和错误码的持久化事件尾部）。
 这些能力不改变工具权限，只把已有审计证据暴露给用户；对应交互、机器契约和
 provider 回归测试均已通过。
@@ -987,6 +987,17 @@ worktree 并行能力仍属于 ForgeCode 的已知 P2/P1 差距，本轮未改�
   `git diff --check` 均通过。
 - RPC/embedding/工具策略/后台任务/语义工具/只读并行的定向测试均在完整回归中覆盖；未发现
   JSONL、审批或 WorkspaceGuard 回归。
+
+### 0.7.36 实施审计：worktree reconcile observability（2026-08-30）
+
+- **范围**：新增只读 `git_worktree_reconcile`，比较 `git worktree list --porcelain` 与
+  ownership records，返回 `healthy`、`unmanaged`、`missing_path`、`owner_missing` 或
+  `path_mismatch`；结果最多 64 条，不修改 Git 或 metadata。
+- **非目标**：不自动修复/删除记录，不创建 worktree，不改变 owner 授权，不提供并行调度。
+- **完成条件**：用户和 RPC 客户端能看见 worktree/session 状态不一致，而不会把发现动作
+  当成授权或副作用操作。
+- **验证**：工具策略与 RPC 契约定向测试 `52 passed, 1 skipped`，compileall 与 diff
+  检查通过；发布门禁将补充 doctor 和完整回归。
 
 ### 0.7.35 实施审计：RPC tool capability discovery（2026-08-30）
 

@@ -175,6 +175,18 @@ def test_worktree_metadata_oversize_fails_closed(tmp_path: Path) -> None:
     assert not result.ok and result.metadata["error"] == "worktree_metadata_unavailable"
 
 
+def test_worktree_reconcile_reports_managed_and_unmanaged_state(tmp_path: Path) -> None:
+    from forgecode.tools import GitWorktreeReconcileTool
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    (tmp_path / "README.md").write_text("base\n", encoding="utf-8")
+    subprocess.run(["git", "add", "README.md"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "-c", "user.name=ForgeCode", "-c", "user.email=forge@example.invalid", "commit", "-qm", "base"], cwd=tmp_path, check=True)
+    guard = WorkspaceGuard(tmp_path)
+    result = GitWorktreeReconcileTool(guard).execute({}, ToolContext(guard))
+    assert result.ok and result.metadata["consistent"] is False
+    assert result.metadata["healthy_count"] == 0
+
+
 def test_worktree_lifecycle_rejects_unsafe_names_and_plan_mode(tmp_path: Path) -> None:
     from forgecode.tools import GitWorktreeCreateTool
     guard = WorkspaceGuard(tmp_path)

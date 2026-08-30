@@ -48,6 +48,7 @@ _RPC_TOOL_CAPABILITIES = tuple(
         ("git_status", "read_only", False), ("git_diff", "read_only", False),
         ("git_log", "read_only", False), ("git_commit", "changes", True),
         ("git_worktrees", "read_only", False), ("git_worktree_create", "changes", True),
+        ("git_worktree_reconcile", "read_only", False),
         ("git_worktree_remove", "changes", True), ("test", "evidence", True),
         ("diagnostics", "evidence", True), ("find_files", "read_only", False),
         ("read_range", "read_only", False), ("list_symbols", "read_only", False),

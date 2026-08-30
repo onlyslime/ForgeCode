@@ -145,7 +145,7 @@ def parse_tool_policy_options(
     known = tuple(str(name) for name in available)
     known_set = set(known)
     groups = {
-        "read_only": {name for name in known if name in {"list_files", "read_file", "search", "workspace_summary", "repository_map", "find_files", "read_range", "list_symbols", "file_metadata", "find_definition", "find_references", "symbol_hover", "git_status", "git_diff", "git_log", "git_worktrees", "lsp_status"}},
+        "read_only": {name for name in known if name in {"list_files", "read_file", "search", "workspace_summary", "repository_map", "find_files", "read_range", "list_symbols", "file_metadata", "find_definition", "find_references", "symbol_hover", "git_status", "git_diff", "git_log", "git_worktrees", "git_worktree_reconcile", "lsp_status"}},
         "changes": {name for name in known if name in {"write_file", "apply_patch", "git_commit", "git_worktree_create", "git_worktree_remove"}},
         "execution": {name for name in known if name in {"run_command", "run_background", "process_status", "poll_process", "list_processes", "kill_process"}},
         "evidence": {name for name in known if name in {"review", "test", "diagnostics", "git_status", "git_diff", "git_log"}},
@@ -253,7 +253,7 @@ class EffectiveConfig:
         if self.verification_command is not None:
             _bounded_text(self.verification_command, "verification_command", 4_000)
         self.tool_policy.validate()
-        known_tools = {"list_files", "read_file", "search", "write_file", "apply_patch", "workspace_summary", "repository_map", "run_command", "find_definition", "find_references", "symbol_hover", "lsp_status", "list_processes", "git_worktrees", "git_worktree_create", "git_worktree_remove"}
+        known_tools = {"list_files", "read_file", "search", "write_file", "apply_patch", "workspace_summary", "repository_map", "run_command", "find_definition", "find_references", "symbol_hover", "lsp_status", "list_processes", "git_worktrees", "git_worktree_reconcile", "git_worktree_create", "git_worktree_remove"}
         unknown_tools = (set(self.tool_policy.allow) | set(self.tool_policy.deny)) - known_tools
         if unknown_tools:
             raise ConfigError("tool_policy contains unknown tools: " + ", ".join(sorted(unknown_tools)))

@@ -173,6 +173,47 @@ class GitWorktreeListTool:
         return ToolResult(True, "\n".join(f"{row.get('path')} {row.get('branch', 'detached')}" for row in rows) or "no worktrees", {"worktrees": rows, "count": len(rows), "exit_code": 0})
 
 
+class GitWorktreeReconcileTool:
+    """Compare Git worktrees with ForgeCode ownership records without mutation."""
+    definition = ToolDefinition(
+        "git_worktree_reconcile",
+        "Reconcile Git worktree paths with ForgeCode session ownership metadata without changing either.",
+        {"type": "object", "additionalProperties": False},
+    )
+
+    def __init__(self, guard):
+        self.guard = guard
+
+    def execute(self, arguments, context):
+        listed = GitWorktreeListTool(self.guard).execute({}, context)
+        if not listed.ok:
+            return listed
+        try:
+            records = _worktree_records(self.guard)
+        except (OSError, ValueError):
+            return ToolResult(False, "managed worktree metadata is unavailable", {"error": "worktree_metadata_unavailable"})
+        rows = listed.metadata.get("worktrees", [])
+        seen = set()
+        findings = []
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            path = row.get("path")
+            name = row.get("name")
+            if isinstance(name, str) and name in records:
+                seen.add(name)
+                status = "healthy" if records[name].get("path") == path and records[name].get("run_id") else ("owner_missing" if not records[name].get("run_id") else "path_mismatch")
+                findings.append({"name": name, "path": path, "status": status, "run_id": records[name].get("run_id")})
+            elif isinstance(path, str):
+                findings.append({"path": path, "status": "unmanaged"})
+        for name, record in records.items():
+            if name not in seen:
+                findings.append({"name": name, "path": record.get("path"), "status": "missing_path", "run_id": record.get("run_id")})
+        healthy = sum(item.get("status") == "healthy" for item in findings)
+        text = "\n".join(f"{item.get('name', item.get('path'))}: {item['status']}" for item in findings) or "no worktrees"
+        return ToolResult(True, text, {"worktrees": findings[:64], "count": len(findings[:64]), "healthy_count": healthy, "consistent": all(item.get("status") == "healthy" for item in findings)})
+
+
 class GitWorktreeCreateTool:
     """Create an explicitly approved, workspace-local worktree."""
     definition = ToolDefinition(
