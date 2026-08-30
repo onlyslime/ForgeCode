@@ -148,6 +148,23 @@ def test_worktree_remove_enforces_session_owner(tmp_path: Path) -> None:
     assert GitWorktreeRemoveTool(guard).execute({"name": "owned"}, ToolContext(guard, AllowAllApproval(), mode="act", run_id="owner")).ok
 
 
+def test_worktree_metadata_alias_fails_as_structured_result(tmp_path: Path) -> None:
+    from forgecode.tools import GitWorktreeListTool
+    guard = WorkspaceGuard(tmp_path)
+    forge_dir = tmp_path / ".forgecode"
+    forge_dir.mkdir()
+    state = forge_dir / "worktrees.json"
+    state.write_text("{}", encoding="utf-8")
+    # Replacing the state file with an alias must not escape as an exception.
+    state.unlink()
+    try:
+        state.symlink_to(tmp_path / "outside.json")
+    except (OSError, NotImplementedError):
+        pytest.skip("symlink creation is unavailable")
+    result = GitWorktreeListTool(guard).execute({}, ToolContext(guard))
+    assert not result.ok and result.metadata["error"] == "worktree_metadata_unavailable"
+
+
 def test_worktree_lifecycle_rejects_unsafe_names_and_plan_mode(tmp_path: Path) -> None:
     from forgecode.tools import GitWorktreeCreateTool
     guard = WorkspaceGuard(tmp_path)

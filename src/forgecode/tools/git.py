@@ -121,7 +121,10 @@ class GitWorktreeListTool:
         self.guard = guard
 
     def execute(self, arguments, context):
-        records = _worktree_records(context.guard)
+        try:
+            records = _worktree_records(context.guard)
+        except (OSError, ValueError):
+            return ToolResult(False, "managed worktree metadata is unavailable", {"error": "worktree_metadata_unavailable"})
         try:
             result = subprocess.run(["git", "worktree", "list", "--porcelain"], cwd=context.guard.root, capture_output=True, text=True, timeout=min(15.0, context.remaining_seconds(15.0)), check=False)
         except (OSError, subprocess.TimeoutExpired) as exc:
@@ -240,7 +243,10 @@ class GitWorktreeRemoveTool:
         target = self.guard.resolve(str(Path(".forgecode") / "worktrees" / name))
         if not target.exists():
             return ToolResult(False, "managed worktree does not exist", {"error": "worktree_missing"})
-        records = _worktree_records(self.guard)
+        try:
+            records = _worktree_records(self.guard)
+        except (OSError, ValueError):
+            return ToolResult(False, "managed worktree metadata is unavailable", {"error": "worktree_metadata_unavailable"})
         if name not in records:
             return ToolResult(False, "worktree is not ForgeCode-managed", {"error": "worktree_unmanaged"})
         owner = records.get(name, {}).get("run_id")

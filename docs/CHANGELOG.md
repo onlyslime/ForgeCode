@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.7.33 — 2026-08-30
+
+- Worktree listing and removal now convert invalid or aliased ownership
+  metadata into bounded structured tool errors instead of leaking exceptions
+  into the agent loop.
+- Added regression coverage for the fail-closed metadata alias boundary.
+
 ## v0.7.32 — 2026-08-30
 
 - Hardened managed worktree ownership persistence with atomic replacement and
