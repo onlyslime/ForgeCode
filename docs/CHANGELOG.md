@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.200 — 2026-08-31
+
+- **RPC session write-path hardening:** session persistence now validates the destination directory and target file against symlink/junction aliases before and after directory creation.
+- **Verification:** RPC lifecycle tests, compile, and diff checks passed.
+
 ## v0.8.199 — 2026-08-31
 
 - **RPC session directory integrity:** persisted session loading now rejects records when the `rpc-sessions` parent directory is a symlink or junction alias, closing a workspace-boundary replacement gap.

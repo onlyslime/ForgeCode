@@ -212,7 +212,10 @@ def _session_record_path(info: dict[str, Any], handle: str) -> Path:
 
 def _persist_session(handle: str, info: dict[str, Any]) -> None:
     path = _session_record_path(info, handle)
+    assert_no_path_alias(path.parent, message="RPC session record directory is a symlink or junction alias")
+    assert_no_path_alias(path, message="RPC session record is a symlink or junction alias")
     path.parent.mkdir(parents=True, exist_ok=True)
+    assert_no_path_alias(path.parent, message="RPC session record directory is a symlink or junction alias")
     payload = {key: info.get(key) for key in ("workspace", "mode", "session_path", "state", "sequence", "created_at", "cancel_requested", "result", "execution")}
     payload["events"] = list(info.get("events", []))[-_MAX_SESSION_EVENTS:]
     tmp = path.with_suffix(".tmp")
