@@ -8,6 +8,11 @@ from forgecode.embed import ForgeCodeError, config_profiles, provider_list, prov
 def test_rpc_describe_embedding_returns_capabilities() -> None:
     rows = rpc_describe()
     assert rows and rows[0]["kind"] == "capabilities"
+
+
+def test_package_exports_rpc_describe_embedding() -> None:
+    import forgecode
+    assert "rpc_describe_embedded" in forgecode.__all__
 import forgecode
 
 
