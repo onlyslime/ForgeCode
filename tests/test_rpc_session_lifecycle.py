@@ -442,6 +442,9 @@ def test_rpc_session_events_can_filter_by_type(tmp_path):
     data = _call({"method": "session.events", "params": {"session": handle, "type": "pause"}})["data"]
     assert data["type"] == "pause"
     assert data["events"] and all(item["type"] == "pause" for item in data["events"])
+    assert data["events"][0]["schema_version"] == 1
+    assert data["events"][0]["event_id"].startswith(f"{handle}:")
+    assert data["events"][0]["session"] == handle
 
 
 def test_rpc_session_handle_can_be_recovered_from_workspace_metadata(tmp_path):

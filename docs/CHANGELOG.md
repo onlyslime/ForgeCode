@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.7.45 — 2026-08-30
+
+- RPC session event responses now include stable `event_id`, `session`, and
+  `schema_version` metadata while preserving existing event payloads and cursors.
+- Event identity is derived from the session handle and monotonic sequence, making
+  client polling and deduplication deterministic.
+
 ## v0.7.44 — 2026-08-30
 
 - `rpc.describe` now publishes a versioned session event schema and the stable

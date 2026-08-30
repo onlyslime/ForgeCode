@@ -562,7 +562,11 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                             _SESSION_CONDITION.wait(timeout=max(0.0, deadline - time.monotonic()))
                             info = _RPC_SESSIONS.get(handle, info)
                         data["type"] = event_type
-                        data["events"] = events[: min(limit, 100)]
+                        selected = events[: min(limit, 100)]
+                        data["events"] = [
+                            {**item, "schema_version": 1, "event_id": f"{handle}:{int(item.get('sequence', 0))}", "session": handle}
+                            for item in selected
+                        ]
                         data["next_sequence"] = int(data["events"][-1]["sequence"]) if data["events"] else after
                         retained = info.get("events", [])
                         oldest = int(retained[0].get("sequence", 0)) if retained else int(info.get("sequence", 0)) + 1
