@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.109 — 2026-08-31
+
+- Hardened code-understanding source selection against symlink/junction
+  aliases, preventing static tools from following redirected files.
+- Verification: alias-path regression, manual source-selection check,
+  compileall, and diff checks passed.
+
 ## v0.8.108 — 2026-08-31
 
 - Added object-argument validation to `workspace_summary`, aligning the

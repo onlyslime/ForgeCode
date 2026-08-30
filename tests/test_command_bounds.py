@@ -137,6 +137,17 @@ def test_understanding_path_must_be_string(tmp_path: Path):
         list(_source_files(context, 42))
 
 
+def test_understanding_source_scan_rejects_symlink_alias(tmp_path: Path):
+    outside = tmp_path / "outside.py"; outside.write_text("secret = 1\n", encoding="utf-8")
+    alias = tmp_path / "alias.py"
+    try:
+        alias.symlink_to(outside)
+    except (OSError, NotImplementedError) as exc:
+        pytest.skip(f"symlink unavailable: {exc}")
+    context = ToolContext(WorkspaceGuard(tmp_path), AllowAllApproval())
+    assert list(_source_files(context, "alias.py")) == []
+
+
 def test_lsp_status_rejects_non_object_arguments(tmp_path: Path):
     with pytest.raises(ValueError, match="arguments must be an object"):
         LspStatusTool().execute(None, None)

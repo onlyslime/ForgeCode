@@ -1,6 +1,7 @@
 """Read-only code understanding and file metadata tools."""
 from __future__ import annotations
 import re
+from pathlib import Path
 from typing import Any
 from .base import ToolContext, ToolDefinition, ToolResult
 from .filesystem import _is_ignored, _positive_int, _required
@@ -43,7 +44,10 @@ def _source_files(context: ToolContext, path_value: str | None = None):
         raise ValueError("path must be a string")
     if path_value:
         candidate = context.guard.resolve(path_value, must_exist=True)
-        if candidate.is_file() and not _is_ignored(candidate, context.guard):
+        lexical = Path(path_value)
+        if not lexical.is_absolute():
+            lexical = context.guard.root / lexical
+        if candidate == lexical.absolute() and candidate.is_file() and not _is_ignored(candidate, context.guard):
             yield candidate
         return
     count = 0
@@ -51,6 +55,12 @@ def _source_files(context: ToolContext, path_value: str | None = None):
         if count >= 500:
             break
         if not candidate.is_file() or _is_ignored(candidate, context.guard):
+            continue
+        try:
+            safe = context.guard.resolve(candidate, must_exist=True)
+        except (OSError, ValueError):
+            continue
+        if safe != candidate.absolute():
             continue
         if candidate.suffix.lower() in {".py", ".js", ".ts", ".tsx", ".jsx", ".java", ".go", ".rs", ".c", ".h", ".cpp", ".cs"}:
             count += 1
