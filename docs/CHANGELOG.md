@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.16 — 2026-08-30
+
+- Added a `cache_hit` diagnostic to `/status` metrics so operators can tell
+  whether the session aggregate was reused or recomputed.
+- Verification: manually reviewed cache hit/miss paths and confirmed the field
+  is additive metadata; status CLI tests and compile checks passed.
+
 ## v0.8.15 — 2026-08-30
 
 - Strengthened `/status` cache invalidation with filesystem ctime/inode

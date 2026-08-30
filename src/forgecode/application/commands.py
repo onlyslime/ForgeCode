@@ -2517,6 +2517,7 @@ def main(argv: list[str] | None = None) -> int:
                 cached = status_metrics_cache if status_metrics_cache and status_metrics_cache[0] == cache_key else None
             if cached is not None:
                 metrics = dict(cached[1])
+                metrics["cache_hit"] = True
             else:
                 metrics = {"provider_attempts": 0, "provider_retries": 0, "tool_calls": 0, "context_chars": 0}
                 try:
@@ -2532,6 +2533,7 @@ def main(argv: list[str] | None = None) -> int:
                             metrics["tool_calls"] += 1
                 except (OSError, ValueError):
                     metrics["audit_read_error"] = True
+                metrics["cache_hit"] = False
                 with status_metrics_lock:
                     status_metrics_cache = (cache_key, dict(metrics))
             worker = controller.snapshot() if controller is not None else {"active": False}
