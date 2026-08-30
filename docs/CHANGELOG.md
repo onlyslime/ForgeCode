@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.7.30 — 2026-08-30
+
+- Worktree creation now records bounded, non-sensitive session ownership
+  metadata in `.forgecode/worktrees.json`.
+- Worktree listing surfaces managed names and run IDs, while removal rejects a
+  mismatched session owner and cleans the record after successful removal.
+
 ## v0.7.29 — 2026-08-30
 
 - Added approved `git_worktree_create` and `git_worktree_remove` tools for

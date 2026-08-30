@@ -3,10 +3,37 @@ from __future__ import annotations
 
 import subprocess
 import re
+import json
 from pathlib import Path
 from typing import Any
 
 from .base import ToolContext, ToolDefinition, ToolResult
+
+
+_WORKTREE_STATE = Path(".forgecode") / "worktrees.json"
+_MAX_WORKTREE_RECORDS = 64
+
+
+def _worktree_records(guard) -> dict[str, dict[str, str]]:
+    """Read bounded, non-sensitive worktree ownership metadata."""
+    path = guard.resolve(_WORKTREE_STATE)
+    if not path.is_file():
+        return {}
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError, UnicodeError):
+        return {}
+    records = value.get("worktrees") if isinstance(value, dict) else None
+    if not isinstance(records, dict):
+        return {}
+    return {str(k): {str(f): str(v) for f, v in item.items() if f in {"run_id", "branch", "path"} and isinstance(v, str)} for k, item in list(records.items())[:_MAX_WORKTREE_RECORDS] if isinstance(k, str) and isinstance(item, dict)}
+
+
+def _save_worktree_records(guard, records: dict[str, dict[str, str]]) -> None:
+    path = guard.resolve(_WORKTREE_STATE)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {"schema_version": 1, "worktrees": dict(list(records.items())[:_MAX_WORKTREE_RECORDS])}
+    path.write_text(json.dumps(payload, ensure_ascii=False, sort_keys=True) + "\n", encoding="utf-8")
 
 
 class GitStatusTool:
@@ -74,6 +101,7 @@ class GitWorktreeListTool:
         self.guard = guard
 
     def execute(self, arguments, context):
+        records = _worktree_records(context.guard)
         try:
             result = subprocess.run(["git", "worktree", "list", "--porcelain"], cwd=context.guard.root, capture_output=True, text=True, timeout=min(15.0, context.remaining_seconds(15.0)), check=False)
         except (OSError, subprocess.TimeoutExpired) as exc:
@@ -98,6 +126,13 @@ class GitWorktreeListTool:
             elif current is not None and line.startswith("branch "):
                 current["branch"] = line[7:].removeprefix("refs/heads/")[:160]
         if current: rows.append(current)
+        for row in rows:
+            for name, record in records.items():
+                if record.get("path") == row.get("path"):
+                    row["name"] = name
+                    if record.get("run_id"):
+                        row["run_id"] = record["run_id"]
+                    break
         rows = rows[:64]
         return ToolResult(True, "\n".join(f"{row.get('path')} {row.get('branch', 'detached')}" for row in rows) or "no worktrees", {"worktrees": rows, "count": len(rows), "exit_code": 0})
 
@@ -151,7 +186,15 @@ class GitWorktreeCreateTool:
             except OSError:
                 pass
             return ToolResult(False, (result.stderr.strip() or "git worktree create failed")[:4_000], {"error": "git_worktree_create_failed", "exit_code": result.returncode})
-        return ToolResult(True, f"created worktree {self.guard.relative(target)} on {branch}", {"path": self.guard.relative(target), "branch": branch, "exit_code": 0})
+        relative = self.guard.relative(target)
+        metadata = {"run_id": context.run_id[:128] if isinstance(context.run_id, str) else "", "branch": branch, "path": relative}
+        try:
+            records = _worktree_records(self.guard)
+            records[name] = metadata
+            _save_worktree_records(self.guard, records)
+        except (OSError, ValueError, TypeError) as exc:
+            return ToolResult(False, "worktree created but ownership metadata could not be saved", {"error": "worktree_metadata_failed", "path": relative, "detail": type(exc).__name__})
+        return ToolResult(True, f"created worktree {relative} on {branch}", {"path": relative, "branch": branch, "run_id": metadata["run_id"], "exit_code": 0})
 
 
 class GitWorktreeRemoveTool:
@@ -176,6 +219,12 @@ class GitWorktreeRemoveTool:
         target = self.guard.resolve(str(Path(".forgecode") / "worktrees" / name))
         if not target.exists():
             return ToolResult(False, "managed worktree does not exist", {"error": "worktree_missing"})
+        records = _worktree_records(self.guard)
+        if name not in records:
+            return ToolResult(False, "worktree is not ForgeCode-managed", {"error": "worktree_unmanaged"})
+        owner = records.get(name, {}).get("run_id")
+        if owner and context.run_id and owner != context.run_id:
+            return ToolResult(False, "worktree belongs to another session", {"error": "worktree_owner_mismatch"})
         if not context.request_approval(self.definition.name, {"name": name, "force": bool(arguments.get("force", False))}):
             return ToolResult(False, "git_worktree_remove denied by approval policy", {"error": "approval_denied"})
         command = ["git", "worktree", "remove"] + (["--force"] if arguments.get("force", False) else []) + [str(target)]
@@ -184,6 +233,12 @@ class GitWorktreeRemoveTool:
         except (OSError, subprocess.TimeoutExpired) as exc:
             return ToolResult(False, f"git worktree remove failed: {type(exc).__name__}", {"error": "git_worktree_remove_failed"})
         output = (result.stderr.strip() or result.stdout.strip() or "worktree removed")[:4_000]
+        if result.returncode == 0 and name in records:
+            records.pop(name, None)
+            try:
+                _save_worktree_records(self.guard, records)
+            except (OSError, ValueError, TypeError):
+                return ToolResult(False, "worktree removed but ownership metadata could not be updated", {"error": "worktree_metadata_failed", "name": name, "exit_code": 0})
         return ToolResult(result.returncode == 0, output, {"name": name, "exit_code": result.returncode})
 
 

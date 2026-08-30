@@ -123,13 +123,29 @@ def test_worktree_lifecycle_is_approved_and_workspace_local(tmp_path: Path) -> N
     subprocess.run(["git", "add", "README.md"], cwd=tmp_path, check=True)
     subprocess.run(["git", "-c", "user.name=ForgeCode", "-c", "user.email=forge@example.invalid", "commit", "-qm", "base"], cwd=tmp_path, check=True)
     guard = WorkspaceGuard(tmp_path)
-    context = ToolContext(guard, AllowAllApproval(), mode="act")
+    context = ToolContext(guard, AllowAllApproval(), mode="act", run_id="run-a")
     created = GitWorktreeCreateTool(guard).execute({"name": "review", "branch": "forge/review"}, context)
     assert created.ok and created.metadata["path"] == ".forgecode/worktrees/review"
+    assert created.metadata["run_id"] == "run-a"
+    assert (tmp_path / ".forgecode" / "worktrees.json").is_file()
     assert (tmp_path / ".forgecode" / "worktrees" / "review" / "README.md").is_file()
     removed = GitWorktreeRemoveTool(guard).execute({"name": "review"}, context)
     assert removed.ok
     assert not (tmp_path / ".forgecode" / "worktrees" / "review").exists()
+
+
+def test_worktree_remove_enforces_session_owner(tmp_path: Path) -> None:
+    from forgecode.tools import GitWorktreeCreateTool, GitWorktreeRemoveTool
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    (tmp_path / "README.md").write_text("base\n", encoding="utf-8")
+    subprocess.run(["git", "add", "README.md"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "-c", "user.name=ForgeCode", "-c", "user.email=forge@example.invalid", "commit", "-qm", "base"], cwd=tmp_path, check=True)
+    guard = WorkspaceGuard(tmp_path)
+    create = GitWorktreeCreateTool(guard).execute({"name": "owned", "branch": "forge/owned"}, ToolContext(guard, AllowAllApproval(), mode="act", run_id="owner"))
+    assert create.ok
+    denied = GitWorktreeRemoveTool(guard).execute({"name": "owned"}, ToolContext(guard, AllowAllApproval(), mode="act", run_id="other"))
+    assert not denied.ok and denied.metadata["error"] == "worktree_owner_mismatch"
+    assert GitWorktreeRemoveTool(guard).execute({"name": "owned"}, ToolContext(guard, AllowAllApproval(), mode="act", run_id="owner")).ok
 
 
 def test_worktree_lifecycle_rejects_unsafe_names_and_plan_mode(tmp_path: Path) -> None:
