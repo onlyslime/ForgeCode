@@ -167,6 +167,8 @@ class FileMetadataTool:
         if path.stat().st_size > _MAX_FILE_BYTES:
             return ToolResult(False, f"file exceeds the {_MAX_FILE_BYTES}-byte safety limit", {"error": "file_too_large", "path": path_value})
         raw = path.read_bytes()
+        if len(raw) > _MAX_FILE_BYTES:
+            return ToolResult(False, f"file exceeds the {_MAX_FILE_BYTES}-byte safety limit", {"error": "file_too_large", "path": path_value})
         import hashlib
         try: text = raw.decode("utf-8"); encoding = "utf-8"
         except UnicodeDecodeError: text = ""; encoding = "binary"

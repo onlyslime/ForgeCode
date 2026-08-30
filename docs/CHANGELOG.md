@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.183 — 2026-08-31
+
+- **Metadata TOCTOU guard:** `file_metadata` now validates the bytes actually read, closing the race where a file grows after the initial size check.
+- **Verification:** command-boundary tests, compile checks, and manual post-stat growth inspection passed.
+
 ## v0.8.182 — 2026-08-31
 
 - **Metadata size safety:** `file_metadata` now rejects files larger than the shared 2 MiB workspace limit before reading or hashing them.
