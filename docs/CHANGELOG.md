@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.129 — 2026-08-31
+
+- **Provider factory validation:** Anthropic translation now rejects non-object tool schemas before field access, avoiding leaked attribute errors from malformed requests.
+- **Verification:** provider tests, compile checks, and manual malformed-tool inspection passed.
+
 ## v0.8.128 — 2026-08-31
 
 - **Outbound description bounds:** wrapped and neutral tool schemas now reject oversized or control-character descriptions before network serialization.

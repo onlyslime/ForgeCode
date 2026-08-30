@@ -5,6 +5,7 @@ import pytest
 
 from forgecode.models import Message, ModelResponse, OpenAICompatibleProvider, ProviderError, ToolCall, is_valid_response, parse_chat_completion, assemble_chat_stream
 from forgecode.models.openai_compatible import _tool_schema_to_payload
+from forgecode.models.factory import _ProtocolTransport
 
 
 class RecordingTransport:
@@ -139,6 +140,12 @@ def test_provider_rejects_invalid_wrapped_tool_fields():
         _tool_schema_to_payload({"type": "function", "function": {"name": "ok", "parameters": []}})
     with pytest.raises(ProviderError, match="function fields are invalid"):
         _tool_schema_to_payload({"type": "function", "function": {"name": "ok", "description": "bad\ntext"}})
+
+
+def test_anthropic_transport_rejects_non_object_tool_schema():
+    transport = _ProtocolTransport(object(), "anthropic", "secret")
+    with pytest.raises(ValueError, match="tool schemas must be objects"):
+        transport._request("https://example/v1/chat/completions", {}, json.dumps({"messages": [], "tools": [None]}).encode())
 
 
 def test_provider_neutral_response_validation_rejects_nonfinite_usage_and_bad_finish_reason():

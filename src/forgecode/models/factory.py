@@ -49,6 +49,8 @@ class _ProtocolTransport:
                 anthropic_messages.append({"role": "assistant" if role == "assistant" else "user", "content": content or str(message.get("content", ""))})
             payload["messages"] = anthropic_messages
             tools = payload.get("tools", [])
+            if not isinstance(tools, list) or any(not isinstance(tool, dict) for tool in tools):
+                raise ValueError("provider tool schemas must be objects")
             payload["tools"] = [{"name": t.get("function", {}).get("name"), "description": t.get("function", {}).get("description", ""), "input_schema": t.get("function", {}).get("parameters", {})} for t in tools]
             headers = {k: v for k, v in headers.items() if k.lower() != "authorization"} | {"x-api-key": self.api_key, "anthropic-version": "2023-06-01"}
             url = url.rsplit("/chat/completions", 1)[0] + "/messages"
