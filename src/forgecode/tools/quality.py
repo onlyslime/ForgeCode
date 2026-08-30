@@ -28,6 +28,8 @@ class _CheckTool:
             return ToolResult(False, f"{self.definition.name} denied by approval policy", {"error": "approval_denied", **risk_metadata})
         if context.cancelled:
             return ToolResult(False, f"{self.definition.name} cancelled before execution", {"error": "cancelled", **risk_metadata})
+        if context.remaining_seconds(60.0) <= 0:
+            return ToolResult(False, f"{self.definition.name} skipped because the run deadline has expired", {"error": "deadline_exceeded", **risk_metadata})
         try:
             environment = {
                 name: value
@@ -35,7 +37,10 @@ class _CheckTool:
                 if not any(marker in name.upper() for marker in ("API_KEY", "APIKEY", "TOKEN", "SECRET", "PASSWORD", "COOKIE"))
             }
             p = subprocess.run(command, cwd=context.guard.root, shell=True, env=environment, capture_output=True, text=True, timeout=min(60.0, context.remaining_seconds(60.0)), check=False)
-        except (OSError, subprocess.TimeoutExpired) as exc:
+        except subprocess.TimeoutExpired:
+            error = "deadline_exceeded" if context.remaining_seconds(0) <= 0 else "check_timeout"
+            return ToolResult(False, f"{self.definition.name} timed out", {"error": error, **risk_metadata})
+        except OSError as exc:
             return ToolResult(False, f"check failed: {type(exc).__name__}", {"error": "check_failed"})
         output = (p.stdout + ("\n" + p.stderr if p.stderr else "")).strip()[:20_000]
         return ToolResult(p.returncode == 0, output or ("passed" if p.returncode == 0 else "failed"), {"exit_code": p.returncode, **risk_metadata})

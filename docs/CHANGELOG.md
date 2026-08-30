@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.158 — 2026-08-31
+
+- **Quality-tool deadline diagnostics:** `test` and `diagnostics` now skip process startup after the run deadline and distinguish deadline expiry from ordinary check timeouts.
+- **Verification:** command-boundary tests, compile checks, and manual expired-deadline inspection passed.
+
 ## v0.8.157 — 2026-08-31
 
 - **Git deadline diagnostics:** read-only Git status, diff, and log tools now fail fast with an explicit `deadline_exceeded` result when the run budget is exhausted.
