@@ -3592,7 +3592,7 @@ def main(argv: list[str] | None = None) -> int:
                 verification_command=verification_command,
                 max_verification_attempts=(effective.repair_attempts if effective and effective.repair_attempts > 0 else 1),
                 total_timeout_seconds=effective.run_timeout_seconds if effective else 600.0,
-                provider_timeout_seconds=effective.provider_timeout_seconds if effective else 90.0,
+                provider_timeout_seconds=effective.provider_timeout_seconds if effective else 300.0,
                 max_tool_calls_total=effective.max_tool_calls if effective else 512,
                 compact_threshold_chars=effective.compact_threshold_chars if effective else None,
             )

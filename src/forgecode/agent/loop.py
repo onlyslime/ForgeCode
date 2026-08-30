@@ -46,7 +46,7 @@ class AgentConfig:
     verification_command: str | None = None
     max_verification_attempts: int = 2
     total_timeout_seconds: float = 600.0
-    provider_timeout_seconds: float = 90.0
+    provider_timeout_seconds: float = 300.0
     max_tool_calls_per_turn: int = 256
     max_tool_calls_total: int = 512
     # A cancelled provider task gets a short chance to acknowledge

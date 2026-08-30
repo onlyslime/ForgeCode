@@ -199,7 +199,7 @@ class EffectiveConfig:
     max_tool_calls: int = 512
     context_budget_chars: int = 60_000
     compact_threshold_chars: int = 48_000
-    provider_timeout_seconds: float = 90.0
+    provider_timeout_seconds: float = 300.0
     run_timeout_seconds: float = 600.0
     verification_command: str | None = None
     repair_attempts: int = 2
@@ -414,7 +414,7 @@ class ConfigLoader:
         merged: dict[str, Any] = {
             "workspace": self.workspace, "profile": "default", "provider": "openai-compatible", "base_url": "https://api.openai.com/v1", "model": None,
             "api_key_env": "FORGECODE_API_KEY", "default_mode": "act", "approval": "interactive", "approval_scopes": {}, "streaming": "auto", "max_steps": None,
-            "max_tool_calls": 512, "context_budget_chars": 60_000, "compact_threshold_chars": 48_000, "provider_timeout_seconds": 90.0,
+            "max_tool_calls": 512, "context_budget_chars": 60_000, "compact_threshold_chars": 48_000, "provider_timeout_seconds": 300.0,
             "run_timeout_seconds": 600.0, "verification_command": None, "repair_attempts": 2, "session_max_chars": 100_000, "transaction_max_bytes": 50_000_000, "offline": False, "telemetry": "off",
             "tool_policy": ToolPolicy(), "sources": ("defaults",),
         }
