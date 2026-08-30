@@ -239,6 +239,8 @@ class TaskPlan:
             raise PlanError("cannot approve an empty plan")
         if any(item.status in {"failed", "blocked"} for item in self.items):
             raise PlanError("failed or blocked plan items require revision before approval")
+        if not isinstance(reason, str):
+            raise PlanError("approval reason must be text")
         approved = replace(self, revision=self.revision + 1, mode="act", approved=True, approval_reason=reason[:500])
         approved.validate()
         return approved

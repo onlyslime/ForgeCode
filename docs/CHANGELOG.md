@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.8.211 — 2026-08-31
+
+- **Plan protocol hardening:** non-text Act approval reasons now fail with a
+  structured `PlanError` instead of leaking slicing/type exceptions.
+- **Verification:** structured-plan tests, compile, and diff checks passed.
+
 ## v0.8.210 — 2026-08-31
 
 - **Memory identity hardening:** workspace memory reads now detect regular

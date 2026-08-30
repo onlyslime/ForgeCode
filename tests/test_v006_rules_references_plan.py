@@ -130,6 +130,8 @@ def test_structured_plan_validates_dag_revision_stale_and_evidence():
     assert stale.stale and not stale.approved
     with pytest.raises(PlanError, match="stale"):
         stale.approve_for_act()
+    with pytest.raises(PlanError, match="approval reason"):
+        plan.approve_for_act(reason=None)
 
 
 def test_structured_plan_rejects_cycles_unknown_dependencies_and_bad_transitions():
