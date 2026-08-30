@@ -925,7 +925,7 @@ scope allow/deny 与 fallback 全局策略。该字段只描述策略路径，�
 - **非目标**：不引入解析器或 LSP，不推断类型，不执行源代码。
 - **验证**：语义工具定向测试 18 passed，compileall 与 diff 检查通过。
 
-### 当前差距复核（v0.7.19）
+### 当前差距复核（v0.7.25）
 
 基于已核实的 Codex `AskForApproval.ts`、Codex app-server 源码树、OpenCode
 Tools/Permissions 文档和 Cline 工具/Plan 文档，ForgeCode 的优势是边界全部在本仓库
@@ -933,23 +933,21 @@ Tools/Permissions 文档和 Cline 工具/Plan 文档，ForgeCode 的优势是边
 
 | 能力 | ForgeCode 当前状态 | 优先级 |
 | --- | --- | --- |
-| 审批粒度 | 全局 interactive/auto/deny，CLI 风险组仅收窄工具集合 | P1 |
-| 语言服务 | 静态 definition/reference，非 LSP | P1 |
-| 后台任务 | 进程生命周期有界且可见；仅当前进程内存，重启后无法恢复 | P1 |
+| 审批粒度 | 全局模式 + 可选 changes/execution/evidence scope，仍非 Codex granular | P1 |
+| 语言服务 | 静态 definition/reference/hover，非 LSP | P1 |
+| 后台任务 | 有界生命周期、持久化 stale 元数据；不自动恢复执行 | P1 |
 | 会话服务 | JSONL/RPC 可用；没有 Codex 等价的长期 daemon/app-server schema | P1 |
 | 隔离执行 | WorkspaceGuard 和审批边界；不是 worktree 或 OS sandbox | P1 |
 | 扩展生态 | skills/hooks 可用；无插件市场、MCP（按当前版本非目标） | P2 |
 
-下一切片应优先实现“持久化后台任务的 stale 标记和只读恢复查询”，禁止自动重放
-命令；随后再设计按工具/风险域的 granular approval。每个切片都必须保留当前
-工具调用、审批、取消和 WorkspaceGuard 的安全契约。
+下一切片应优先评估真正 LSP 的安全适配和 worktree 生命周期隔离；每个切片都必须
+保留当前工具调用、审批、取消和 WorkspaceGuard 的安全契约。
 
-### 审批策略原型（v0.7.17）
+### 审批策略实现（v0.7.18–v0.7.19）
 
 新增 `RiskScopedApproval` 策略对象作为 Codex granular approval 的安全适配层原型：
 它可对 `changes`、`execution`、`evidence` 风险域分别指定 `allow`、`ask` 或 `deny`，
-未命中的工具始终委托给既有策略。该原型目前不改变默认 CLI 配置，避免未经用户
-选择就扩大权限；下一切片将评估其配置入口、审计展示和与 Bypass/Plan 的组合语义。
+未命中的工具始终委托给既有策略；审批事件记录 `decision_source`，便于审计解释。
 
 ### 外部资料复核（2026-08-30）
 
