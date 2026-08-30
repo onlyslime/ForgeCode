@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.104 — 2026-08-31
+
+- Centralized object-argument validation in the shared filesystem helper,
+  hardening all code-understanding and metadata tools against malformed calls.
+- Verification: six-tool invalid-input regression, manual API checks,
+  compileall, and diff checks passed.
+
 ## v0.8.103 — 2026-08-31
 
 - Synchronized the `repository_map` JSON schema with its runtime budget

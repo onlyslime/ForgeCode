@@ -8,6 +8,7 @@ from forgecode.tools.shell import classify_command
 from forgecode.tools.quality import DiagnosticsTool, TestTool as QualityCheckTool
 from forgecode.tools.filesystem import ListFilesTool, ReadFileTool, SearchTool, WriteFileTool
 from forgecode.tools.repository_map import RepositoryMapTool
+from forgecode.tools.understanding import ReadRangeTool, ListSymbolsTool, FindDefinitionTool, FindReferencesTool, SymbolHoverTool, FileMetadataTool
 import pytest
 
 
@@ -108,3 +109,11 @@ def test_repository_map_budget_is_bounded(tmp_path: Path):
         RepositoryMapTool(guard).execute({"budget_chars": 100001}, context)
     schema = RepositoryMapTool(guard).definition.parameters
     assert schema["properties"]["budget_chars"]["maximum"] == 100_000
+
+
+def test_understanding_tools_reject_non_object_arguments(tmp_path: Path):
+    guard = WorkspaceGuard(tmp_path); context = ToolContext(guard, AllowAllApproval())
+    tools = [ReadRangeTool(guard), ListSymbolsTool(guard), FindDefinitionTool(), FindReferencesTool(), SymbolHoverTool(), FileMetadataTool(guard)]
+    for tool in tools:
+        with pytest.raises(ValueError, match="arguments must be an object"):
+            tool.execute(None, context)

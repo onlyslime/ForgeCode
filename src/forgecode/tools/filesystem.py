@@ -32,6 +32,8 @@ def _is_skipped(path, guard) -> bool:
 
 
 def _required(arguments: dict[str, Any], name: str) -> str:
+    if not isinstance(arguments, dict):
+        raise ValueError("arguments must be an object")
     value = arguments.get(name)
     if not isinstance(value, str) or not value:
         raise ValueError(f"{name} must be a non-empty string")
