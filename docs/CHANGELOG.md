@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.143 — 2026-08-31
+
+- **Response body strictness:** provider factory response translation now requires bytes-like bodies, matching request transport contracts.
+- **Verification:** provider tests, compile checks, and manual malformed-response inspection passed.
+
 ## v0.8.142 — 2026-08-31
 
 - **Transport URL safety:** reject control characters in custom transport URLs before provider-specific rewriting or network dispatch.

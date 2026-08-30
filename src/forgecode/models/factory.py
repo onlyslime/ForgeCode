@@ -133,6 +133,8 @@ class _ProtocolTransport:
         return url, headers, json.dumps(payload, ensure_ascii=False).encode()
 
     def _response(self, body: bytes) -> bytes:
+        if not isinstance(body, (bytes, bytearray)):
+            raise ValueError("provider response body must be bytes")
         try:
             data = json.loads(body.decode("utf-8"))
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:

@@ -184,6 +184,12 @@ def test_provider_transport_rejects_non_object_response():
         transport._response(b"[]")
 
 
+def test_provider_transport_rejects_non_bytes_response_body():
+    transport = _ProtocolTransport(object(), "anthropic", "secret")
+    with pytest.raises(ValueError, match="response body must be bytes"):
+        transport._response("{}")
+
+
 def test_anthropic_transport_rejects_invalid_content_blocks():
     transport = _ProtocolTransport(object(), "anthropic", "secret")
     with pytest.raises(ValueError, match="content must be a list"):
