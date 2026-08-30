@@ -14,6 +14,10 @@ copied into ForgeCode.
 Codex was inspected through Git tree objects because several Windows snapshot
 paths exceed the local checkout limit. OpenCode was shallow-cloned normally.
 
+The latest reachable heads were rechecked on 2026-08-30: Codex advanced to
+`88f776588f5e73467e7659c268f8358a9a2378b6`; OpenCode remains at the audited
+`10765ff2a9da8c3b88e4de873aa383a49c318912` commit.
+
 ## Capability matrix
 
 | Area | ForgeCode | Codex CLI evidence | OpenCode evidence | Decision |
