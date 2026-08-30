@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.7.41 — 2026-08-30
+
+- `rpc.describe` now publishes an explicit approval capability catalog: supported
+  modes, granular risk scopes, and unsupported Codex-style domains are separated.
+- Clients can negotiate safety behavior without mistaking capability discovery for
+  authorization; existing workspace and approval checks remain authoritative.
+
 ## v0.7.40 — 2026-08-30
 
 - RPC session recovery now validates persisted lifecycle states; unknown future

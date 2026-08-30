@@ -20,6 +20,10 @@ def test_rpc_describe_exposes_versioned_session_capabilities() -> None:
     assert payload["kind"] == "capabilities" and payload["data"]["version"] == 1
     assert "session.cancel" in payload["data"]["methods"]
     assert payload["data"]["safety"]["no_automatic_replay"] is True
+    approval = payload["data"]["approval"]
+    assert approval["modes"] == ["untrusted", "on-request", "never"] or tuple(approval["modes"]) == ("untrusted", "on-request", "never")
+    assert set(approval["granular_scopes"]) == {"changes", "execution", "evidence"}
+    assert "mcp_elicitations" in approval["unsupported_granular_scopes"]
     tools = payload["data"]["tools"]
     assert len(tools) == 31
     assert any(item["name"] == "git_worktree_create" and item["side_effecting"] for item in tools)

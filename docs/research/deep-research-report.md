@@ -675,7 +675,7 @@ CLI/TUI
 - [x] 每个 P0/P1 能力都有可执行验收标准或演示场景。
 - [x] 已明确竞品参考与本题自研实现的边界，避免误用现成 agent 框架。
 
-## ForgeCode 当前差距复核（2026-08-30，v0.7.40）
+## ForgeCode 当前差距复核（2026-08-30，v0.7.41）
 
 本节以当前仓库源码、定向测试和正常 `fcc` 工作流为准；竞品能力只作为产品
 形态基线，不把未能直接访问的页面当作已验证事实。OpenAI 官方 Codex 页面在
@@ -691,6 +691,13 @@ CLI/TUI
 | 安全 | Plan/Act/Bypass、启动信任、风险分类、审批、硬拦截、脱敏 | 不是操作系统级沙箱，需持续明确边界 | P0 |
 | 验证 | 测试 profile、有限修复、review/export、轨迹评估 | 缺少语言服务和调试器集成 | P1 |
 | 扩展发布 | Skills、hooks、SDK、JSONL RPC、工具收窄、uv/独立二进制布局 | 缺少 MCP、插件市场、跨平台一键安装 | P2 |
+
+v0.7.41 进一步公开 RPC 安全协商信息：`rpc.describe` 明确列出 ForgeCode
+支持的 `untrusted/on-request/never` 模式、`changes/execution/evidence` 三个
+风险域，以及尚未实现的 Codex 风格 sandbox/rules/skill/request-permissions/MCP
+域。该目录仅用于能力发现，不授予权限；实际 WorkspaceGuard、策略和审批仍在执行路径
+上生效。这缩小了客户端“能发现什么”和“能授权什么”混淆的差距，但不宣称已实现
+Codex granular approval。
 
 截至当前 v0.7.40，正常交互工作流还提供 `/context`（有界索引健康度）和
 `/events [limit] [kind]`（可筛选、带相对耗时和错误码的持久化事件尾部）。
