@@ -391,6 +391,8 @@ class GitCommitTool:
             return ToolResult(False, "git_commit denied by approval policy", {"error": "approval_denied"})
         if context.cancelled:
             return ToolResult(False, "git_commit cancelled before execution", {"error": "cancelled"})
+        if context.remaining_seconds(30.0) <= 0:
+            return ToolResult(False, "git_commit skipped because the run deadline has expired", {"error": "deadline_exceeded"})
         try:
             result = subprocess.run(["git", "diff", "--cached", "--quiet"], cwd=context.guard.root, capture_output=True, text=True, timeout=min(15.0, context.remaining_seconds(15.0)), check=False)
             if result.returncode == 0:

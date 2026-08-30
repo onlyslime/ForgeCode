@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.173 — 2026-08-31
+
+- **Commit deadline boundary:** `git_commit` now checks cancellation and the run deadline after approval before invoking Git, preventing expired sessions from creating commits.
+- **Verification:** command-boundary tests, compile checks, and manual expired-commit inspection passed.
+
 ## v0.8.172 — 2026-08-31
 
 - **Worktree mutation deadlines:** create and remove operations now recheck cancellation and run budgets after approval before touching Git state.
