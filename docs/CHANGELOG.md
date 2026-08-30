@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.162 — 2026-08-31
+
+- **Workspace-summary deadlines:** summary scans now honor cancellation and run deadlines, including the nested Git status query, instead of using an unconditional five-second wait.
+- **Verification:** command-boundary tests, compile checks, and manual expired-summary inspection passed.
+
 ## v0.8.161 — 2026-08-31
 
 - **Background failure persistence:** persisted task snapshots now retain `failed` for non-zero exits instead of collapsing every finished process into `completed`.

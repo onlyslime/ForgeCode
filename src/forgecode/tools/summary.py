@@ -55,6 +55,10 @@ class WorkspaceSummaryTool:
     def execute(self, arguments: dict[str, Any], context: ToolContext) -> ToolResult:
         if not isinstance(arguments, dict):
             raise ValueError("arguments must be an object")
+        if context.cancelled:
+            return ToolResult(False, "workspace summary cancelled before scan", {"error": "cancelled"})
+        if context.remaining_seconds(5.0) <= 0:
+            return ToolResult(False, "workspace summary skipped because the run deadline has expired", {"error": "deadline_exceeded"})
         root = context.guard.root
         top_level = []
         language_counts: dict[str, int] = {}
@@ -66,6 +70,10 @@ class WorkspaceSummaryTool:
         scanned = 0
         scan_truncated = False
         for path in sorted(root.rglob("*"), key=lambda candidate: candidate.as_posix()):
+            if context.cancelled:
+                return ToolResult(False, "workspace summary cancelled during scan", {"error": "cancelled"})
+            if context.remaining_seconds(5.0) <= 0:
+                return ToolResult(False, "workspace summary stopped because the run deadline has expired", {"error": "deadline_exceeded"})
             if scanned >= 2_000:
                 scan_truncated = True
                 break
@@ -85,7 +93,7 @@ class WorkspaceSummaryTool:
                     cwd=root,
                     capture_output=True,
                     text=True,
-                    timeout=5,
+                    timeout=context.remaining_seconds(5.0),
                     check=False,
                 )
                 if completed.returncode == 0:
