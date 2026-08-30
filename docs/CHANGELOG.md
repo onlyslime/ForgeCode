@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.7.44 — 2026-08-30
+
+- `rpc.describe` now publishes a versioned session event schema and the stable
+  event type catalog used by `session.events` polling.
+- The catalog is explicitly forward-compatible with unknown future event types.
+
 ## v0.7.43 — 2026-08-30
 
 - `session.events` supports bounded long-polling with `wait` (0–30 seconds),

@@ -25,6 +25,8 @@ def test_rpc_describe_exposes_versioned_session_capabilities() -> None:
     assert approval["codex_compatibility"]["on-request"] == "interactive"
     assert set(approval["granular_scopes"]) == {"changes", "execution", "evidence"}
     assert "mcp_elicitations" in approval["unsupported_granular_scopes"]
+    assert payload["data"]["event_schema"]["version"] == 1
+    assert "run_finished" in payload["data"]["event_schema"]["types"]
     tools = payload["data"]["tools"]
     assert len(tools) == 31
     assert any(item["name"] == "git_worktree_create" and item["side_effecting"] for item in tools)
