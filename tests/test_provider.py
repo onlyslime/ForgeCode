@@ -244,6 +244,11 @@ def test_transport_result_rejects_implicitly_convertible_body():
         _json_result((200, 4))
 
 
+def test_transport_result_rejects_oversized_body():
+    with pytest.raises(ValueError, match="exceeds size limit"):
+        _json_result((200, b"x" * 4_000_001))
+
+
 def test_provider_neutral_response_validation_rejects_nonfinite_usage_and_bad_finish_reason():
     assert not is_valid_response(ModelResponse(Message("assistant", "ok"), finish_reason="made_up"))
     assert not is_valid_response(ModelResponse(Message("assistant", "ok"), usage={"total_tokens": float("nan")}))

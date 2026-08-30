@@ -28,6 +28,8 @@ def _json_result(result: Any) -> tuple[int, bytes, dict[str, str]]:
         raise ValueError("transport returned invalid result fields") from exc
     if status < 100 or status > 599:
         raise ValueError("transport returned invalid HTTP status")
+    if len(body) > 4_000_000:
+        raise ValueError("transport response body exceeds size limit")
     if not isinstance(headers, dict):
         raise ValueError("transport returned invalid headers")
     if len(headers) > 128 or any(not isinstance(key, str) or not isinstance(value, str) or len(key) > 256 or len(value) > 8_000 or any(ord(ch) < 32 for ch in key + value) for key, value in headers.items()):

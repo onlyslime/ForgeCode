@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.147 — 2026-08-31
+
+- **Transport response bound:** cap custom transport response bodies at 4 MiB before parsing, matching provider safety limits and reducing memory pressure.
+- **Verification:** provider tests, compile checks, and manual oversized-body inspection passed.
+
 ## v0.8.146 — 2026-08-31
 
 - **Common request validation:** Ollama requests now enforce the same object-only message list contract as Anthropic and Google translations.
