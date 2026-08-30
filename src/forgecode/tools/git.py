@@ -76,6 +76,8 @@ class GitStatusTool:
         self.guard = guard
 
     def execute(self, arguments: dict[str, Any], context: ToolContext) -> ToolResult:
+        if not isinstance(arguments, dict):
+            raise ValueError("arguments must be an object")
         command = ["git", "status", "--short"] if arguments.get("porcelain", True) else ["git", "status"]
         try:
             result = subprocess.run(command, cwd=context.guard.root, capture_output=True, text=True, timeout=min(15.0, context.remaining_seconds(15.0)), check=False)
@@ -93,6 +95,8 @@ class GitDiffTool:
         self.guard = guard
 
     def execute(self, arguments: dict[str, Any], context: ToolContext) -> ToolResult:
+        if not isinstance(arguments, dict):
+            raise ValueError("arguments must be an object")
         command = ["git", "diff", "--no-ext-diff", "--unified=3"]
         if arguments.get("staged"):
             command.append("--cached")
@@ -115,6 +119,8 @@ class GitLogTool:
         self.guard = guard
 
     def execute(self, arguments, context):
+        if not isinstance(arguments, dict):
+            raise ValueError("arguments must be an object")
         limit = arguments.get("limit", 10)
         if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 50:
             raise ValueError("limit must be between 1 and 50")

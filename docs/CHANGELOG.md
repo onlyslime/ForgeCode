@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.92 — 2026-08-31
+
+- Added object-argument validation to Git status, diff, and log inspection
+  tools, preventing leaked attribute errors on malformed direct calls.
+- Verification: three-tool invalid-input regression, manual API checks,
+  compileall, and diff checks passed.
+
 ## v0.8.91 — 2026-08-31
 
 - Serialized background state snapshots with the manager's re-entrant lock,
