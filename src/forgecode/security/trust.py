@@ -29,6 +29,12 @@ class TrustStore:
     def _check(self) -> None:
         if not self.workspace.is_dir():
             raise TrustError("workspace is not a directory")
+        try:
+            # Validate the parent even when trust.json does not exist yet;
+            # otherwise a pre-created .forgecode link could redirect writes.
+            assert_no_path_alias(self.path.parent, message="trust directory must be workspace-local")
+        except WorkspaceViolation as exc:
+            raise TrustError(str(exc)) from exc
         if os.path.lexists(self.path):
             try:
                 assert_no_path_alias(self.path, message="trust record must be a workspace-local regular file")

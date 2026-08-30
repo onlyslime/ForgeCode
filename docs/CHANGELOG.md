@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.68 — 2026-08-31
+
+- Hardened trust persistence by rejecting symlink/junction `.forgecode`
+  directories before creating or writing trust records.
+- Verification: alias-directory regression, targeted trust tests, and manual
+  boundary check passed.
+
 ## v0.8.67 — 2026-08-31
 
 - Hardened trust grants with unique, flushed, fsynced temporary files so
