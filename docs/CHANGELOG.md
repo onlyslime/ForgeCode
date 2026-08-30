@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.69 — 2026-08-31
+
+- Hardened background task state persistence with unique temporary files and
+  durable flushes before atomic replacement.
+- Verification: background tool tests, compileall, diff checks, and manual
+  concurrent state-write inspection passed.
+
 ## v0.8.68 — 2026-08-31
 
 - Hardened trust persistence by rejecting symlink/junction `.forgecode`

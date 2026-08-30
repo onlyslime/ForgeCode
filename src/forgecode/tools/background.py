@@ -1,7 +1,7 @@
 """Controlled background process tools with incremental output polling."""
 from __future__ import annotations
 from dataclasses import dataclass, field
-import json, os, subprocess, threading, time, uuid
+import json, os, subprocess, tempfile, threading, time, uuid
 from pathlib import Path
 from typing import Any
 from .base import ToolContext, ToolDefinition, ToolResult
@@ -62,9 +62,19 @@ class ProcessManager:
         rows = rows[-self.max_history:]
         try:
             self._state_path.parent.mkdir(parents=True, exist_ok=True)
-            tmp = self._state_path.with_suffix(self._state_path.suffix + ".tmp")
-            tmp.write_text(json.dumps({"schema_version": 1, "tasks": rows}, ensure_ascii=False), encoding="utf-8")
-            os.replace(tmp, self._state_path)
+            descriptor, name = tempfile.mkstemp(prefix="background-", suffix=".tmp", dir=self._state_path.parent)
+            tmp = Path(name)
+            try:
+                with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as stream:
+                    descriptor = -1
+                    stream.write(json.dumps({"schema_version": 1, "tasks": rows}, ensure_ascii=False))
+                    stream.flush()
+                    os.fsync(stream.fileno())
+                os.replace(tmp, self._state_path)
+            finally:
+                if descriptor >= 0:
+                    os.close(descriptor)
+                tmp.unlink(missing_ok=True)
         except OSError:
             return
 
