@@ -25,9 +25,16 @@ class _ProtocolTransport:
         self.delegate, self.provider, self.api_key = delegate, provider, api_key
 
     def _request(self, url: str, headers: dict[str, str], body: bytes) -> tuple[str, dict[str, str], bytes]:
-        payload = json.loads(body.decode("utf-8"))
+        try:
+            payload = json.loads(body.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise ValueError("provider request body must be valid JSON") from exc
+        if not isinstance(payload, dict):
+            raise ValueError("provider request body must be an object")
         if self.provider == "anthropic":
             messages = payload.pop("messages", [])
+            if not isinstance(messages, list) or any(not isinstance(message, dict) for message in messages):
+                raise ValueError("provider messages must be objects")
             payload["max_tokens"] = payload.get("max_tokens", 4096)
             anthropic_messages = []
             for message in messages:
@@ -56,6 +63,8 @@ class _ProtocolTransport:
             url = url.rsplit("/chat/completions", 1)[0] + "/messages"
         elif self.provider == "google":
             messages = payload.pop("messages", [])
+            if not isinstance(messages, list) or any(not isinstance(message, dict) for message in messages):
+                raise ValueError("provider messages must be objects")
             model = payload.get("model")
             raw_tools = payload.pop("tools", [])
             declarations = []

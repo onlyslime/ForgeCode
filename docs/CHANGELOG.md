@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.130 — 2026-08-31
+
+- **Transport request validation:** provider factory translation now rejects malformed JSON bodies and non-object message entries before field access.
+- **Verification:** provider tests, compile checks, and manual malformed-request inspection passed.
+
 ## v0.8.129 — 2026-08-31
 
 - **Provider factory validation:** Anthropic translation now rejects non-object tool schemas before field access, avoiding leaked attribute errors from malformed requests.
