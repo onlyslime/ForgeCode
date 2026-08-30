@@ -164,6 +164,10 @@ class SearchTool:
         if not isinstance(arguments, dict):
             raise ValueError("arguments must be an object")
         query = _required(arguments, "query")
+        if context.cancelled:
+            return ToolResult(False, "search cancelled before scan", {"error": "cancelled"})
+        if context.remaining_seconds(10.0) <= 0:
+            return ToolResult(False, "search skipped because the run deadline has expired", {"error": "deadline_exceeded"})
         path_value = arguments.get("path", ".")
         root = context.guard.resolve(path_value, must_exist=True)
         lexical_root = Path(path_value)
