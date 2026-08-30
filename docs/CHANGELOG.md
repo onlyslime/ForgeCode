@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.56 — 2026-08-31
+
+- Snapshot validated tool schemas at registration time so post-registration
+  mutation of extension-owned dictionaries cannot alter provider payloads.
+- Verification: registry tests, manual schema mutation check, compileall, and
+  diff checks passed.
+
 ## v0.8.55 — 2026-08-31
 
 - Hardened tool schema registration against recursion-depth failures by

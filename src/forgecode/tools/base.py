@@ -144,6 +144,7 @@ class Tool(Protocol):
 class ToolRegistry:
     def __init__(self, *, max_output_chars: int = 20_000):
         self._tools: dict[str, Tool] = {}
+        self._schema_snapshots: dict[str, dict[str, Any]] = {}
         self._unavailable_tools: set[str] = set()
         if isinstance(max_output_chars, bool) or not isinstance(max_output_chars, int) or not 1 <= max_output_chars <= 1_000_000:
             raise ValueError("max_output_chars must be an integer between 1 and 1000000")
@@ -166,9 +167,11 @@ class ToolRegistry:
             raise ValueError("tool parameters must be strict JSON") from exc
         if len(encoded_parameters.encode("utf-8")) > 1_000_000:
             raise ValueError("tool parameters exceed 1 MiB")
+        schema_snapshot = json.loads(encoded_parameters)
         if name in self._tools:
             raise ValueError(f"duplicate tool: {tool.definition.name}")
-        self._tools[tool.definition.name] = tool
+        self._tools[name] = tool
+        self._schema_snapshots[name] = schema_snapshot
 
     def filter(self, policy: Any | None = None) -> "ToolRegistry":
         """Return a registry narrowed by policy; policy cannot add tools."""
@@ -205,7 +208,7 @@ class ToolRegistry:
                 "function": {
                     "name": definition.name,
                     "description": definition.description,
-                    "parameters": definition.parameters,
+                    "parameters": self._schema_snapshots[definition.name],
                 },
             }
             for definition in self.definitions(mode)

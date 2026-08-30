@@ -226,3 +226,13 @@ def test_registry_rejects_deeply_nested_schema():
         pass
     else:
         raise AssertionError("expected deep schema validation")
+
+
+def test_registry_schema_snapshot_resists_post_registration_mutation():
+    parameters = {"type": "object", "properties": {"safe": {"type": "string"}}}
+    definition = type("D", (), {"name": "mutable_schema", "description": "", "parameters": parameters})()
+    registry = ToolRegistry()
+    registry.register(type("T", (), {"definition": definition})())
+    parameters["properties"]["injected"] = {"type": "string"}
+    schema = registry.schemas()[0]["function"]["parameters"]
+    assert "injected" not in schema["properties"]
