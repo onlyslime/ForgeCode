@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.7.50 — 2026-08-30
+
+- RPC session status now includes bounded `active_flags` (`turn_in_progress`,
+  `paused`, or `recovery_required`) while preserving the existing state field.
+- Flags are descriptive metadata only and do not grant control or execution.
+
 ## v0.7.49 — 2026-08-30
 
 - Provider capabilities now advertise transport modes (`json`, and `sse` when

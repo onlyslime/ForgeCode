@@ -675,7 +675,7 @@ CLI/TUI
 - [x] 每个 P0/P1 能力都有可执行验收标准或演示场景。
 - [x] 已明确竞品参考与本题自研实现的边界，避免误用现成 agent 框架。
 
-## ForgeCode 当前差距复核（2026-08-30，v0.7.49）
+## ForgeCode 当前差距复核（2026-08-30，v0.7.50）
 
 本节以当前仓库源码、定向测试和正常 `fcc` 工作流为准；竞品能力只作为产品
 形态基线，不把未能直接访问的页面当作已验证事实。OpenAI 官方 Codex 页面在
@@ -1279,3 +1279,6 @@ v0.7.48 增加 `/queue` 可见性入口，展示有界 follow-up 队列的活动
 v0.7.49 为 provider capability 增加 `transports` 声明：非流式为 `json`，启用
 streaming 时为 `json+sse`；不宣称 WebSocket。相比 Pi 的多传输 auto 选择仍是差距，
 但客户端已能安全区分当前可用协议。
+v0.7.50 在 RPC session status 中增加受限 `active_flags`，用于表达执行中、暂停和
+需要恢复三种活动原因。这与 Codex ThreadStatus 的 active flags 方向一致，但仍是
+session 级描述，不等价于 Codex 的 thread/turn 状态对象。

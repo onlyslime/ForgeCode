@@ -433,6 +433,8 @@ def test_rpc_session_events_reports_cursor_is_current(tmp_path):
     data = _call({"method": "session.events", "params": {"session": handle, "after": 0}})["data"]
     assert data["oldest_sequence"] == 1
     assert data["truncated"] is False
+    status = _call({"method": "session.status", "params": {"session": handle}})["data"]
+    assert status["active_flags"] == ["paused"]
 
 
 def test_rpc_session_events_can_filter_by_type(tmp_path):
