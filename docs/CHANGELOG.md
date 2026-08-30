@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.7.7 — 2026-08-30
+
+- Synchronized the interactive and machine tool inventories after adding
+  `list_processes`; it is exposed as a read-only capability in `/tools`.
+
 ## v0.7.6 — 2026-08-30
 
 - Added a bounded `list_processes` background-task tool for discovering active
