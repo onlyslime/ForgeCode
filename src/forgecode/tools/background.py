@@ -95,6 +95,8 @@ class ProcessManager:
             return
 
     def start(self, command: str, root, task_id: str) -> _Process:
+        if not isinstance(command, str) or not command.strip() or len(command) > 4_000:
+            raise ValueError("command must be a non-empty string of at most 4000 characters")
         if not isinstance(task_id, str) or not 0 < len(task_id) <= _MAX_TASK_ID_CHARS or any(ch in task_id for ch in "\r\n"):
             raise ValueError("task_id must be bounded newline-safe text")
         with self._lock:

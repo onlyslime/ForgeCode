@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.74 — 2026-08-31
+
+- Added manager-level validation for background commands, rejecting empty,
+  non-text, and oversized commands before process creation.
+- Verification: direct API boundary checks, background tests, compileall, and
+  diff checks passed.
+
 ## v0.8.73 — 2026-08-31
 
 - Made `process_status` return a failed tool result for unknown task IDs,

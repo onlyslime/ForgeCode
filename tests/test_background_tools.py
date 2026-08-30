@@ -59,6 +59,17 @@ def test_background_manager_bounds_task_id(tmp_path):
             raise AssertionError("expected task id validation")
 
 
+def test_background_manager_bounds_command(tmp_path):
+    manager = ProcessManager()
+    for command in ("", "   ", None, 42, "x" * 4001):
+        try:
+            manager.start(command, tmp_path, "task")
+        except ValueError as exc:
+            assert "command" in str(exc)
+        else:
+            raise AssertionError("expected command validation")
+
+
 def test_background_output_is_hard_bounded_and_completion_duration_stable(tmp_path):
     guard = WorkspaceGuard(tmp_path); context = ToolContext(guard, AllowAllApproval())
     manager = ProcessManager(max_output_chars=12)
