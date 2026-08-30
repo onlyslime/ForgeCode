@@ -17,6 +17,13 @@ def test_rpc_describe_exposes_versioned_session_capabilities() -> None:
     assert payload["kind"] == "capabilities" and payload["data"]["version"] == 1
     assert "session.cancel" in payload["data"]["methods"]
     assert payload["data"]["safety"]["no_automatic_replay"] is True
+
+
+def test_rpc_describe_honors_request_id_replay_contract() -> None:
+    request = json.dumps({"id": "describe-replay", "method": "rpc.describe", "params": {}})
+    first = list(serve_lines([request]))
+    second = list(serve_lines([request]))
+    assert first == second and len(second) == 1
 from forgecode.application.commands import _build_recovery_prompt, _machine_envelope
 
 

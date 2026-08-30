@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.7.26 — 2026-08-30
+
+- Fixed `rpc.describe` request-id handling so capability discovery follows the
+  same bounded replay and idempotency contract as other JSONL RPC methods.
+- Added regression coverage for repeated capability requests.
+
 ## v0.7.25 — 2026-08-30
 
 - Static `symbol_hover` now recognizes common JavaScript/TypeScript arrow

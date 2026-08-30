@@ -692,7 +692,7 @@ CLI/TUI
 | 验证 | 测试 profile、有限修复、review/export、轨迹评估 | 缺少语言服务和调试器集成 | P1 |
 | 扩展发布 | Skills、hooks、SDK、JSONL RPC、工具收窄、uv/独立二进制布局 | 缺少 MCP、插件市场、跨平台一键安装 | P2 |
 
-截至当前 v0.7.25，正常交互工作流还提供 `/context`（有界索引健康度）和
+截至当前 v0.7.26，正常交互工作流还提供 `/context`（有界索引健康度）和
 `/events [limit] [kind]`（可筛选、带相对耗时和错误码的持久化事件尾部）。
 这些能力不改变工具权限，只把已有审计证据暴露给用户；对应交互、机器契约和
 provider 回归测试均已通过。
@@ -924,6 +924,13 @@ scope allow/deny 与 fallback 全局策略。该字段只描述策略路径，�
   有界上下文并标记 static precision。
 - **非目标**：不引入解析器或 LSP，不推断类型，不执行源代码。
 - **验证**：语义工具定向测试 18 passed，compileall 与 diff 检查通过。
+
+### 0.7.26 实施审计：RPC capability replay 一致性（2026-08-30）
+
+- **范围**：`rpc.describe` 现在将带 request id 的响应写入有界 replay/fingerprint 缓存，
+  与其它 RPC 方法保持重复请求幂等及冲突检测语义。
+- **非目标**：不改变 capability 内容、协议版本或会话执行行为。
+- **验证**：CLI machine contract 定向测试 27 passed，compileall 与 diff 检查通过。
 
 ### 当前差距复核（v0.7.25）
 
