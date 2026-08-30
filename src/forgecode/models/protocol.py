@@ -69,7 +69,7 @@ class ProviderContext:
             or not math.isfinite(self.deadline_monotonic)
         ):
             raise ValueError("deadline_monotonic must be a finite number or None")
-        if not isinstance(self.request_id, str) or len(self.request_id) > 256:
+        if not isinstance(self.request_id, str) or len(self.request_id) > 256 or any(ord(ch) < 32 or ord(ch) == 127 for ch in self.request_id):
             raise ValueError("request_id must be bounded text")
         if self.on_text_delta is not None and not callable(self.on_text_delta):
             raise ValueError("on_text_delta must be callable or None")

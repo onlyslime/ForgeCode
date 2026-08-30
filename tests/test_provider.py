@@ -8,6 +8,12 @@ from forgecode.models.openai_compatible import _tool_schema_to_payload
 from forgecode.models.factory import _ProtocolTransport, _json_result
 
 
+def test_provider_context_rejects_control_character_request_id():
+    from forgecode.models import ProviderContext
+    with pytest.raises(ValueError, match="request_id"):
+        ProviderContext(request_id="req\nforged")
+
+
 class RecordingTransport:
     def __init__(self, status=200, payload=None):
         self.status = status

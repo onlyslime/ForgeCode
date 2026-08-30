@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.205 — 2026-08-31
+
+- **Request correlation hardening:** provider request IDs now reject control
+  characters before they enter telemetry, retry metadata, or audit records.
+- **Verification:** provider regression tests, compile, diff checks, and a
+  manual newline-injection check passed.
+
 ## v0.8.204 — 2026-08-31
 
 - **Provider credential boundary:** API keys are now type-checked and reject

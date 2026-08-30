@@ -1,6 +1,6 @@
 """ForgeCode coding-agent framework."""
 
-__version__ = "0.8.204"
+__version__ = "0.8.205"
 
 # Public, provider-neutral review API.  Importing these types has no I/O and
 # keeps CLI/application consumers independent from storage internals.
