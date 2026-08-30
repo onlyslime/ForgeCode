@@ -11,19 +11,20 @@ ForgeCode uses semantic-looking versions in the form `vA.B.C` for every commit a
 
 The initial framework commit is `v0.0.1: initialize framework`.
 
-The current framework version is `v0.7.61`. The ordinary next version after this
-release is `v0.0.9`.
+The current framework version is maintained in the repository's version files;
+the next version is determined by the requested release level and the rules
+above. This document intentionally avoids hard-coding a release number so that
+the checklist remains valid as the project evolves.
 
-## v0.0.8 release checklist
+## Release checklist
 
-Before the release commit, confirm that `VERSION`, `pyproject.toml` and
-`src/forgecode/__init__.py` all contain `0.0.8`; run the focused and complete
-test suites, `compileall`, `forgecode doctor`, and the documented CLI smoke
-commands. Inspect `git status --short --ignored` for credentials, private
-paths, generated runtime data and the ignored `docs/goals/` prompts. The
-acceptance record in local ignored `docs/releases/v008-acceptance-report.md` must contain only bounded
-command results, identifiers and digest summaries. Create exactly one commit
-with subject `v0.0.8: harden cancellation, recovery, and evidence workflows`,
-create annotated tag `v0.0.8`, and push the branch and tag only after local
-checks pass. A network or permission failure must be reported as a blocker
-rather than described as a successful publication.
+Before a release commit, confirm that `VERSION`, `pyproject.toml` and
+`src/forgecode/__init__.py` contain the same version. Run the focused and
+complete test suites, `compileall`, `forgecode doctor`, and the documented CLI
+smoke commands. Inspect `git status --short --ignored` for credentials, private
+paths, generated runtime data, and ignored `docs/goals/` prompts. Update
+`docs/CHANGELOG.md` with the user-visible behavior and verification evidence.
+Create one commit with subject `vA.B.C: short description`, create the matching
+annotated tag when a release is intended, and push the branch and tag only
+after local checks pass. Report network or permission failures as blockers
+rather than describing publication as successful.
