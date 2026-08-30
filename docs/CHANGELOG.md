@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.7.23 — 2026-08-30
+
+- Added read-only `rpc.describe` capability discovery with protocol version,
+  session controls, and explicit safety guarantees.
+- Existing JSONL RPC methods and request/replay semantics remain unchanged.
+
 ## v0.7.22 — 2026-08-30
 
 - Human `/tools` output is now grouped by risk category and marks

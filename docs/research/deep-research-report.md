@@ -691,7 +691,7 @@ CLI/TUI
 | 验证 | 测试 profile、有限修复、review/export、轨迹评估 | 缺少语言服务和调试器集成 | P1 |
 | 扩展发布 | Skills、hooks、SDK、JSONL RPC、工具收窄、uv/独立二进制布局 | 缺少 MCP、插件市场、跨平台一键安装 | P2 |
 
-截至当前 v0.7.22，正常交互工作流还提供 `/context`（有界索引健康度）和
+截至当前 v0.7.23，正常交互工作流还提供 `/context`（有界索引健康度）和
 `/events [limit] [kind]`（可筛选、带相对耗时和错误码的持久化事件尾部）。
 这些能力不改变工具权限，只把已有审计证据暴露给用户；对应交互、机器契约和
 provider 回归测试均已通过。
@@ -902,6 +902,13 @@ scope allow/deny 与 fallback 全局策略。该字段只描述策略路径，�
   并用 `!` 标记副作用工具；JSON/JSONL 输出契约保持不变。
 - **非目标**：不改变工具注册、审批或实际权限，不新增专用演示入口。
 - **验证**：CLI machine contract 与工具策略定向测试通过，compileall/diff 检查通过。
+
+### 0.7.23 实施审计：RPC capability discovery（2026-08-30）
+
+- **范围**：新增只读 `rpc.describe`，返回协议版本、方法列表、会话控制集合及
+  WorkspaceGuard/审批/禁止自动重放等安全保证。
+- **非目标**：不启动会话、不执行工具、不建立长期 daemon，不改变既有 JSONL 请求语义。
+- **验证**：RPC/CLI machine contract 定向测试通过，compileall 和 diff 检查通过。
 
 ### 当前差距复核（v0.7.19）
 

@@ -8,6 +8,15 @@ from pathlib import Path
 import pytest
 
 from forgecode.cli import main
+from forgecode.rpc import serve_lines
+
+
+def test_rpc_describe_exposes_versioned_session_capabilities() -> None:
+    rows = list(serve_lines([json.dumps({"id": "describe-1", "method": "rpc.describe", "params": {}})]))
+    payload = json.loads(rows[0])
+    assert payload["kind"] == "capabilities" and payload["data"]["version"] == 1
+    assert "session.cancel" in payload["data"]["methods"]
+    assert payload["data"]["safety"]["no_automatic_replay"] is True
 from forgecode.application.commands import _build_recovery_prompt, _machine_envelope
 
 

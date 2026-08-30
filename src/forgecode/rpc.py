@@ -260,6 +260,10 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                 if not isinstance(method, str) or len(method) > 128 or any(ch.isspace() for ch in method):
                     raise ValueError("method must be bounded non-whitespace text")
                 method_map = {"trust.status": ["trust", "status"], "trust.grant": ["trust", "grant"], "trust.revoke": ["trust", "revoke"], "provider.list": ["provider", "list"], "provider.health": ["provider", "health"], "config.show": ["config", "show"], "config.profiles": ["config", "profiles"], "config.policy": ["config", "policy"], "doctor": ["doctor"], "login": ["login"], "run": ["run"], "session.open": ["session", "open"], "session.run": ["run"], "session.list": ["sessions"], "session.events": ["session", "events"], "session.cancel": ["session", "cancel"], "session.pause": ["session", "pause"], "session.resume": ["session", "resume"], "session.approval": ["session", "approval"], "session.close": ["session", "close"], "session.status": ["session", "status"], "session.result": ["session", "result"], "session.wait": ["session", "wait"], "session.inspect": ["session", "inspect"], "session.tree": ["session", "tree"], "session.export": ["session", "export"]}
+                if method == "rpc.describe":
+                    payload = {"schema_version": 1, "kind": "capabilities", "ok": True, "command": "rpc.describe", "data": {"protocol": "forgecode-jsonl-rpc", "version": 1, "methods": ["rpc.describe", *sorted(method_map)], "session_controls": ["open", "run", "status", "events", "result", "wait", "pause", "resume", "cancel", "approval", "close"], "safety": {"workspace_guard": True, "approval_required_for_side_effects": True, "no_automatic_replay": True}}, "exit_code": 0}
+                    yield json.dumps(payload, ensure_ascii=False, allow_nan=False)
+                    continue
                 if method not in method_map:
                     raise ValueError("unsupported RPC method")
                 if argv_value:
