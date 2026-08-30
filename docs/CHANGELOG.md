@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.131 — 2026-08-31
+
+- **Transport response validation:** provider factory adapters now reject malformed or non-object response bodies before provider-specific field access.
+- **Verification:** provider tests, compile checks, and manual malformed-response inspection passed.
+
 ## v0.8.130 — 2026-08-31
 
 - **Transport request validation:** provider factory translation now rejects malformed JSON bodies and non-object message entries before field access.

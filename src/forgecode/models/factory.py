@@ -109,7 +109,12 @@ class _ProtocolTransport:
         return url, headers, json.dumps(payload, ensure_ascii=False).encode()
 
     def _response(self, body: bytes) -> bytes:
-        data = json.loads(body.decode("utf-8"))
+        try:
+            data = json.loads(body.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise ValueError("provider response body must be valid JSON") from exc
+        if not isinstance(data, dict):
+            raise ValueError("provider response body must be an object")
         if self.provider == "anthropic":
             blocks = data.get("content", [])
             text = "".join(str(b.get("text", "")) for b in blocks if b.get("type") == "text")
