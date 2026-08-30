@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.111 — 2026-08-31
+
+- Enforced `additionalProperties: false` at the registry execution boundary,
+  rejecting unknown tool-call fields before tool dispatch.
+- Verification: registry unknown-field regression, manual dispatch check,
+  compileall, and diff checks passed.
+
 ## v0.8.110 — 2026-08-31
 
 - Added object-argument validation to `repository_map`, aligning runtime

@@ -249,6 +249,13 @@ class ToolRegistry:
             )
         if not isinstance(arguments, dict):
             return ToolResult(False, "tool arguments must be an object", {"error": "invalid_arguments"})
+        schema = self._schema_snapshots.get(name)
+        if isinstance(schema, dict) and schema.get("additionalProperties") is False:
+            properties = schema.get("properties", {})
+            if isinstance(properties, dict):
+                unknown = sorted(set(arguments) - set(properties))
+                if unknown:
+                    return ToolResult(False, "tool arguments contain unknown fields", {"error": "invalid_arguments", "unknown_fields": unknown[:32]})
         before_hook_issues = ()
         if context.hooks is not None:
             hook_correlation = context.correlation_id or f"{context.run_id or 'run'}:tool:{name}"
