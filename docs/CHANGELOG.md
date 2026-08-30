@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.45 — 2026-08-31
+
+- Added bounded newline-safe task-ID validation at the `ProcessManager.start()`
+  boundary, protecting direct and extension callers from state-key injection.
+- Verification: background tests, manual task-ID checks, compileall, and diff
+  checks passed.
+
 ## v0.8.44 — 2026-08-31
 
 - Extended destructive Git push hard-blocking to short `-f`, `-d`, and

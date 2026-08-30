@@ -30,6 +30,17 @@ def test_background_manager_rejects_duplicate_task_id(tmp_path):
         item.process.wait(timeout=3)
 
 
+def test_background_manager_bounds_task_id(tmp_path):
+    manager = ProcessManager()
+    for task_id in ("", "x\n", "x" * 129):
+        try:
+            manager.start("python -c \"print('x')\"", tmp_path, task_id)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("expected task id validation")
+
+
 def test_background_output_is_hard_bounded_and_completion_duration_stable(tmp_path):
     guard = WorkspaceGuard(tmp_path); context = ToolContext(guard, AllowAllApproval())
     manager = ProcessManager(max_output_chars=12)

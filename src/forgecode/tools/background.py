@@ -69,6 +69,8 @@ class ProcessManager:
             return
 
     def start(self, command: str, root, task_id: str) -> _Process:
+        if not isinstance(task_id, str) or not 0 < len(task_id) <= _MAX_TASK_ID_CHARS or any(ch in task_id for ch in "\r\n"):
+            raise ValueError("task_id must be bounded newline-safe text")
         with self._lock:
             active = sum(item.process.poll() is None for item in self._items.values())
             if active >= self.max_tasks:
