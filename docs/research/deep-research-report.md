@@ -675,7 +675,7 @@ CLI/TUI
 - [x] 每个 P0/P1 能力都有可执行验收标准或演示场景。
 - [x] 已明确竞品参考与本题自研实现的边界，避免误用现成 agent 框架。
 
-## ForgeCode 当前差距复核（2026-08-30，v0.7.45）
+## ForgeCode 当前差距复核（2026-08-30，v0.7.46）
 
 本节以当前仓库源码、定向测试和正常 `fcc` 工作流为准；竞品能力只作为产品
 形态基线，不把未能直接访问的页面当作已验证事实。OpenAI 官方 Codex 页面在
@@ -1199,6 +1199,10 @@ pytest collection warning。
 
 每项实现都需要源码入口、定向测试、CLI 可观察证据和 changelog 条目；不以
 “功能数量”替代可靠性、安全边界或可解释的失败结果。
+
+v0.7.46 为事件分页增加 `has_more`，与 Codex app-server 常见的分页/游标消费
+模式更接近；客户端不必通过“返回数量是否等于 limit”自行猜测，且仍受单次最多
+100 条和 session 事件保留上限约束。
 
 v0.7.45 为 `session.events` 响应增加稳定 `event_id`、session 归属和
 `schema_version`。事件 ID 使用 session handle + 单调 sequence，适合客户端断线

@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.7.46 — 2026-08-30
+
+- `session.events` now reports `has_more`, allowing clients to distinguish an
+  exhausted cursor from a bounded page that needs another request.
+
 ## v0.7.45 — 2026-08-30
 
 - RPC session event responses now include stable `event_id`, `session`, and

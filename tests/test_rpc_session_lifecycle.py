@@ -445,6 +445,7 @@ def test_rpc_session_events_can_filter_by_type(tmp_path):
     assert data["events"][0]["schema_version"] == 1
     assert data["events"][0]["event_id"].startswith(f"{handle}:")
     assert data["events"][0]["session"] == handle
+    assert data["has_more"] is False
 
 
 def test_rpc_session_handle_can_be_recovered_from_workspace_metadata(tmp_path):

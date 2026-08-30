@@ -568,6 +568,7 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                             for item in selected
                         ]
                         data["next_sequence"] = int(data["events"][-1]["sequence"]) if data["events"] else after
+                        data["has_more"] = len(events) > len(selected)
                         retained = info.get("events", [])
                         oldest = int(retained[0].get("sequence", 0)) if retained else int(info.get("sequence", 0)) + 1
                         data["oldest_sequence"] = oldest
