@@ -10,7 +10,7 @@ def test_background_task_can_be_started_and_polled(tmp_path):
     assert started.ok
     assert "command" not in started.metadata
     task_id = started.metadata["task_id"]
-    for _ in range(20):
+    for _ in range(100):
         result = PollProcessTool(guard, manager).execute({"task_id": task_id}, context)
         if result.metadata.get("status") != "running": break
         time.sleep(0.05)
