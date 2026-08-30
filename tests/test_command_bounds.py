@@ -9,6 +9,7 @@ from forgecode.tools.quality import DiagnosticsTool, TestTool as QualityCheckToo
 from forgecode.tools.filesystem import ListFilesTool, ReadFileTool, SearchTool, WriteFileTool
 from forgecode.tools.repository_map import RepositoryMapTool
 from forgecode.tools.understanding import ReadRangeTool, ListSymbolsTool, FindDefinitionTool, FindReferencesTool, SymbolHoverTool, FileMetadataTool
+from forgecode.tools.lsp import LspStatusTool
 import pytest
 
 
@@ -133,3 +134,8 @@ def test_understanding_path_must_be_string(tmp_path: Path):
     guard = WorkspaceGuard(tmp_path); context = ToolContext(guard, AllowAllApproval())
     with pytest.raises(ValueError, match="path must be a string"):
         list(_source_files(context, 42))
+
+
+def test_lsp_status_rejects_non_object_arguments(tmp_path: Path):
+    with pytest.raises(ValueError, match="arguments must be an object"):
+        LspStatusTool().execute(None, None)

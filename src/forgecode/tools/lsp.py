@@ -21,6 +21,8 @@ class LspStatusTool:
     }
 
     def execute(self, arguments, context):
+        if not isinstance(arguments, dict):
+            raise ValueError("arguments must be an object")
         rows = []
         for language, candidates in self._SERVERS.items():
             found = next((name for name in candidates if shutil.which(name)), None)

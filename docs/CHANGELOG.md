@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.107 — 2026-08-31
+
+- Added object-argument validation to `lsp_status`, aligning the read-only
+  discovery tool with the repository-wide tool input contract.
+- Verification: invalid-input regression, manual API check, compileall, and
+  diff checks passed.
+
 ## v0.8.106 — 2026-08-31
 
 - Added strict string validation for optional code-understanding `path`
