@@ -259,6 +259,8 @@ class WriteFileTool:
         # Never prepare a transaction or touch the target after cancellation.
         if context.cancelled:
             return ToolResult(False, "write_file cancelled after approval", {"error": "cancelled", "approval": "approved", "cancellation_reason": context.cancellation_reason, "transaction_id": transaction_id, "path": path_value})
+        if context.remaining_seconds(1.0) <= 0:
+            return ToolResult(False, "write_file skipped because the run deadline has expired", {"error": "deadline_exceeded", "approval": "approved", "transaction_id": transaction_id, "path": path_value})
         stale = context.deny_if_stale(self.definition.name)
         if stale:
             return stale
@@ -303,6 +305,13 @@ class WriteFileTool:
                 except Exception:
                     pass
             return ToolResult(False, "write_file cancelled before write", {"error": "cancelled", "approval": "approved", "cancellation_reason": context.cancellation_reason, "transaction_id": transaction_id, "path": path_value})
+        if context.remaining_seconds(1.0) <= 0:
+            if transaction_manifest is not None:
+                try:
+                    context.transaction_store.fail(transaction_id, "deadline exceeded before write", recovery_required=False)
+                except Exception:
+                    pass
+            return ToolResult(False, "write_file deadline expired before write", {"error": "deadline_exceeded", "approval": "approved", "transaction_id": transaction_id, "path": path_value})
         try:
             path.parent.mkdir(parents=True, exist_ok=True)
             descriptor, temporary_name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".forgecode.tmp", dir=path.parent)

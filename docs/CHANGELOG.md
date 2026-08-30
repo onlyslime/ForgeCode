@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.164 — 2026-08-31
+
+- **Write deadline boundary:** `write_file` now checks the run deadline after approval and immediately before mutation, failing and closing any prepared transaction when the budget expires.
+- **Verification:** command-boundary tests, compile checks, and manual expired-write inspection passed.
+
 ## v0.8.163 — 2026-08-31
 
 - **Recovered task observability:** `list_processes` now safely renders stale tasks restored from disk even when runtime-only PID and duration fields are unavailable.

@@ -76,6 +76,15 @@ def test_workspace_summary_reports_expired_deadline(tmp_path: Path):
     assert result.metadata["error"] == "deadline_exceeded"
 
 
+def test_write_file_does_not_mutate_after_deadline(tmp_path: Path):
+    registry = build_default_registry(WorkspaceGuard(tmp_path))
+    context = ToolContext(WorkspaceGuard(tmp_path), AllowAllApproval(), deadline_monotonic=time.monotonic() - 1)
+    result = registry.execute("write_file", {"path": "expired.txt", "content": "must not write"}, context)
+    assert result.ok is False
+    assert result.metadata["error"] == "deadline_exceeded"
+    assert not (tmp_path / "expired.txt").exists()
+
+
 def test_command_cancellation_terminates_process(tmp_path: Path):
     registry = build_default_registry(WorkspaceGuard(tmp_path))
     cancelled = False
