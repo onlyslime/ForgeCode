@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.114 — 2026-08-31
+
+- **Tool argument key validation:** reject non-string JSON object keys before schema validation, returning a structured `invalid_arguments` error instead of raising a sorting exception.
+- **Verification:** targeted command-bound tests and compile checks passed.
+
 ## v0.8.113 — 2026-08-31
 
 - Treat `null` values for schema-required tool fields as missing at the

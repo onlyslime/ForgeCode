@@ -249,6 +249,8 @@ class ToolRegistry:
             )
         if not isinstance(arguments, dict):
             return ToolResult(False, "tool arguments must be an object", {"error": "invalid_arguments"})
+        if any(not isinstance(key, str) for key in arguments):
+            return ToolResult(False, "tool argument keys must be strings", {"error": "invalid_arguments"})
         schema = self._schema_snapshots.get(name)
         if isinstance(schema, dict) and schema.get("additionalProperties") is False:
             properties = schema.get("properties", {})
