@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.7.51 — 2026-08-30
+
+- Model progress, request, and response events now share a stable bounded
+  `turn_id`, allowing RPC/session clients to correlate each model turn without
+  depending on provider-specific request IDs.
+- Existing event fields and provider request identities remain unchanged.
+
 ## v0.7.50 — 2026-08-30
 
 - RPC session status now includes bounded `active_flags` (`turn_in_progress`,

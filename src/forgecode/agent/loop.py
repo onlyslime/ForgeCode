@@ -821,11 +821,16 @@ class AgentLoop:
             request_messages = self._maybe_auto_compact(messages, step=step)
             request_messages = self.context_builder.fit(request_messages)
             self._last_context_summary = "\n".join(message.content for message in request_messages[-8:])[:8_000]
+            # A turn is one model request/response boundary.  Keep its ID
+            # stable across progress, request, and response events so RPC and
+            # session consumers can correlate a visible turn without parsing
+            # provider-specific request IDs.
+            turn_id = f"{self.run_id or 'run'}:turn:{step}"
             # ``step`` is one-based (incremented immediately before this
             # boundary), so the first provider turn must use the initial
             # progress message.  The old ``step == 0`` check was unreachable
             # and made every run look like a continuation in the UI.
-            self._record("model_progress", {"step": step, "message": "Analyzing the task and deciding the next safe action…" if step == 1 else "Reviewing the latest tool result and continuing…"})
+            self._record("model_progress", {"step": step, "turn_id": turn_id, "message": "Analyzing the task and deciding the next safe action…" if step == 1 else "Reviewing the latest tool result and continuing…"})
             request_tools = self.registry.schemas(self.context.mode)
             capabilities = getattr(self.provider, "capabilities", None)
             if callable(capabilities):
@@ -844,7 +849,7 @@ class AgentLoop:
                 result = LoopResult(tuple(messages), "capability_mismatch", error_text, verification_ok, self.context.mode.value, explored=tuple(explored), state=self.lifecycle.state.value, run_id=self.run_id, audit_complete=self.audit_complete)
                 self._record("final", {"stopped_reason": result.stopped_reason, "error": error_text})
                 return result
-            self._record("model_request", {"step": step, "message_count": len(request_messages), "context_chars": sum(len(message.content) for message in request_messages), "tool_count": len(request_tools), "capabilities": capabilities.to_dict() if hasattr(capabilities, "to_dict") else None})
+            self._record("model_request", {"step": step, "turn_id": turn_id, "message_count": len(request_messages), "context_chars": sum(len(message.content) for message in request_messages), "tool_count": len(request_tools), "capabilities": capabilities.to_dict() if hasattr(capabilities, "to_dict") else None})
             provider_started = time.monotonic()
             try:
                 if self.context.hooks is not None:
@@ -972,7 +977,7 @@ class AgentLoop:
                 result = LoopResult(tuple(messages), "tool_call_limit", error_text, verification_ok, self.context.mode.value, explored=tuple(explored), state=self.lifecycle.state.value, run_id=self.run_id, audit_complete=self.audit_complete)
                 self._record("final", {"stopped_reason": result.stopped_reason, "error": error_text})
                 return result
-            self._record("model_message", {"step": step, "content": response.message.content[:16_000], "tool_calls": [call.name for call in response.message.tool_calls], "finish_reason": response.finish_reason, "usage": response.usage, "duration_seconds": round(time.monotonic() - provider_started, 3)})
+            self._record("model_message", {"step": step, "turn_id": turn_id, "content": response.message.content[:16_000], "tool_calls": [call.name for call in response.message.tool_calls], "finish_reason": response.finish_reason, "usage": response.usage, "duration_seconds": round(time.monotonic() - provider_started, 3)})
             if not response.message.tool_calls:
                 if self.context.mode is AgentMode.PLAN:
                     if self.lifecycle.state is RunState.DISCOVERING:

@@ -39,6 +39,10 @@ def test_agent_loop_labels_first_progress_as_initial_analysis(tmp_path: Path):
     progress = [payload for kind, payload in events if kind == "model_progress"]
     assert progress[0]["step"] == 1
     assert progress[0]["message"].startswith("Analyzing the task")
+    requests = [payload for kind, payload in events if kind == "model_request"]
+    messages = [payload for kind, payload in events if kind == "model_message"]
+    assert requests and messages
+    assert requests[0]["turn_id"] == progress[0]["turn_id"] == messages[0]["turn_id"]
 
 
 def test_agent_loop_fails_fast_on_explicit_provider_tool_capability_mismatch(tmp_path: Path):
