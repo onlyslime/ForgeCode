@@ -42,7 +42,8 @@ _RPC_SESSION_STATES = frozenset({"idle", "running", "paused", "completed", "fail
 # callers must still provide a workspace, policy, and (where applicable) an
 # approval decision for each side effect.
 _RPC_APPROVAL_CAPABILITIES = {
-    "modes": ("untrusted", "on-request", "never"),
+    "modes": ("interactive", "auto", "deny"),
+    "codex_compatibility": {"on-request": "interactive", "never": "deny"},
     "granular_scopes": ("changes", "execution", "evidence"),
     "unsupported_granular_scopes": ("sandbox_approval", "rules", "skill_approval", "request_permissions", "mcp_elicitations"),
     "scope_decisions": ("allow", "ask", "deny"),

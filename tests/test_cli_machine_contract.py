@@ -21,7 +21,8 @@ def test_rpc_describe_exposes_versioned_session_capabilities() -> None:
     assert "session.cancel" in payload["data"]["methods"]
     assert payload["data"]["safety"]["no_automatic_replay"] is True
     approval = payload["data"]["approval"]
-    assert approval["modes"] == ["untrusted", "on-request", "never"] or tuple(approval["modes"]) == ("untrusted", "on-request", "never")
+    assert approval["modes"] == ["interactive", "auto", "deny"]
+    assert approval["codex_compatibility"]["on-request"] == "interactive"
     assert set(approval["granular_scopes"]) == {"changes", "execution", "evidence"}
     assert "mcp_elicitations" in approval["unsupported_granular_scopes"]
     tools = payload["data"]["tools"]

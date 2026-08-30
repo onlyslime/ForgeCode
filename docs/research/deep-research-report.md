@@ -693,7 +693,7 @@ CLI/TUI
 | 扩展发布 | Skills、hooks、SDK、JSONL RPC、工具收窄、uv/独立二进制布局 | 缺少 MCP、插件市场、跨平台一键安装 | P2 |
 
 v0.7.41 进一步公开 RPC 安全协商信息：`rpc.describe` 明确列出 ForgeCode
-支持的 `untrusted/on-request/never` 模式、`changes/execution/evidence` 三个
+实际支持的 `interactive/auto/deny` 模式（并提供 Codex `on-request/never` 的兼容映射）、`changes/execution/evidence` 三个
 风险域，以及尚未实现的 Codex 风格 sandbox/rules/skill/request-permissions/MCP
 域。该目录仅用于能力发现，不授予权限；实际 WorkspaceGuard、策略和审批仍在执行路径
 上生效。这缩小了客户端“能发现什么”和“能授权什么”混淆的差距，但不宣称已实现
