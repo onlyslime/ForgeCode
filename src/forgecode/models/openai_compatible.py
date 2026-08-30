@@ -264,13 +264,15 @@ def _tool_schema_to_payload(schema: dict[str, Any]) -> dict[str, Any]:
         function_name = schema["function"].get("name")
         if not isinstance(function_name, str) or not function_name or len(function_name) > 256 or any(ord(ch) < 32 for ch in function_name):
             raise ProviderError("tool schema function name is invalid", category="protocol_error")
-        if not isinstance(schema["function"].get("description", ""), str) or not isinstance(schema["function"].get("parameters", {}), dict):
+        description = schema["function"].get("description", "")
+        if not isinstance(description, str) or len(description) > 4_000 or any(ord(ch) < 32 for ch in description) or not isinstance(schema["function"].get("parameters", {}), dict):
             raise ProviderError("tool schema function fields are invalid", category="protocol_error")
         return schema
     if isinstance(schema.get("name"), str):
         if not schema["name"] or len(schema["name"]) > 256 or any(ord(ch) < 32 for ch in schema["name"]):
             raise ProviderError("tool schema function name is invalid", category="protocol_error")
-        if not isinstance(schema.get("description", ""), str) or not isinstance(schema.get("parameters", {}), dict):
+        description = schema.get("description", "")
+        if not isinstance(description, str) or len(description) > 4_000 or any(ord(ch) < 32 for ch in description) or not isinstance(schema.get("parameters", {}), dict):
             raise ProviderError("tool schema function fields are invalid", category="protocol_error")
         return {
             "type": "function",

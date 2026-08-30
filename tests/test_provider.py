@@ -137,6 +137,8 @@ def test_provider_rejects_invalid_wrapped_tool_name():
 def test_provider_rejects_invalid_wrapped_tool_fields():
     with pytest.raises(ProviderError, match="function fields are invalid"):
         _tool_schema_to_payload({"type": "function", "function": {"name": "ok", "parameters": []}})
+    with pytest.raises(ProviderError, match="function fields are invalid"):
+        _tool_schema_to_payload({"type": "function", "function": {"name": "ok", "description": "bad\ntext"}})
 
 
 def test_provider_neutral_response_validation_rejects_nonfinite_usage_and_bad_finish_reason():

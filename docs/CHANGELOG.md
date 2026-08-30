@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.128 — 2026-08-31
+
+- **Outbound description bounds:** wrapped and neutral tool schemas now reject oversized or control-character descriptions before network serialization.
+- **Verification:** provider tests, compile checks, and manual malformed-description inspection passed.
+
 ## v0.8.127 — 2026-08-31
 
 - **Outbound schema field validation:** reject malformed wrapped function descriptions and parameter objects before request serialization.
