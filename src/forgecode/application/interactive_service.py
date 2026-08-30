@@ -641,6 +641,7 @@ class InteractiveSession:
     diff: Callable[[], object] = lambda: {}
     context_info: Callable[[], object] = lambda: {}
     events_info: Callable[[int, str | None], object] = lambda _limit=40, _kind=None: {}
+    memory: Callable[[list[str]], object] = lambda _args: {"memory": True, "entries": []}
     cancel: Callable[[], object] = lambda: {"cancelled": True}
     steer: Callable[[str], object] = lambda _message: {"accepted": False, "error": "no active worker"}
     pause: Callable[[], object] = lambda: {"paused": True}
@@ -664,7 +665,7 @@ class InteractiveSession:
     stopped: bool = False
     controller: InteractiveRunController | None = None
 
-    COMMANDS = ("help", "introduce", "introdece", "status", "queue", "steer", "tools", "plan", "mode", "model", "connect", "login", "rules", "files", "skills", "skill", "tree", "diff", "context", "events", "review", "test", "compact", "undo", "cancel", "pause", "resume", "clear", "quit", "exit")
+    COMMANDS = ("help", "introduce", "introdece", "status", "queue", "steer", "tools", "plan", "mode", "model", "connect", "login", "rules", "files", "skills", "skill", "tree", "diff", "context", "events", "memory", "review", "test", "compact", "undo", "cancel", "pause", "resume", "clear", "quit", "exit")
 
     def header(self, *, run_id: str = "", mode: str = "plan", profile: str = "default", rules_count: int = 0, budget: int = 60_000) -> str:
         return f"ForgeCode session run={run_id or '<new>'} workspace=. mode={mode} profile={profile} rules={rules_count} budget={budget}"
@@ -678,6 +679,7 @@ class InteractiveSession:
             "/status               show live worker, phase, and timing\n"
             "/queue                show pending follow-up queue capacity\n"
             "/steer <message>      guide an active run at its next model boundary\n"
+            "/memory [action]       inspect or manage user memory\n"
             "/tools                list available tools and safety categories\n"
             "/model [show|list]    inspect the active model configuration\n"
             "/mode plan|act|bypass switch planning, approved edits, or trusted mode\n"
@@ -742,6 +744,14 @@ class InteractiveSession:
             if not args:
                 raise SlashCommandError("usage: /steer <message>")
             return self.steer(" ".join(args))
+        if command == "memory":
+            if args and args[0] == "add":
+                if len(args) < 2:
+                    raise SlashCommandError("usage: /memory add <text>")
+                return self.memory(["add", " ".join(args[1:])])
+            if len(args) > 2 or (args and args[0] not in {"show", "remove", "clear"}):
+                raise SlashCommandError("usage: /memory [show|add <text>|remove <id>|clear]")
+            return self.memory(args)
         if command == "tools":
             if args: raise SlashCommandError("usage: /tools")
             return self.tools()

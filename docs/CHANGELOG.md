@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.8.4 — 2026-08-30
+
+- Added interactive `/memory` management so users can inspect, add, remove, or clear workspace memory without leaving `fcc` or involving the model.
+- Multi-word additions are preserved and invalid actions fail with bounded usage guidance.
+- Manually verified interactive dispatch and reran focused controls/memory tests.
+
 ## v0.8.3 — 2026-08-30
 
 - Added bounded workspace-local user memory with explicit `memory add/show/remove/clear` commands.

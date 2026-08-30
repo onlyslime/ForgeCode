@@ -2783,6 +2783,25 @@ def main(argv: list[str] | None = None) -> int:
             except (OSError, ValueError) as exc:
                 return {"events_status": False, "error": _redact_display(str(exc), [api_key])}
 
+        def memory_info_command(command_args: list[str] | None = None) -> Any:
+            """Manage explicit workspace memory without involving the model."""
+            values = list(command_args or [])
+            action = values[0] if values else "show"
+            value = values[1] if len(values) > 1 else None
+            try:
+                store = MemoryStore(guard)
+                if action == "show" and value is None:
+                    return {"memory": True, "entries": [entry.to_dict() for entry in store.read()]}
+                if action == "add" and value:
+                    return {"memory": True, "added": store.add(value).to_dict()}
+                if action == "remove" and value:
+                    return {"memory": True, "removed": store.remove(value).to_dict()}
+                if action == "clear" and value is None:
+                    return {"memory": True, "cleared": store.clear()}
+                raise MemoryError("usage: /memory [show|add <text>|remove <id>|clear]")
+            except MemoryError as exc:
+                return {"memory": False, "error": str(exc)}
+
         controller = InteractiveRunController(
             start=run_message,
             on_result=emit_interactive_result,
@@ -2813,6 +2832,7 @@ def main(argv: list[str] | None = None) -> int:
             diff=diff_command,
             context_info=context_info_command,
             events_info=events_info_command,
+            memory=memory_info_command,
             cancel=controller.cancel,
             steer=controller.steer,
             pause=controller.pause,

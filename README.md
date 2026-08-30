@@ -120,11 +120,11 @@ WorkspaceGuard is an application boundary, not an operating-system sandbox.
 ## Commands worth knowing
 
 Inside `fcc`, start with `/help`, `/tools`, `/status`, `/files`, `/rules`,
-`/tree`, `/review`, `/context`, `/compact`, `/events`, `/steer`, `/cancel`, and
+`/tree`, `/review`, `/context`, `/compact`, `/events`, `/steer`, `/memory`, `/cancel`, and
 `/exit`. `/steer <message>` guides an active run before its next model request;
 it never interrupts a tool side effect.
 Workspace memory is explicitly managed with `forgecode memory add/show/remove/clear`
-and is treated as untrusted context.
+or `/memory add <text>` inside `fcc`, and is treated as untrusted context.
 Use `!command` to send a bounded command result to the model, or `!!command` to
 keep it local. For scripts and CI:
 

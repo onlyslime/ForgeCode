@@ -109,7 +109,7 @@ WorkspaceGuard + 模式 + 风险 + 审批
 
 ## 常用命令
 
-在 `fcc` 中可以从 `/help`、`/tools`、`/status`、`/files`、`/rules`、`/tree`、`/review`、`/context`、`/compact`、`/events`、`/steer`、`/cancel` 和 `/exit` 开始。`/steer <消息>` 会在下一次模型请求前引导正在运行的任务，不会打断工具副作用。使用 `!command` 将有界命令结果发送给模型，使用 `!!command` 则只在本地执行。跨会话记忆由用户显式管理：`forgecode memory add/show/remove/clear`，并作为不可信上下文注入。
+在 `fcc` 中可以从 `/help`、`/tools`、`/status`、`/files`、`/rules`、`/tree`、`/review`、`/context`、`/compact`、`/events`、`/steer`、`/memory`、`/cancel` 和 `/exit` 开始。`/steer <消息>` 会在下一次模型请求前引导正在运行的任务，不会打断工具副作用。使用 `!command` 将有界命令结果发送给模型，使用 `!!command` 则只在本地执行。跨会话记忆由用户显式管理：`forgecode memory add/show/remove/clear` 或交互式 `/memory`，并作为不可信上下文注入。
 
 ```powershell
 fcc --print "review this project" --jsonl
