@@ -64,7 +64,12 @@ class ToolContext:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "mode", AgentMode(self.mode))
-        object.__setattr__(self, "secrets", tuple(secret for secret in self.secrets if isinstance(secret, str) and secret))
+        if not isinstance(self.secrets, (tuple, list)) or len(self.secrets) > 64:
+            raise ValueError("secrets must contain at most 64 entries")
+        normalized_secrets = tuple(secret for secret in self.secrets if isinstance(secret, str) and secret)
+        if any(len(secret) > 4_096 for secret in normalized_secrets):
+            raise ValueError("secrets must contain bounded text")
+        object.__setattr__(self, "secrets", normalized_secrets)
         object.__setattr__(self, "memory_context", str(self.memory_context)[:20_000])
         if self.deadline_monotonic is not None and (isinstance(self.deadline_monotonic, bool) or not isinstance(self.deadline_monotonic, (int, float)) or not math.isfinite(self.deadline_monotonic)):
             raise ValueError("deadline_monotonic must be a finite number or None")

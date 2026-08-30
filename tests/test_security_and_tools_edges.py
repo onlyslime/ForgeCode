@@ -169,6 +169,17 @@ def test_registry_output_limit_is_bounded_and_rejects_bool():
             raise AssertionError("expected bounded output limit validation")
 
 
+def test_tool_context_bounds_secret_material(tmp_path):
+    guard = WorkspaceGuard(tmp_path)
+    for secrets in (["x"] * 65, ["x" * 4_097]):
+        try:
+            ToolContext(guard, DenyAllApproval(), secrets=secrets)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("expected secret bounds validation")
+
+
 def test_registry_rejects_non_mapping_tool_metadata(tmp_path):
     class BadTool:
         definition = type("Definition", (), {"name": "bad_meta", "description": "", "parameters": {}})()

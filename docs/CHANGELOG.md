@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.46 — 2026-08-31
+
+- Added bounded secret material validation to `ToolContext`, limiting entries
+  to 64 values of at most 4,096 characters before output redaction.
+- Verification: tool boundary tests, manual secret-limit checks, compileall,
+  and diff checks passed.
+
 ## v0.8.45 — 2026-08-31
 
 - Added bounded newline-safe task-ID validation at the `ProcessManager.start()`
