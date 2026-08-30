@@ -164,6 +164,9 @@ def test_registry_rejects_unknown_schema_fields(tmp_path: Path):
     required = registry.execute("read_file", {}, ToolContext(WorkspaceGuard(tmp_path), AllowAllApproval()))
     assert required.ok is False
     assert required.metadata["missing_fields"] == ["path"]
+    null_required = registry.execute("read_file", {"path": None}, ToolContext(WorkspaceGuard(tmp_path), AllowAllApproval()))
+    assert null_required.ok is False
+    assert null_required.metadata["missing_fields"] == ["path"]
 
 
 def test_workspace_summary_rejects_non_object_arguments(tmp_path: Path):

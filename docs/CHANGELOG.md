@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.113 — 2026-08-31
+
+- Treat `null` values for schema-required tool fields as missing at the
+  registry boundary, producing consistent structured validation errors.
+- Verification: null-required-field regression, manual dispatch check,
+  compileall, and diff checks passed.
+
 ## v0.8.112 — 2026-08-31
 
 - Enforced schema `required` fields at the `ToolRegistry` boundary, returning

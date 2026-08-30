@@ -259,7 +259,7 @@ class ToolRegistry:
         if isinstance(schema, dict):
             required = schema.get("required", ())
             if isinstance(required, list):
-                missing = [field for field in required if isinstance(field, str) and field not in arguments]
+                missing = [field for field in required if isinstance(field, str) and (field not in arguments or arguments.get(field) is None)]
                 if missing:
                     return ToolResult(False, "tool arguments are missing required fields", {"error": "invalid_arguments", "missing_fields": missing[:32]})
         before_hook_issues = ()
