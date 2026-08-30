@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.32 — 2026-08-30
+
+- Isolated `EmbeddedSession` stderr readers by reconnect generation so stale
+  worker diagnostics cannot contaminate a restarted session.
+- Verification: embedding/recovery tests, compileall, and manual reconnect
+  diagnostics inspection passed.
+
 ## v0.8.31 — 2026-08-30
 
 - Made background task admission atomic and rejected duplicate task IDs,

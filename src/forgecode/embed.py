@@ -325,6 +325,7 @@ class EmbeddedSession:
             raise ValueError("max_events must be between 1 and 100000")
         command = [sys.executable, "-u", "-m", "forgecode"] if executable == "forgecode" else [executable]
         self._workspace, self._mode, self._command, self._environment, self._max_events = workspace, mode, command, dict(os.environ), max_events
+        self._generation = 0
         environment = dict(os.environ)
         source_root = str(Path(__file__).resolve().parents[1])
         environment["PYTHONPATH"] = source_root + os.pathsep + environment.get("PYTHONPATH", "")
@@ -348,6 +349,7 @@ class EmbeddedSession:
             except TrustError as exc:
                 raise ForgeCodeError(str(exc), code="trust_required") from exc
         environment = dict(self._environment)
+        self._generation += 1
         source_root = str(Path(__file__).resolve().parents[1])
         environment["PYTHONPATH"] = source_root + os.pathsep + environment.get("PYTHONPATH", "")
         self.process = subprocess.Popen([*self._command, "--workspace", self._workspace, "chat", "--mode", self._mode, "--jsonl"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8", bufsize=1, env=environment)
@@ -373,9 +375,11 @@ class EmbeddedSession:
 
     def _read_stderr(self) -> None:
         process = self.process
+        generation = self._generation
         if process.stderr is None: return
         for line in process.stderr:
-            self._stderr_text = (self._stderr_text + line)[-16_000:]
+            if generation == self._generation:
+                self._stderr_text = (self._stderr_text + line)[-16_000:]
 
     @property
     def is_alive(self) -> bool:
