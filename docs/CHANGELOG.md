@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.41 — 2026-08-30
+
+- Extended force-push hard-block detection across Git `--git-dir` and
+  `--work-tree` global options, including force refspecs.
+- Verification: command classifier tests, manual option variants, compileall,
+  and diff checks passed.
+
 ## v0.8.40 — 2026-08-30
 
 - Hardened the tool result boundary by rejecting non-mapping metadata from
