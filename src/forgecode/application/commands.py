@@ -2438,7 +2438,7 @@ def main(argv: list[str] | None = None) -> int:
         def tools_command() -> Any:
             evidence_names = {"review", "test", "diagnostics", "git_status", "git_diff", "transaction", "rollback", "eval"}
             execution_names = {"run_command", "run_background", "process_status", "poll_process", "kill_process"}
-            change_names = {"write_file", "apply_patch", "git_commit"}
+            change_names = {"write_file", "apply_patch", "git_commit", "git_worktree_create", "git_worktree_remove"}
             rows = []
             for definition in registry.definitions(state["mode"]):
                 if definition.name in evidence_names:
@@ -2857,7 +2857,7 @@ def main(argv: list[str] | None = None) -> int:
         command_name = "tools"
         evidence_names = {"review", "test", "diagnostics", "git_status", "git_diff", "transaction", "rollback", "eval"}
         execution_names = {"run_command", "run_background", "process_status", "poll_process", "kill_process"}
-        change_names = {"write_file", "apply_patch", "git_commit"}
+        change_names = {"write_file", "apply_patch", "git_commit", "git_worktree_create", "git_worktree_remove"}
         tool_data = []
         for definition in registry.definitions():
             if definition.name in evidence_names:

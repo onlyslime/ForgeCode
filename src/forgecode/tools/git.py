@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import subprocess
+import re
+from pathlib import Path
 from typing import Any
 
 from .base import ToolContext, ToolDefinition, ToolResult
@@ -98,6 +100,91 @@ class GitWorktreeListTool:
         if current: rows.append(current)
         rows = rows[:64]
         return ToolResult(True, "\n".join(f"{row.get('path')} {row.get('branch', 'detached')}" for row in rows) or "no worktrees", {"worktrees": rows, "count": len(rows), "exit_code": 0})
+
+
+class GitWorktreeCreateTool:
+    """Create an explicitly approved, workspace-local worktree."""
+    definition = ToolDefinition(
+        "git_worktree_create",
+        "Create an approved Git worktree under .forgecode/worktrees for isolated edits.",
+        {"type": "object", "properties": {"name": {"type": "string"}, "branch": {"type": "string"}, "start_point": {"type": "string"}}, "required": ["name", "branch"], "additionalProperties": False},
+        side_effecting=True,
+    )
+
+    def __init__(self, guard):
+        self.guard = guard
+
+    def execute(self, arguments, context):
+        denied = context.deny_if_plan(self.definition.name)
+        if denied:
+            return denied
+        name, branch = arguments.get("name"), arguments.get("branch")
+        if not isinstance(name, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}", name):
+            raise ValueError("name must be 1-64 safe filename characters")
+        if not isinstance(branch, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._/-]{0,127}", branch) or branch.startswith(("-", ".")):
+            raise ValueError("branch must be a valid bounded branch name")
+        start = arguments.get("start_point")
+        if start is not None and (not isinstance(start, str) or not start.strip() or len(start) > 160 or start.startswith("-")):
+            raise ValueError("start_point must be a bounded Git ref")
+        target = self.guard.resolve(str(Path(".forgecode") / "worktrees" / name))
+        if target.exists():
+            return ToolResult(False, "worktree target already exists", {"error": "worktree_exists"})
+        if not context.request_approval(self.definition.name, {"name": name, "branch": branch}):
+            return ToolResult(False, "git_worktree_create denied by approval policy", {"error": "approval_denied"})
+        if context.cancelled:
+            return ToolResult(False, "git_worktree_create cancelled before execution", {"error": "cancelled"})
+        target.parent.mkdir(parents=True, exist_ok=True)
+        command = ["git", "worktree", "add", "-b", branch, str(target), start or "HEAD"]
+        try:
+            result = subprocess.run(command, cwd=context.guard.root, capture_output=True, text=True, timeout=min(45.0, context.remaining_seconds(45.0)), check=False)
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            try:
+                if target.is_dir() and not any(target.iterdir()):
+                    target.rmdir()
+            except OSError:
+                pass
+            return ToolResult(False, f"git worktree create failed: {type(exc).__name__}", {"error": "git_worktree_create_failed"})
+        if result.returncode != 0:
+            try:
+                if target.is_dir() and not any(target.iterdir()):
+                    target.rmdir()
+            except OSError:
+                pass
+            return ToolResult(False, (result.stderr.strip() or "git worktree create failed")[:4_000], {"error": "git_worktree_create_failed", "exit_code": result.returncode})
+        return ToolResult(True, f"created worktree {self.guard.relative(target)} on {branch}", {"path": self.guard.relative(target), "branch": branch, "exit_code": 0})
+
+
+class GitWorktreeRemoveTool:
+    """Remove only worktrees created in the ForgeCode-managed directory."""
+    definition = ToolDefinition(
+        "git_worktree_remove",
+        "Remove an approved ForgeCode-managed worktree under .forgecode/worktrees.",
+        {"type": "object", "properties": {"name": {"type": "string"}, "force": {"type": "boolean"}}, "required": ["name"], "additionalProperties": False},
+        side_effecting=True,
+    )
+
+    def __init__(self, guard):
+        self.guard = guard
+
+    def execute(self, arguments, context):
+        denied = context.deny_if_plan(self.definition.name)
+        if denied:
+            return denied
+        name = arguments.get("name")
+        if not isinstance(name, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}", name):
+            raise ValueError("name must be 1-64 safe filename characters")
+        target = self.guard.resolve(str(Path(".forgecode") / "worktrees" / name))
+        if not target.exists():
+            return ToolResult(False, "managed worktree does not exist", {"error": "worktree_missing"})
+        if not context.request_approval(self.definition.name, {"name": name, "force": bool(arguments.get("force", False))}):
+            return ToolResult(False, "git_worktree_remove denied by approval policy", {"error": "approval_denied"})
+        command = ["git", "worktree", "remove"] + (["--force"] if arguments.get("force", False) else []) + [str(target)]
+        try:
+            result = subprocess.run(command, cwd=context.guard.root, capture_output=True, text=True, timeout=min(45.0, context.remaining_seconds(45.0)), check=False)
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            return ToolResult(False, f"git worktree remove failed: {type(exc).__name__}", {"error": "git_worktree_remove_failed"})
+        output = (result.stderr.strip() or result.stdout.strip() or "worktree removed")[:4_000]
+        return ToolResult(result.returncode == 0, output, {"name": name, "exit_code": result.returncode})
 
 
 class GitCommitTool:

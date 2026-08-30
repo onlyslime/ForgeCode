@@ -117,7 +117,7 @@ class AllowAllApproval:
 class RiskScopedApproval:
     """Apply per-risk-domain decisions before delegating to a fallback policy."""
     GROUPS = {
-        "changes": frozenset({"write_file", "apply_patch", "git_commit"}),
+        "changes": frozenset({"write_file", "apply_patch", "git_commit", "git_worktree_create", "git_worktree_remove"}),
         "execution": frozenset({"run_command", "run_background", "kill_process"}),
         "evidence": frozenset({"test", "diagnostics"}),
     }

@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.7.29 — 2026-08-30
+
+- Added approved `git_worktree_create` and `git_worktree_remove` tools for
+  isolated, workspace-local lifecycles under `.forgecode/worktrees`.
+- Creation and removal remain unavailable in plan mode, are classified under
+  the changes risk group, and reject unsafe names before Git runs.
+
 ## v0.7.28 — 2026-08-30
 
 - Added `lsp_status`, a bounded read-only capability discovery tool that reports

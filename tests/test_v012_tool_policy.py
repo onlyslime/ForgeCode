@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 import json
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -113,6 +114,31 @@ def test_lsp_status_is_discovery_only_and_bounded(tmp_path) -> None:
 def test_read_only_group_accepts_lsp_status() -> None:
     policy = parse_tool_policy_options("lsp_status", available=("lsp_status",))
     assert policy.allow == ("lsp_status",)
+
+
+def test_worktree_lifecycle_is_approved_and_workspace_local(tmp_path: Path) -> None:
+    from forgecode.tools import GitWorktreeCreateTool, GitWorktreeRemoveTool
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    (tmp_path / "README.md").write_text("base\n", encoding="utf-8")
+    subprocess.run(["git", "add", "README.md"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "-c", "user.name=ForgeCode", "-c", "user.email=forge@example.invalid", "commit", "-qm", "base"], cwd=tmp_path, check=True)
+    guard = WorkspaceGuard(tmp_path)
+    context = ToolContext(guard, AllowAllApproval(), mode="act")
+    created = GitWorktreeCreateTool(guard).execute({"name": "review", "branch": "forge/review"}, context)
+    assert created.ok and created.metadata["path"] == ".forgecode/worktrees/review"
+    assert (tmp_path / ".forgecode" / "worktrees" / "review" / "README.md").is_file()
+    removed = GitWorktreeRemoveTool(guard).execute({"name": "review"}, context)
+    assert removed.ok
+    assert not (tmp_path / ".forgecode" / "worktrees" / "review").exists()
+
+
+def test_worktree_lifecycle_rejects_unsafe_names_and_plan_mode(tmp_path: Path) -> None:
+    from forgecode.tools import GitWorktreeCreateTool
+    guard = WorkspaceGuard(tmp_path)
+    with pytest.raises(ValueError, match="safe filename"):
+        GitWorktreeCreateTool(guard).execute({"name": "../escape", "branch": "x"}, ToolContext(guard, AllowAllApproval(), mode="act"))
+    plan = GitWorktreeCreateTool(guard).execute({"name": "x", "branch": "x"}, ToolContext(guard, AllowAllApproval(), mode="plan"))
+    assert not plan.ok and plan.metadata["error"] == "mode_denied"
 
 
 def test_registry_policy_intersection_preserves_stable_unavailable_result(tmp_path: Path) -> None:

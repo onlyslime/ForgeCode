@@ -62,7 +62,7 @@ def _human_result(value: object) -> str | None:
         groups: dict[str, list[object]] = {"Read-only": [], "Changes": [], "Execution": [], "Evidence": [], "Other": []}
         evidence_names = {"review", "test", "diagnostics", "git_status", "git_diff", "transaction", "rollback", "eval"}
         execution_names = {"run_command", "run_background", "process_status", "poll_process", "kill_process"}
-        change_names = {"write_file", "apply_patch", "git_commit"}
+        change_names = {"write_file", "apply_patch", "git_commit", "git_worktree_create", "git_worktree_remove"}
         for row in rows:
             if not isinstance(row, dict):
                 groups["Other"].append(row)
