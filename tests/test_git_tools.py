@@ -23,3 +23,11 @@ def test_git_commit_rejects_non_object_arguments(tmp_path):
     guard = WorkspaceGuard(tmp_path); context = ToolContext(guard, AllowAllApproval())
     with pytest.raises(ValueError, match="arguments must be an object"):
         GitCommitTool(guard).execute(None, context)
+
+
+def test_git_inspection_rejects_non_boolean_flags(tmp_path):
+    guard = WorkspaceGuard(tmp_path); context = ToolContext(guard, AllowAllApproval())
+    with pytest.raises(ValueError, match="porcelain"):
+        GitStatusTool(guard).execute({"porcelain": "yes"}, context)
+    with pytest.raises(ValueError, match="staged"):
+        GitDiffTool(guard).execute({"staged": 1}, context)

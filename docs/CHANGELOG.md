@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.94 — 2026-08-31
+
+- Enforced strict boolean validation for Git status `porcelain` and diff
+  `staged` flags, preventing truthiness-based command selection.
+- Verification: non-boolean flag regression, manual API checks, compileall,
+  and diff checks passed.
+
 ## v0.8.93 — 2026-08-31
 
 - Added object-argument validation to `git_commit`, preventing malformed

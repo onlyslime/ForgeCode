@@ -78,7 +78,10 @@ class GitStatusTool:
     def execute(self, arguments: dict[str, Any], context: ToolContext) -> ToolResult:
         if not isinstance(arguments, dict):
             raise ValueError("arguments must be an object")
-        command = ["git", "status", "--short"] if arguments.get("porcelain", True) else ["git", "status"]
+        porcelain = arguments.get("porcelain", True)
+        if not isinstance(porcelain, bool):
+            raise ValueError("porcelain must be a boolean")
+        command = ["git", "status", "--short"] if porcelain else ["git", "status"]
         try:
             result = subprocess.run(command, cwd=context.guard.root, capture_output=True, text=True, timeout=min(15.0, context.remaining_seconds(15.0)), check=False)
         except (OSError, subprocess.TimeoutExpired) as exc:
@@ -98,7 +101,10 @@ class GitDiffTool:
         if not isinstance(arguments, dict):
             raise ValueError("arguments must be an object")
         command = ["git", "diff", "--no-ext-diff", "--unified=3"]
-        if arguments.get("staged"):
+        staged = arguments.get("staged", False)
+        if not isinstance(staged, bool):
+            raise ValueError("staged must be a boolean")
+        if staged:
             command.append("--cached")
         path = arguments.get("path")
         if path:
