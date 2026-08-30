@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.67 — 2026-08-31
+
+- Hardened trust grants with unique, flushed, fsynced temporary files so
+  concurrent grants cannot collide or expose a partial record.
+- Verification: concurrent grant regression, full pytest, compileall, and
+  manual trust-file inspection passed.
+
 ## v0.8.66 — 2026-08-31
 
 - Serialized in-process `MemoryStore` read-modify-write mutations so concurrent

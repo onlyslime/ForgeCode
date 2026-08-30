@@ -7,6 +7,8 @@ from __future__ import annotations
 
 import json
 import os
+import tempfile
+import threading
 import time
 from pathlib import Path
 from typing import Any
@@ -22,6 +24,7 @@ class TrustStore:
     def __init__(self, workspace: Path):
         self.workspace = Path(workspace).expanduser().resolve()
         self.path = self.workspace / ".forgecode" / "trust.json"
+        self._lock = threading.RLock()
 
     def _check(self) -> None:
         if not self.workspace.is_dir():
@@ -45,21 +48,35 @@ class TrustStore:
         return {"trusted": True, "workspace": ".", "granted_at": data.get("granted_at"), "version": data.get("version", 1)}
 
     def grant(self) -> dict[str, Any]:
-        self._check()
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        payload = {"version": 1, "workspace": str(self.workspace), "trusted": True, "granted_at": int(time.time())}
-        tmp = self.path.with_suffix(".tmp")
-        tmp.write_text(json.dumps(payload, separators=(",", ":"), ensure_ascii=False), encoding="utf-8")
-        os.replace(tmp, self.path)
-        return self.status()
+        with self._lock:
+            self._check()
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            payload = {"version": 1, "workspace": str(self.workspace), "trusted": True, "granted_at": int(time.time())}
+            descriptor, name = tempfile.mkstemp(prefix="trust-", suffix=".tmp", dir=self.path.parent)
+            tmp = Path(name)
+            try:
+                with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as stream:
+                    descriptor = -1
+                    stream.write(json.dumps(payload, separators=(",", ":"), ensure_ascii=False))
+                    stream.flush()
+                    os.fsync(stream.fileno())
+                os.replace(tmp, self.path)
+            except OSError as exc:
+                raise TrustError("could not grant workspace trust") from exc
+            finally:
+                if descriptor >= 0:
+                    os.close(descriptor)
+                tmp.unlink(missing_ok=True)
+            return self.status()
 
     def revoke(self) -> dict[str, Any]:
-        self._check()
-        try:
-            self.path.unlink(missing_ok=True)
-        except OSError as exc:
-            raise TrustError("could not revoke workspace trust") from exc
-        return self.status()
+        with self._lock:
+            self._check()
+            try:
+                self.path.unlink(missing_ok=True)
+            except OSError as exc:
+                raise TrustError("could not revoke workspace trust") from exc
+            return self.status()
 
 
 __all__ = ["TrustError", "TrustStore"]
