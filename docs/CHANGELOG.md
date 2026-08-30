@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.61 — 2026-08-31
+
+- Made `ToolRegistry.definitions()` return immutable-definition snapshots,
+  preventing callers from mutating registered schemas through introspection.
+- Verification: registry/loop tests, manual definition mutation check,
+  compileall, and diff checks passed.
+
 ## v0.8.60 — 2026-08-31
 
 - Returned deep-copied tool schemas from `ToolRegistry.schemas()`, preventing

@@ -199,10 +199,16 @@ class ToolRegistry:
         return tuple(sorted(self._unavailable_tools))
 
     def definitions(self, mode: AgentMode | str | None = None) -> tuple[ToolDefinition, ...]:
-        definitions = tuple(tool.definition for tool in self._tools.values())
-        if mode is None or AgentMode(mode) in {AgentMode.ACT, AgentMode.BYPASS}:
-            return definitions
-        return tuple(definition for definition in definitions if not definition.side_effecting)
+        active_mode = None if mode is None else AgentMode(mode)
+        result: list[ToolDefinition] = []
+        for name, tool in self._tools.items():
+            definition = tool.definition
+            side_effecting = bool(getattr(definition, "side_effecting", False))
+            if active_mode not in {None, AgentMode.ACT, AgentMode.BYPASS} and side_effecting:
+                continue
+            snapshot_name, snapshot_description = self._definition_snapshots[name]
+            result.append(ToolDefinition(snapshot_name, snapshot_description, copy.deepcopy(self._schema_snapshots[name]), side_effecting))
+        return tuple(result)
 
     def schemas(self, mode: AgentMode | str | None = None) -> list[dict[str, Any]]:
         return [
