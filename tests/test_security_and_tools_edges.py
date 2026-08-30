@@ -189,3 +189,14 @@ def test_registry_rejects_non_mapping_tool_metadata(tmp_path):
     registry.register(BadTool())
     result = registry.execute("bad_meta", {}, ToolContext(WorkspaceGuard(tmp_path), DenyAllApproval()))
     assert not result.ok and result.metadata["error"] == "invalid_tool_result"
+
+
+def test_registry_validates_extension_definition_fields():
+    class Bad:
+        definition = type("D", (), {"name": "bad\nname", "description": "", "parameters": {}})()
+    try:
+        ToolRegistry().register(Bad())
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("expected tool definition validation")

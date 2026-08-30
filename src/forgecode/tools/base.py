@@ -149,7 +149,17 @@ class ToolRegistry:
         self.max_output_chars = max_output_chars
 
     def register(self, tool: Tool) -> None:
-        if tool.definition.name in self._tools:
+        definition = getattr(tool, "definition", None)
+        name = getattr(definition, "name", None)
+        description = getattr(definition, "description", None)
+        parameters = getattr(definition, "parameters", None)
+        if not isinstance(name, str) or not name or len(name) > 128 or any(ch in name for ch in "\r\n"):
+            raise ValueError("tool name must be bounded newline-safe text")
+        if not isinstance(description, str) or len(description) > 4_000 or any(ch in description for ch in "\r\n"):
+            raise ValueError("tool description must be bounded newline-safe text")
+        if not isinstance(parameters, dict):
+            raise ValueError("tool parameters must be an object")
+        if name in self._tools:
             raise ValueError(f"duplicate tool: {tool.definition.name}")
         self._tools[tool.definition.name] = tool
 

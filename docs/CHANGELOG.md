@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.53 — 2026-08-31
+
+- Validated extension tool definitions during registration, bounding names
+  and descriptions and requiring object-shaped parameter schemas.
+- Verification: registry/CLI contract tests, manual malformed-definition
+  check, compileall, and diff checks passed.
+
 ## v0.8.52 — 2026-08-31
 
 - Preserved the existing non-finite redaction marker while using a distinct
