@@ -68,6 +68,8 @@ class _CheckTool:
             return ToolResult(False, f"{self.definition.name} timed out", {"error": error, **risk_metadata})
         except OSError as exc:
             return ToolResult(False, f"check failed: {type(exc).__name__}", {"error": "check_failed"})
+        if context.deadline_monotonic is not None and context.remaining_seconds(0) <= 0:
+            return ToolResult(False, f"{self.definition.name} result discarded because the run deadline expired", {"error": "deadline_exceeded", **risk_metadata})
         output = (stdout + ("\n" + stderr if stderr else "")).strip()[:20_000]
         return ToolResult(p.returncode == 0, output or ("passed" if p.returncode == 0 else "failed"), {"exit_code": p.returncode, **risk_metadata})
 

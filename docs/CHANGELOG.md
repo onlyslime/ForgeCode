@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.194 — 2026-08-31
+
+- **Quality-check deadline correctness:** test and diagnostics tools now discard subprocess results only when an actual run deadline is configured and has expired, preserving normal no-deadline behavior while preventing stale successes after expiry.
+- **Verification:** command-boundary tests, compile, and diff checks passed; an initial regression exposed and was corrected during validation.
+
 ## v0.8.193 — 2026-08-31
 
 - **Git inspection deadline consistency:** status, diff, and log tools now discard subprocess output if the run deadline expires during command execution, preventing stale success results after timeout.

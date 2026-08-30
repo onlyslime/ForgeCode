@@ -93,7 +93,7 @@ class GitStatusTool:
             result = subprocess.run(command, cwd=context.guard.root, capture_output=True, text=True, timeout=min(15.0, context.remaining_seconds(15.0)), check=False)
         except (OSError, subprocess.TimeoutExpired) as exc:
             return ToolResult(False, f"git status failed: {type(exc).__name__}", {"error": "git_status_failed"})
-        if context.remaining_seconds(0) <= 0:
+        if context.deadline_monotonic is not None and context.remaining_seconds(0) <= 0:
             return ToolResult(False, "git status result discarded because the run deadline expired", {"error": "deadline_exceeded"})
         if result.returncode != 0:
             return ToolResult(False, result.stderr.strip()[:4_000] or "not a Git repository", {"exit_code": result.returncode})
@@ -126,7 +126,7 @@ class GitDiffTool:
             result = subprocess.run(command, cwd=context.guard.root, capture_output=True, text=True, timeout=min(20.0, context.remaining_seconds(20.0)), check=False)
         except (OSError, subprocess.TimeoutExpired) as exc:
             return ToolResult(False, f"git diff failed: {type(exc).__name__}", {"error": "git_diff_failed"})
-        if context.remaining_seconds(0) <= 0:
+        if context.deadline_monotonic is not None and context.remaining_seconds(0) <= 0:
             return ToolResult(False, "git diff result discarded because the run deadline expired", {"error": "deadline_exceeded"})
         if result.returncode != 0:
             return ToolResult(False, result.stderr.strip()[:4_000], {"exit_code": result.returncode})
@@ -151,7 +151,7 @@ class GitLogTool:
             result = subprocess.run(["git", "log", f"-{limit}", "--date=short", "--pretty=format:%h %ad %an %s"], cwd=context.guard.root, capture_output=True, text=True, timeout=min(15.0, context.remaining_seconds(15.0)), check=False)
         except (OSError, subprocess.TimeoutExpired) as exc:
             return ToolResult(False, f"git log failed: {type(exc).__name__}", {"error": "git_log_failed"})
-        if context.remaining_seconds(0) <= 0:
+        if context.deadline_monotonic is not None and context.remaining_seconds(0) <= 0:
             return ToolResult(False, "git log result discarded because the run deadline expired", {"error": "deadline_exceeded"})
         if result.returncode != 0:
             return ToolResult(False, result.stderr.strip()[:4_000], {"exit_code": result.returncode})
