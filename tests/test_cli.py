@@ -1,4 +1,22 @@
-from forgecode.cli import main
+from forgecode.cli import _insert_chat_after_global_options, fc_main, main
+
+
+def test_fcc_launcher_keeps_global_options_before_chat():
+    assert _insert_chat_after_global_options(["--workspace", "work", "--json"]) == [
+        "--workspace", "work", "--json", "chat"
+    ]
+    assert _insert_chat_after_global_options(["--jsonl", "--bypass"]) == [
+        "--jsonl", "chat", "--bypass"
+    ]
+
+
+def test_fcc_version_passthrough(monkeypatch, capsys):
+    monkeypatch.setattr("sys.argv", ["fcc", "--version"])
+    import pytest
+    with pytest.raises(SystemExit) as exc:
+        fc_main()
+    assert exc.value.code == 0
+    assert capsys.readouterr().out.strip()
 
 
 def test_doctor_command(capsys, tmp_path):
