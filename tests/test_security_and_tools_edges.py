@@ -7,6 +7,11 @@ from forgecode.security import WorkspaceGuard, WorkspaceViolation
 from forgecode.tools import AllowAllApproval, DenyAllApproval, ToolContext, ToolRegistry, ToolResult, build_default_registry
 
 
+def test_workspace_guard_rejects_non_path_root():
+    with pytest.raises(TypeError, match="path-like"):
+        WorkspaceGuard(".")
+
+
 def test_absolute_outside_and_symlink_escape_are_rejected(tmp_path):
     guard = WorkspaceGuard(tmp_path)
     outside = tmp_path.parent / "outside.txt"

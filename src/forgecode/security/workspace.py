@@ -1,6 +1,7 @@
 """Workspace path validation used by every filesystem tool."""
 
 from pathlib import Path
+import os
 
 
 def _is_reparse_or_symlink(path: Path) -> bool:
@@ -56,7 +57,9 @@ class WorkspaceViolation(ValueError):
 
 class WorkspaceGuard:
     def __init__(self, root: Path):
-        self.root = root.expanduser().resolve()
+        if not isinstance(root, (Path, os.PathLike)):
+            raise TypeError("workspace root must be a path-like object")
+        self.root = Path(root).expanduser().resolve()
         if not self.root.is_dir():
             raise WorkspaceViolation(f"workspace does not exist: {self.root}")
 

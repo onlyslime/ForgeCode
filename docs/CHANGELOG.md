@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.64 — 2026-08-31
+
+- Added explicit path-like validation to `WorkspaceGuard`, turning invalid
+  string roots into a clear type error instead of an internal attribute error.
+- Verification: workspace/tool tests, manual constructor check, compileall,
+  and diff checks passed.
+
 ## v0.8.63 — 2026-08-31
 
 - Required extension tool definitions to provide a genuine boolean
