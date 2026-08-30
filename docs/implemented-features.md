@@ -37,6 +37,8 @@ locations are mapped in [`capability-trace.md`](capability-trace.md).
   `changes`, `execution`, and `evidence` decisions.
 - Bounded `/steer` instructions injected at the next model boundary; steering
   never interrupts synchronous tool side effects and is cleared on cancel.
+- Live `/status` diagnostics expose lifecycle, timing, event cursor,
+  provider/tool counters, and configured step/tool budgets.
 - Explicitly managed, bounded workspace memory (`memory add/show/remove/clear`)
   is atomically persisted and injected as untrusted context; models cannot
   mutate it implicitly.
