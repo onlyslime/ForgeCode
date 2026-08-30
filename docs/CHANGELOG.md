@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.117 — 2026-08-31
+
+- **Tool-name log safety:** reject oversized or control-character tool names before lookup, preventing malformed model data from polluting structured logs.
+- **Verification:** command-bound regression tests and compile checks passed.
+
 ## v0.8.116 — 2026-08-31
 
 - **Provider payload guard:** direct chat-completion parsing now reports a protocol error for non-object JSON payloads, matching the HTTP adapter contract.

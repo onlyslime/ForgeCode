@@ -174,6 +174,9 @@ def test_registry_rejects_unknown_schema_fields(tmp_path: Path):
     malformed_name = registry.execute([], {}, ToolContext(WorkspaceGuard(tmp_path), AllowAllApproval()))
     assert malformed_name.ok is False
     assert malformed_name.metadata["error"] == "invalid_tool_name"
+    newline_name = registry.execute("git_status\nforged", {}, ToolContext(WorkspaceGuard(tmp_path), AllowAllApproval()))
+    assert newline_name.ok is False
+    assert newline_name.metadata["error"] == "invalid_tool_name"
 
 
 def test_workspace_summary_rejects_non_object_arguments(tmp_path: Path):

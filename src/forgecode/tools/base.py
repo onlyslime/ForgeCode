@@ -231,7 +231,7 @@ class ToolRegistry:
         ]
 
     def execute(self, name: str, arguments: dict[str, Any], context: ToolContext) -> ToolResult:
-        if not isinstance(name, str) or not name.strip():
+        if not isinstance(name, str) or not name.strip() or len(name) > 256 or any(ord(ch) < 32 for ch in name):
             return ToolResult(False, "tool name must be a non-empty string", {"error": "invalid_tool_name"})
         tool = self._tools.get(name)
         if tool is None:
