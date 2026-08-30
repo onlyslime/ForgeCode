@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.155 — 2026-08-31
+
+- **Session-error callback isolation:** callbacks invoked while reporting session append failures are now guarded against recursive callback exceptions.
+- **Verification:** agent-edge tests, compile checks, and manual failing-session-callback inspection passed.
+
 ## v0.8.154 — 2026-08-31
 
 - **Event callback isolation:** exceptions from external `on_event` callbacks no longer abort AgentLoop execution; they mark audit completeness false and emit a bounded session error when possible.

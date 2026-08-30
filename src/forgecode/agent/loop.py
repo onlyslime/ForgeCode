@@ -287,13 +287,10 @@ class AgentLoop:
             except Exception as exc:  # audit I/O must not erase the task result
                 self.audit_complete = False
                 if self.on_event and kind != "session_error":
-                    self.on_event(
-                        "session_error",
-                        {
-                            "event": kind,
-                            "error": f"{type(exc).__name__}: {exc}",
-                        },
-                    )
+                    try:
+                        self.on_event("session_error", {"event": kind, "error": f"{type(exc).__name__}: {exc}"})
+                    except Exception:
+                        pass
         if self.on_event:
             try:
                 self.on_event(kind, safe_payload)
