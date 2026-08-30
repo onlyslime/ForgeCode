@@ -197,6 +197,8 @@ class GitWorktreeReconcileTool:
         self.guard = guard
 
     def execute(self, arguments, context):
+        if not isinstance(arguments, dict):
+            raise ValueError("arguments must be an object")
         listed = GitWorktreeListTool(self.guard).execute({}, context)
         if not listed.ok:
             return listed
@@ -302,6 +304,8 @@ class GitWorktreeRemoveTool:
         self.guard = guard
 
     def execute(self, arguments, context):
+        if not isinstance(arguments, dict):
+            raise ValueError("arguments must be an object")
         denied = context.deny_if_plan(self.definition.name)
         if denied:
             return denied

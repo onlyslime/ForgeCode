@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.95 — 2026-08-31
+
+- Added object-argument validation to Git worktree create, remove, and
+  reconcile tools, preventing malformed direct calls from leaking exceptions.
+- Verification: three-tool boundary regression, manual API checks, compileall,
+  and diff checks passed.
+
 ## v0.8.94 — 2026-08-31
 
 - Enforced strict boolean validation for Git status `porcelain` and diff

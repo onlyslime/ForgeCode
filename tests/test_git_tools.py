@@ -1,5 +1,5 @@
 from forgecode.security import WorkspaceGuard
-from forgecode.tools import AllowAllApproval, GitCommitTool, GitLogTool, GitStatusTool, GitDiffTool, ToolContext
+from forgecode.tools import AllowAllApproval, GitCommitTool, GitLogTool, GitStatusTool, GitDiffTool, GitWorktreeCreateTool, GitWorktreeRemoveTool, GitWorktreeReconcileTool, ToolContext
 import pytest
 
 def test_git_log_and_commit_require_expected_boundaries(tmp_path):
@@ -31,3 +31,10 @@ def test_git_inspection_rejects_non_boolean_flags(tmp_path):
         GitStatusTool(guard).execute({"porcelain": "yes"}, context)
     with pytest.raises(ValueError, match="staged"):
         GitDiffTool(guard).execute({"staged": 1}, context)
+
+
+def test_git_worktree_tools_reject_non_object_arguments(tmp_path):
+    guard = WorkspaceGuard(tmp_path); context = ToolContext(guard, AllowAllApproval())
+    for tool in (GitWorktreeCreateTool(guard), GitWorktreeRemoveTool(guard), GitWorktreeReconcileTool(guard)):
+        with pytest.raises(ValueError, match="arguments must be an object"):
+            tool.execute(None, context)
