@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.7.19 — 2026-08-30
+
+- Approval audit events now identify whether a scoped allow/deny or the global
+  fallback policy made the decision, improving explainability without logging
+  commands, file contents, or credentials.
+
 ## v0.7.18 — 2026-08-30
 
 - Added optional `[approval_scopes]` configuration for per-domain `allow`,

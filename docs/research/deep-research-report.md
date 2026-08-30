@@ -873,6 +873,12 @@ Codex 官方页面或未实现的竞品特性当作本项目已完成能力。
 - **完成条件**：配置严格校验、策略在 chat 中生效、policy 诊断可见且凭据不外泄。
 - **验证**：配置、策略与 CLI machine contract 定向测试通过；compileall 和 diff 检查通过。
 
+### 审批可观测性补充（v0.7.18）
+
+`RiskScopedApproval` 现在在审批事件中记录 `decision_source`，区分具体风险域的
+scope allow/deny 与 fallback 全局策略。该字段只描述策略路径，不包含命令、内容或
+凭据，便于 `/events` 和 JSONL 审计解释“为什么被允许或拒绝”。
+
 ### 当前差距复核（v0.7.18）
 
 基于已核实的 Codex `AskForApproval.ts`、Codex app-server 源码树、OpenCode

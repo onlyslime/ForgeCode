@@ -125,6 +125,7 @@ class RiskScopedApproval:
     def __init__(self, fallback: ApprovalPolicy, decisions: dict[str, str] | None = None):
         self.fallback = fallback
         self.decisions = dict(decisions or {})
+        self.last_decision = "fallback"
         if set(self.decisions) - set(self.GROUPS) or any(v not in {"allow", "ask", "deny"} for v in self.decisions.values()):
             raise ValueError("approval decisions must map groups to allow, ask, or deny")
 
@@ -132,8 +133,13 @@ class RiskScopedApproval:
         for group, tools in self.GROUPS.items():
             if tool_name in tools and group in self.decisions:
                 decision = self.decisions[group]
-                if decision == "allow": return True
-                if decision == "deny": return False
+                if decision == "allow":
+                    self.last_decision = f"scope_{group}_allow"
+                    return True
+                if decision == "deny":
+                    self.last_decision = f"scope_{group}_deny"
+                    return False
+        self.last_decision = "fallback"
         return self.fallback.approve(tool_name, arguments)
 
 

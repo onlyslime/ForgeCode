@@ -20,6 +20,11 @@ def test_risk_scoped_approval_overrides_groups_and_delegates() -> None:
     assert policy.approve("write_file", {}) is True
     assert policy.approve("run_command", {}) is False
     assert policy.approve("git_status", {}) is False
+    assert policy.last_decision == "fallback"
+    assert policy.approve("write_file", {}) is True
+    assert policy.last_decision == "scope_changes_allow"
+    assert policy.approve("run_command", {}) is False
+    assert policy.last_decision == "scope_execution_deny"
 
 
 def test_risk_scoped_approval_rejects_invalid_decisions() -> None:

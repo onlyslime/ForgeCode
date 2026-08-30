@@ -2135,6 +2135,7 @@ def main(argv: list[str] | None = None) -> int:
                     threading.Event().wait(0.01)
 
             def approval_observer(tool_name: str, arguments: dict[str, Any], approved: bool) -> None:
+                decision_source = getattr(approval, "last_decision", "fallback")
                 session.append(
                     "shortcut_approval",
                     {
@@ -2144,6 +2145,7 @@ def main(argv: list[str] | None = None) -> int:
                         "command_fingerprint": command_fingerprint,
                         "risk": arguments.get("_risk"),
                         "risk_reasons": arguments.get("_risk_reasons", ()),
+                        "decision_source": decision_source,
                     },
                     mode=state["mode"],
                     outcome="approved" if approved else "denied",
