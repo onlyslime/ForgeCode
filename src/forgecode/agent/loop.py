@@ -129,6 +129,8 @@ class AgentLoop:
         self._last_provider_unresolved = False
         self._started_monotonic: float | None = None
         self._current_step = 0
+        self._provider_requests = 0
+        self._tool_calls = 0
         integer_limits = (self.config.max_repeated_calls, self.config.max_verification_attempts, self.config.max_tool_calls_per_turn, self.config.max_tool_calls_total, self.config.max_auto_compactions, self.config.rolling_window_messages)
         if self.config.max_steps is not None and (isinstance(self.config.max_steps, bool) or not isinstance(self.config.max_steps, int) or self.config.max_steps < 1):
             raise ValueError("max_steps must be positive when set")
@@ -244,6 +246,8 @@ class AgentLoop:
             "state": self.lifecycle.state.value,
             "run_id": self.run_id,
             "step": self._current_step,
+            "provider_requests": self._provider_requests,
+            "tool_calls": self._tool_calls,
             "elapsed_seconds": round(elapsed, 3) if elapsed is not None else None,
             "remaining_seconds": round(remaining, 3) if remaining is not None else None,
             "steering_items": steering_items,
@@ -920,6 +924,7 @@ class AgentLoop:
                 self._record("final", {"stopped_reason": result.stopped_reason, "error": error_text})
                 return result
             self._record("model_request", {"step": step, "turn_id": turn_id, "message_count": len(request_messages), "context_chars": sum(len(message.content) for message in request_messages), "tool_count": len(request_tools), "capabilities": capabilities.to_dict() if hasattr(capabilities, "to_dict") else None})
+            self._provider_requests += 1
             provider_started = time.monotonic()
             try:
                 if self.context.hooks is not None:
@@ -1147,6 +1152,7 @@ class AgentLoop:
             # unchanged.  Futures are consumed in model order below.
             parallel_results: dict[str, Any] = {}
             batch_calls = response.message.tool_calls
+            self._tool_calls += len(batch_calls)
             if len(batch_calls) > 1 and self.context.hooks is None and all(
                 call.name in _PARALLEL_READ_TOOLS
                 for call in batch_calls

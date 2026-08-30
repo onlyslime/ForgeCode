@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.8 — 2026-08-30
+
+- Added live provider-request and tool-call counters to the bounded run status
+  snapshot for diagnosing retries and excessive tool activity.
+- Verification: status snapshot assertions passed; manual review confirmed
+  counters include attempted provider requests and only dispatched tool calls.
+
 ## v0.8.7 — 2026-08-30
 
 - Included RunService loop diagnostics in interactive `/status` output while

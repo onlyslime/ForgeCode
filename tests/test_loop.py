@@ -37,8 +37,10 @@ def test_agent_loop_status_snapshot_is_bounded_and_tracks_run(tmp_path: Path):
     assert after["active"] is False
     assert after["state"] == "completed"
     assert after["step"] == 2
+    assert after["provider_requests"] == 2
+    assert after["tool_calls"] == 1
     assert after["run_id"] is None
-    assert set(after) == {"active", "state", "run_id", "step", "elapsed_seconds", "remaining_seconds", "steering_items", "steering_chars", "cancelled", "audit_complete"}
+    assert set(after) == {"active", "state", "run_id", "step", "provider_requests", "tool_calls", "elapsed_seconds", "remaining_seconds", "steering_items", "steering_chars", "cancelled", "audit_complete"}
 
 
 def test_agent_loop_labels_first_progress_as_initial_analysis(tmp_path: Path):
