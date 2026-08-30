@@ -854,6 +854,25 @@ Codex 官方页面或未实现的竞品特性当作本项目已完成能力。
 - **验证**：工具策略定向测试 10 passed；发布前执行完整 pytest、doctor、compileall
   与 diff 检查。
 
+### 当前差距复核（v0.7.16）
+
+基于已核实的 Codex `AskForApproval.ts`、Codex app-server 源码树、OpenCode
+Tools/Permissions 文档和 Cline 工具/Plan 文档，ForgeCode 的优势是边界全部在本仓库
+内、工具结果和审批事件可审计；仍有以下可验证差距：
+
+| 能力 | ForgeCode 当前状态 | 优先级 |
+| --- | --- | --- |
+| 审批粒度 | 全局 interactive/auto/deny，CLI 风险组仅收窄工具集合 | P1 |
+| 语言服务 | 静态 definition/reference，非 LSP | P1 |
+| 后台任务 | 进程生命周期有界且可见；仅当前进程内存，重启后无法恢复 | P1 |
+| 会话服务 | JSONL/RPC 可用；没有 Codex 等价的长期 daemon/app-server schema | P1 |
+| 隔离执行 | WorkspaceGuard 和审批边界；不是 worktree 或 OS sandbox | P1 |
+| 扩展生态 | skills/hooks 可用；无插件市场、MCP（按当前版本非目标） | P2 |
+
+下一切片应优先实现“持久化后台任务的 stale 标记和只读恢复查询”，禁止自动重放
+命令；随后再设计按工具/风险域的 granular approval。每个切片都必须保留当前
+工具调用、审批、取消和 WorkspaceGuard 的安全契约。
+
 ### 外部资料复核（2026-08-30）
 
 - OpenCode 官方 Tools 页面当前可访问（HTTP 200），明确列出 `read`、`write`、
