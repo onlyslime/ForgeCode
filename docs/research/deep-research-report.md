@@ -854,6 +854,12 @@ Codex 官方页面或未实现的竞品特性当作本项目已完成能力。
   达到 OpenCode 那样的细粒度权限对象和 LSP 集成。
 - OpenCode permission 源码本轮请求超时，不能声称已读取实现细节；仅保留官方权限
   文档的 allow/ask/deny 结论。
+- OpenAI Codex GitHub 仓库 API 当前可访问（HTTP 200）。公开生成的
+  `codex-rs/app-server-protocol/schema/typescript/v2/AskForApproval.ts` 明确定义
+  `untrusted`、`on-request`、`never` 以及 granular 选项（sandbox、rules、skill、
+  request permissions、MCP elicitations）。这是真实源码证据，说明 Codex 的审批
+  边界比 ForgeCode 当前全局 interactive/auto/deny 更细；本项目后续可按风险域拆分，
+  但不能宣称已实现 Codex 的 granular profile。
 
 ### 0.7.3 实施审计：静态语义导航（2026-08-30）
 
