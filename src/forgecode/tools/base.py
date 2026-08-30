@@ -157,12 +157,15 @@ class ToolRegistry:
         name = getattr(definition, "name", None)
         description = getattr(definition, "description", None)
         parameters = getattr(definition, "parameters", None)
+        side_effecting = getattr(definition, "side_effecting", False)
         if not isinstance(name, str) or not name or len(name) > 128 or any(ch in name for ch in "\r\n"):
             raise ValueError("tool name must be bounded newline-safe text")
         if not isinstance(description, str) or len(description) > 4_000 or any(ch in description for ch in "\r\n"):
             raise ValueError("tool description must be bounded newline-safe text")
         if not isinstance(parameters, dict):
             raise ValueError("tool parameters must be an object")
+        if not isinstance(side_effecting, bool):
+            raise ValueError("tool side_effecting must be boolean")
         try:
             encoded_parameters = json.dumps(parameters, ensure_ascii=False, allow_nan=False, separators=(",", ":"))
         except (TypeError, ValueError, RecursionError) as exc:
@@ -174,7 +177,7 @@ class ToolRegistry:
             raise ValueError(f"duplicate tool: {tool.definition.name}")
         self._tools[name] = tool
         self._schema_snapshots[name] = schema_snapshot
-        self._definition_snapshots[name] = (name, description, bool(getattr(definition, "side_effecting", False)))
+        self._definition_snapshots[name] = (name, description, side_effecting)
 
     def filter(self, policy: Any | None = None) -> "ToolRegistry":
         """Return a registry narrowed by policy; policy cannot add tools."""

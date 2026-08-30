@@ -214,6 +214,16 @@ def test_registry_rejects_non_json_or_oversized_schemas():
             raise AssertionError("expected schema validation")
 
 
+def test_registry_rejects_non_boolean_side_effect_flag():
+    definition = type("D", (), {"name": "bad_flag", "description": "", "parameters": {}, "side_effecting": "false"})()
+    try:
+        ToolRegistry().register(type("T", (), {"definition": definition})())
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("expected side_effecting validation")
+
+
 def test_registry_rejects_deeply_nested_schema():
     parameters = value = {}
     for _ in range(10_000):

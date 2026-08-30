@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.63 — 2026-08-31
+
+- Required extension tool definitions to provide a genuine boolean
+  `side_effecting` flag, preventing truthy strings from weakening mode policy.
+- Verification: registry tests, manual string-flag check, compileall, and diff
+  checks passed.
+
 ## v0.8.62 — 2026-08-31
 
 - Included `side_effecting` in registered tool definition snapshots so mode
