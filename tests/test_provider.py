@@ -166,6 +166,12 @@ def test_provider_transport_rejects_invalid_request_headers():
         transport._request("https://example/v1/chat/completions", {"X-Test": 1}, b"{}")
 
 
+def test_ollama_transport_rejects_invalid_messages():
+    transport = _ProtocolTransport(object(), "ollama", "secret")
+    with pytest.raises(ValueError, match="messages must be objects"):
+        transport._request("https://example/v1/chat/completions", {}, json.dumps({"messages": [None]}).encode())
+
+
 def test_provider_transport_rejects_control_character_url():
     transport = _ProtocolTransport(object(), "anthropic", "secret")
     with pytest.raises(ValueError, match="request URL is invalid"):

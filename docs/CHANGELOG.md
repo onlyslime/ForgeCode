@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.146 — 2026-08-31
+
+- **Common request validation:** Ollama requests now enforce the same object-only message list contract as Anthropic and Google translations.
+- **Verification:** provider tests, compile checks, and manual malformed-message inspection passed.
+
 ## v0.8.145 — 2026-08-31
 
 - **Provider tool conversion:** validate nested `function` objects in Anthropic and Google request translation, preventing malformed schemas from raising attribute errors.

@@ -53,6 +53,9 @@ class _ProtocolTransport:
             raise ValueError("provider request body must be valid JSON") from exc
         if not isinstance(payload, dict):
             raise ValueError("provider request body must be an object")
+        raw_messages = payload.get("messages", [])
+        if not isinstance(raw_messages, list) or any(not isinstance(message, dict) for message in raw_messages):
+            raise ValueError("provider messages must be objects")
         if self.provider == "anthropic":
             messages = payload.pop("messages", [])
             if not isinstance(messages, list) or any(not isinstance(message, dict) for message in messages):
