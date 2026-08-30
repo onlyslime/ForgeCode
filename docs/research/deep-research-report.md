@@ -950,6 +950,12 @@ Tools/Permissions 文档和 Cline 工具/Plan 文档，ForgeCode 的优势是边
 源码树与 `AskForApproval.ts` 证据。网络可访问性变化本身已记录，避免把旧页面状态
 误写成当前可访问。
 
+同日通过 GitHub Contents API 重新读取 Codex `AskForApproval.ts`（HTTP 200，blob
+SHA `1d605501b2a3164d9effca75a6940d67ae833abb`）。当前 schema 仍明确包含
+`untrusted`、`on-request`、`never` 与 granular 的 sandbox/rules/skill/request
+permissions/MCP 五个布尔域；ForgeCode 的 `[approval_scopes]` 仍是风险域近似，
+并不覆盖这些 Codex 专用维度。
+
 - OpenCode 官方 Tools 页面当前可访问（HTTP 200），明确列出 `read`、`write`、
   `edit`、`bash`、`grep`、`glob` 以及 experimental `lsp`；这验证了 ForgeCode
   已有基础读写/搜索工具，但仍缺少真正语言服务器协议和更多编辑语义。
