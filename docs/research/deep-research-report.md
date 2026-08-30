@@ -1232,6 +1232,13 @@ v0.7.44 为 RPC 客户端公开版本化 `event_schema`，列出当前 session �
 而不只是 CLI 文本。ForgeCode 当前 JSONL RPC 已有 session 事件、暂停/恢复/取消和
 能力描述，但尚未提供等价的 thread/turn 通知 schema。后续应先定义稳定事件类型和
 客户端订阅边界，再考虑长期 daemon，避免堆叠未经审计的后台功能。
+
+进一步读取公开 schema（HTTP 200）确认：Codex `ThreadStatus` 区分 `notLoaded`、
+`idle`、`systemError`、带 `activeFlags` 的 `active`；`TurnStatus` 为
+`completed/interrupted/failed/inProgress`，并通过 `TurnStartedNotification`、
+`TurnCompletedNotification` 携带 `threadId` 与完整 turn。ForgeCode 的 session 状态
+目前更偏向执行生命周期，尚无 thread/turn 层级或 active flags；后续映射必须保持
+语义差异，不能把 `running` 直接宣传成 Codex `active`。
 v0.7.42 在此基础上为 `session.events` 增加有界 `type` 过滤；客户端可以用
 `after + limit + type` 稳定轮询单类事件，并继续获得 `next_sequence`、
 `oldest_sequence` 与 `truncated` 游标信息。这是向 Codex thread/turn 通知模型
