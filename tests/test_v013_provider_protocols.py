@@ -38,6 +38,18 @@ def test_google_and_ollama_protocol_translation():
     assert ollama_t.calls[0][0].endswith("/api/chat")
 
 
+def test_google_tool_schema_and_function_call_translation():
+    google_t = Transport({"candidates": [{"content": {"parts": [{"functionCall": {"name": "read_file", "args": {"path": "README.md"}}}]}}]})
+    google = GoogleProvider(api_key="k", base_url="https://g.test/v1", model="m", transport=google_t)
+    tools = [{"type": "function", "function": {"name": "read_file", "description": "read", "parameters": {"type": "object", "properties": {"path": {"type": "string"}}}}}]
+    result = asyncio.run(google.complete([Message("user", "read")], tools))
+    assert google_t.calls[0][1]["Content-Type"] == "application/json"
+    assert google_t.calls[0][2]["tools"][0]["functionDeclarations"][0]["name"] == "read_file"
+    assert result.finish_reason == "tool_calls"
+    assert result.message.tool_calls[0].name == "read_file"
+    assert result.message.tool_calls[0].arguments == {"path": "README.md"}
+
+
 def test_anthropic_stream_is_normalized_to_openai_sse():
     class StreamTransport(Transport):
         def post_stream(self, url, headers, body, timeout):

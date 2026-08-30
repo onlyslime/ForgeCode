@@ -36,7 +36,15 @@ class _ProtocolTransport:
             url = url.rsplit("/chat/completions", 1)[0] + "/messages"
         elif self.provider == "google":
             messages = payload.pop("messages", [])
-            payload = {"contents": [{"role": "user" if m.get("role") == "user" else "model", "parts": [{"text": str(m.get("content", ""))}]} for m in messages], "tools": payload.get("tools", [])}
+            raw_tools = payload.pop("tools", [])
+            declarations = []
+            for tool in raw_tools if isinstance(raw_tools, list) else []:
+                function = tool.get("function", {}) if isinstance(tool, dict) else {}
+                if isinstance(function, dict) and function.get("name"):
+                    declarations.append({"name": function["name"], "description": str(function.get("description", "")), "parameters": function.get("parameters", {"type": "object"})})
+            payload = {"contents": [{"role": "user" if m.get("role") == "user" else "model", "parts": [{"text": str(m.get("content", ""))}]} for m in messages]}
+            if declarations:
+                payload["tools"] = [{"functionDeclarations": declarations}]
             url = url.rsplit("/chat/completions", 1)[0] + ":generateContent"
             headers = {"Content-Type": "application/json"}
         elif self.provider == "ollama":
@@ -54,7 +62,12 @@ class _ProtocolTransport:
         elif self.provider == "google":
             parts = data.get("candidates", [{}])[0].get("content", {}).get("parts", [])
             text = "".join(str(p.get("text", "")) for p in parts)
-            data = {"choices": [{"message": {"role": "assistant", "content": text}, "finish_reason": "stop"}], "usage": data.get("usageMetadata", {})}
+            calls = []
+            for index, part in enumerate(parts):
+                function = part.get("functionCall") if isinstance(part, dict) else None
+                if isinstance(function, dict) and function.get("name"):
+                    calls.append({"id": str(function.get("id") or f"call-{index}"), "type": "function", "function": {"name": function["name"], "arguments": json.dumps(function.get("args", {}), ensure_ascii=False)}})
+            data = {"choices": [{"message": {"role": "assistant", "content": text, "tool_calls": calls}, "finish_reason": "tool_calls" if calls else "stop"}], "usage": data.get("usageMetadata", {})}
         elif self.provider == "ollama":
             msg = data.get("message", {})
             data = {"choices": [{"message": {"role": "assistant", "content": msg.get("content", "")}, "finish_reason": "stop"}], "usage": {}}

@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.7.55 — 2026-08-30
+
+- Google provider requests now translate OpenAI-style tool schemas into
+  `functionDeclarations` for `generateContent`.
+- Google `functionCall` response parts are normalized into ForgeCode tool calls,
+  preserving arguments and finish reasons.
+
 ## v0.7.54 — 2026-08-30
 
 - Anthropic streaming responses now normalize `tool_use` blocks and
