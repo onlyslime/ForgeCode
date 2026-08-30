@@ -123,7 +123,15 @@ class _ProtocolTransport:
             calls = [{"id": b.get("id", "call"), "type": "function", "function": {"name": b.get("name", ""), "arguments": json.dumps(b.get("input", {}))}} for b in blocks if b.get("type") == "tool_use"]
             data = {"choices": [{"message": {"role": "assistant", "content": text, "tool_calls": calls}, "finish_reason": "tool_calls" if calls else "stop"}], "usage": data.get("usage", {})}
         elif self.provider == "google":
-            parts = data.get("candidates", [{}])[0].get("content", {}).get("parts", [])
+            candidates = data.get("candidates", [{}])
+            if not isinstance(candidates, list) or not candidates or not isinstance(candidates[0], dict):
+                raise ValueError("google response candidates must contain an object")
+            candidate_content = candidates[0].get("content", {})
+            if not isinstance(candidate_content, dict):
+                raise ValueError("google response candidate content must be an object")
+            parts = candidate_content.get("parts", [])
+            if not isinstance(parts, list) or any(not isinstance(part, dict) for part in parts):
+                raise ValueError("google response parts must be objects")
             text = "".join(str(p.get("text", "")) for p in parts)
             calls = []
             for index, part in enumerate(parts):

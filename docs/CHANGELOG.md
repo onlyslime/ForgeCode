@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.133 — 2026-08-31
+
+- **Google response validation:** validate candidates, candidate content, and parts before translation, preventing leaked index/attribute errors on malformed responses.
+- **Verification:** provider tests, compile checks, and manual malformed-candidate inspection passed.
+
 ## v0.8.132 — 2026-08-31
 
 - **Anthropic response validation:** reject non-list or non-object content blocks before provider translation, avoiding leaked attribute errors on malformed responses.
