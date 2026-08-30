@@ -675,7 +675,7 @@ CLI/TUI
 - [x] 每个 P0/P1 能力都有可执行验收标准或演示场景。
 - [x] 已明确竞品参考与本题自研实现的边界，避免误用现成 agent 框架。
 
-## ForgeCode 当前差距复核（2026-08-30，v0.7.50）
+## ForgeCode 当前差距复核（2026-08-30，v0.7.61）
 
 本节以当前仓库源码、定向测试和正常 `fcc` 工作流为准；竞品能力只作为产品
 形态基线，不把未能直接访问的页面当作已验证事实。OpenAI 官方 Codex 页面在
@@ -1308,7 +1308,7 @@ session 级描述，不等价于 Codex 的 thread/turn 状态对象。
 20 次运行该用例全部通过，随后完整门禁也通过 `528 passed, 9 skipped, 2 warnings`。
 当前没有可稳定复现的失败；仍保留该时序用例作为后续共享核心改动的重点回归项。
 
-当前 CLI 冒烟检查（v0.7.50）也通过：`forgecode --help` 列出完整命令面，
+当前 CLI 冒烟检查（v0.7.61）也通过：`forgecode --help` 列出完整命令面，
 `forgecode tools --json` 返回 31 个带 schema/category/side_effecting 元数据的工具；
 未配置 provider 时 doctor 正确报告 framework-only/offline-unconfigured，而不是伪造
 模型可用性。
