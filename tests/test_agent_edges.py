@@ -8,6 +8,7 @@ from forgecode.security import WorkspaceGuard
 from forgecode.storage import SessionStore
 from forgecode.tools import AgentMode, AllowAllApproval, DenyAllApproval, ToolContext, build_default_registry
 from forgecode.tools.base import ToolDefinition, ToolRegistry, ToolResult
+from forgecode.tools.understanding import FindDefinitionTool, FindReferencesTool
 
 
 class ScriptedProvider:
@@ -105,6 +106,15 @@ def test_read_only_batch_cancellation_marks_queued_calls(tmp_path):
     tool_messages = [m for m in result.messages if m.role == "tool"]
     assert len(tool_messages) == 6
     assert any("cancelled before execution" in m.content for m in tool_messages)
+
+
+def test_semantic_navigation_tools_are_bounded_and_guarded(tmp_path):
+    (tmp_path / "mod.py").write_text("def target():\n    return target()\n", encoding="utf-8")
+    context = ToolContext(WorkspaceGuard(tmp_path))
+    definition = FindDefinitionTool().execute({"symbol": "target"}, context)
+    references = FindReferencesTool().execute({"symbol": "target"}, context)
+    assert definition.metadata["matches"][0]["line"] == 1
+    assert references.metadata["count"] == 2
 
 
 def test_unknown_tool_is_returned_to_model(tmp_path):

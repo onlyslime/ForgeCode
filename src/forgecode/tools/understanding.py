@@ -36,6 +36,58 @@ class ListSymbolsTool:
                     break
         return ToolResult(True, "\n".join(rows[:500]) or "no symbols detected", {"path": context.guard.relative(path), "count": len(rows)})
 
+
+def _source_files(context: ToolContext, path_value: str | None = None):
+    """Yield bounded, guarded text files without importing or executing code."""
+    if path_value:
+        candidate = context.guard.resolve(path_value, must_exist=True)
+        if candidate.is_file() and not _is_ignored(candidate, context.guard):
+            yield candidate
+        return
+    count = 0
+    for candidate in context.guard.root.rglob("*"):
+        if count >= 500 or not candidate.is_file() or _is_ignored(candidate, context.guard):
+            continue
+        if candidate.suffix.lower() in {".py", ".js", ".ts", ".tsx", ".jsx", ".java", ".go", ".rs", ".c", ".h", ".cpp", ".cs"}:
+            count += 1
+            yield candidate
+
+
+class FindDefinitionTool:
+    definition = ToolDefinition("find_definition", "Find bounded source definitions for a symbol without executing project code.", {"type":"object","properties":{"symbol":{"type":"string"},"path":{"type":"string"}},"required":["symbol"]})
+    def execute(self, arguments, context):
+        symbol = _required(arguments, "symbol")
+        if not isinstance(symbol, str) or not re.fullmatch(r"[A-Za-z_]\w{0,127}", symbol):
+            raise ValueError("symbol must be a simple identifier")
+        pattern = re.compile(rf"^\s*(?:(?:async)\s+)?(?:def|class|function|export\s+(?:async\s+)?function|export\s+class)\s+{re.escape(symbol)}\b")
+        rows = []
+        for path in _source_files(context, arguments.get("path")):
+            try: lines = path.read_text(encoding="utf-8").splitlines()
+            except (OSError, UnicodeError): continue
+            for number, line in enumerate(lines, 1):
+                if pattern.search(line): rows.append({"path": context.guard.relative(path), "line": number, "symbol": symbol, "text": line.strip()[:300]})
+                if len(rows) >= 200: break
+            if len(rows) >= 200: break
+        return ToolResult(True, "\n".join(f"{item['path']}:{item['line']} {item['text']}" for item in rows) or "definition not found", {"symbol": symbol, "matches": rows, "count": len(rows)})
+
+
+class FindReferencesTool:
+    definition = ToolDefinition("find_references", "Find bounded textual references to a symbol in source files.", {"type":"object","properties":{"symbol":{"type":"string"},"path":{"type":"string"}},"required":["symbol"]})
+    def execute(self, arguments, context):
+        symbol = _required(arguments, "symbol")
+        if not isinstance(symbol, str) or not re.fullmatch(r"[A-Za-z_]\w{0,127}", symbol):
+            raise ValueError("symbol must be a simple identifier")
+        pattern = re.compile(rf"\b{re.escape(symbol)}\b")
+        rows = []
+        for path in _source_files(context, arguments.get("path")):
+            try: lines = path.read_text(encoding="utf-8").splitlines()
+            except (OSError, UnicodeError): continue
+            for number, line in enumerate(lines, 1):
+                if pattern.search(line): rows.append({"path": context.guard.relative(path), "line": number, "text": line.strip()[:300]})
+                if len(rows) >= 500: break
+            if len(rows) >= 500: break
+        return ToolResult(True, "\n".join(f"{item['path']}:{item['line']} {item['text']}" for item in rows) or "no references found", {"symbol": symbol, "matches": rows, "count": len(rows)})
+
 class FileMetadataTool:
     definition = ToolDefinition("file_metadata", "Show bounded metadata including size, lines, encoding, modified time, and SHA-256.", {"type":"object","properties":{"path":{"type":"string"}},"required":["path"]})
     def __init__(self, guard): self.guard = guard

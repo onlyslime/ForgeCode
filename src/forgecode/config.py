@@ -241,7 +241,7 @@ class EffectiveConfig:
         if self.verification_command is not None:
             _bounded_text(self.verification_command, "verification_command", 4_000)
         self.tool_policy.validate()
-        known_tools = {"list_files", "read_file", "search", "write_file", "apply_patch", "workspace_summary", "repository_map", "run_command"}
+        known_tools = {"list_files", "read_file", "search", "write_file", "apply_patch", "workspace_summary", "repository_map", "run_command", "find_definition", "find_references"}
         unknown_tools = (set(self.tool_policy.allow) | set(self.tool_policy.deny)) - known_tools
         if unknown_tools:
             raise ConfigError("tool_policy contains unknown tools: " + ", ".join(sorted(unknown_tools)))

@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.7.3 — 2026-08-30
+
+- Added guarded, bounded `find_definition` and `find_references` tools for
+  language-neutral static navigation across common source files.
+- Navigation never imports or executes project code and returns structured,
+  capped matches suitable for model context and audit output.
+- Added regression coverage for definition/reference results and workspace
+  boundaries.
+
 ## v0.7.2 — 2026-08-30
 
 - Restricted read-only parallel scheduling to an explicit audited allowlist.

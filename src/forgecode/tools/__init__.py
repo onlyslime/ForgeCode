@@ -6,7 +6,7 @@ from .repository_map import RepositoryMapTool
 from .shell import AllowAllApproval, DenyAllApproval, InteractiveApproval, ShellTool
 from .git import GitCommitTool, GitDiffTool, GitLogTool, GitStatusTool
 from .quality import DiagnosticsTool, FindFilesTool, TestTool
-from .understanding import FileMetadataTool, ListSymbolsTool, ReadRangeTool
+from .understanding import FileMetadataTool, FindDefinitionTool, FindReferencesTool, ListSymbolsTool, ReadRangeTool
 from .background import KillProcessTool, PollProcessTool, ProcessManager, ProcessStatusTool, RunBackgroundTool
 from ..hooks import Hook, HookIssue, HookRegistry
 
@@ -32,6 +32,8 @@ def build_default_registry(guard) -> ToolRegistry:
     registry.register(ReadRangeTool(guard))
     registry.register(ListSymbolsTool(guard))
     registry.register(FileMetadataTool(guard))
+    registry.register(FindDefinitionTool())
+    registry.register(FindReferencesTool())
     registry.register(RunBackgroundTool(guard, process_manager))
     registry.register(ProcessStatusTool(guard, process_manager))
     registry.register(PollProcessTool(guard, process_manager))
@@ -70,6 +72,8 @@ __all__ = [
     "FileMetadataTool",
     "ListSymbolsTool",
     "ReadRangeTool",
+    "FindDefinitionTool",
+    "FindReferencesTool",
     "KillProcessTool",
     "PollProcessTool",
     "ProcessManager",
