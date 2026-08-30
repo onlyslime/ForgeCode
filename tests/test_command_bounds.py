@@ -106,5 +106,5 @@ def test_repository_map_budget_is_bounded(tmp_path: Path):
     guard = WorkspaceGuard(tmp_path); context = ToolContext(guard, AllowAllApproval())
     with pytest.raises(ValueError, match="between 256 and 100000"):
         RepositoryMapTool(guard).execute({"budget_chars": 100001}, context)
-    schema = RepositoryMapTool(guard).definition.input_schema
+    schema = RepositoryMapTool(guard).definition.parameters
     assert schema["properties"]["budget_chars"]["maximum"] == 100_000
