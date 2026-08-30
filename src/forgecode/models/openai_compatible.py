@@ -286,7 +286,7 @@ def _parse_tool_calls(raw_calls: Any, *, max_calls: int = 64) -> tuple[ToolCall,
             raise ProviderError(f"model response tool call {index} is not an object", category="protocol_error")
         call_id = raw_call.get("id")
         function = raw_call.get("function")
-        if not isinstance(call_id, str) or not call_id:
+        if not isinstance(call_id, str) or not call_id or len(call_id) > 256 or any(ord(ch) < 32 for ch in call_id):
             raise ProviderError(f"model response tool call {index} has no id", category="protocol_error")
         if call_id in seen_ids:
             raise ProviderError(f"model response repeats tool call id {call_id}", category="protocol_error")
@@ -507,7 +507,7 @@ def assemble_chat_stream(events: Iterable[dict[str, Any]], *, max_content_chars:
                 order.append(call_index)
             current = calls[call_index]
             if raw.get("id") is not None:
-                if not isinstance(raw["id"], str) or (current["id"] is not None and current["id"] != raw["id"]):
+                if not isinstance(raw["id"], str) or not raw["id"] or len(raw["id"]) > 256 or any(ord(ch) < 32 for ch in raw["id"]) or (current["id"] is not None and current["id"] != raw["id"]):
                     raise ProviderError("stream tool call id changed or is invalid", category="stream_protocol_error")
                 current["id"] = raw["id"]
             function = raw.get("function", {})
@@ -538,7 +538,7 @@ def assemble_chat_stream(events: Iterable[dict[str, Any]], *, max_content_chars:
     seen_ids: set[str] = set()
     for index in order:
         call = calls[index]
-        if not isinstance(call["id"], str) or not call["id"] or not isinstance(call["name"], str) or not call["name"]:
+        if not isinstance(call["id"], str) or not call["id"] or len(call["id"]) > 256 or any(ord(ch) < 32 for ch in call["id"]) or not isinstance(call["name"], str) or not call["name"]:
             raise ProviderError("stream tool call is incomplete", category="stream_incomplete")
         if call["id"] in seen_ids:
             raise ProviderError("stream repeats a tool call id", category="stream_protocol_error")

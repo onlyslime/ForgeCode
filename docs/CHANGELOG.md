@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.119 — 2026-08-31
+
+- **Tool-call ID safety:** reject empty, oversized, or control-character IDs in synchronous and streaming provider responses to preserve log/session correlation integrity.
+- **Verification:** provider tests, compile checks, and manual malformed-ID inspection passed.
+
 ## v0.8.118 — 2026-08-31
 
 - **Streaming protocol guard:** reject non-object SSE events during chat-stream assembly with a structured protocol error.
