@@ -78,6 +78,11 @@ def test_execution_group_includes_background_lifecycle_tools() -> None:
     assert set(policy.allow) == set(available)
 
 
+def test_read_only_group_includes_worktree_inspection() -> None:
+    policy = parse_tool_policy_options("read_only", available=("git_worktrees",))
+    assert policy.allow == ("git_worktrees",)
+
+
 def test_registry_policy_intersection_preserves_stable_unavailable_result(tmp_path: Path) -> None:
     guard = WorkspaceGuard(tmp_path)
     base = build_default_registry(guard)

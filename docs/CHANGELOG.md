@@ -5,6 +5,8 @@
 - Added the read-only `git_worktrees` tool to inspect bounded worktree paths,
   branches, and HEADs without creating, switching, or mutating worktrees.
 - The listing is workspace-validated and capped at 64 entries.
+- Included `git_worktrees` in the `read_only` risk group and configuration
+  validation so policy filtering and tool discovery stay consistent.
 
 ## v0.7.19 — 2026-08-30
 

@@ -886,6 +886,8 @@ scope allow/deny 与 fallback 全局策略。该字段只描述策略路径，�
 - **非目标**：不创建、切换、删除或合并 worktree，不提供并发隔离；这些仍是后续 P1/P2
   设计项。
 - **验证**：工具策略定向测试、compileall 和 diff 检查通过。
+- **修补**：将 `git_worktrees` 纳入 read_only 风险组及配置 known-tools 校验，避免
+  新工具在不同策略入口出现可见性不一致。
 
 ### 当前差距复核（v0.7.19）
 
