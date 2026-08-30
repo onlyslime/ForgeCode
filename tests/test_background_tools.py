@@ -16,6 +16,20 @@ def test_background_task_can_be_started_and_polled(tmp_path):
     assert "hello" in result.output
 
 
+def test_background_manager_rejects_duplicate_task_id(tmp_path):
+    manager = ProcessManager()
+    item = manager.start("python -c \"print('ok')\"", tmp_path, "same")
+    try:
+        try:
+            manager.start("python -c \"print('again')\"", tmp_path, "same")
+        except RuntimeError as exc:
+            assert "already exists" in str(exc)
+        else:
+            raise AssertionError("expected duplicate task id rejection")
+    finally:
+        item.process.wait(timeout=3)
+
+
 def test_background_output_is_hard_bounded_and_completion_duration_stable(tmp_path):
     guard = WorkspaceGuard(tmp_path); context = ToolContext(guard, AllowAllApproval())
     manager = ProcessManager(max_output_chars=12)

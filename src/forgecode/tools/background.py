@@ -65,9 +65,13 @@ class ProcessManager:
             active = sum(item.process.poll() is None for item in self._items.values())
             if active >= self.max_tasks:
                 raise RuntimeError("background task limit exceeded")
-        process = subprocess.Popen(command, cwd=root, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
-        item = _Process(process, command, time.monotonic())
-        with self._lock:
+            if task_id in self._items:
+                raise RuntimeError("background task id already exists")
+            # Keep the admission check and process registration under one
+            # lock. Otherwise concurrent callers can both pass the limit and
+            # temporarily exceed the configured task budget.
+            process = subprocess.Popen(command, cwd=root, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
+            item = _Process(process, command, time.monotonic())
             self._items[task_id] = item
             self._stale.pop(task_id, None)
             self._persist_state()

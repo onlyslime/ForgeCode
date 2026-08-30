@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.31 — 2026-08-30
+
+- Made background task admission atomic and rejected duplicate task IDs,
+  preventing concurrent starts from exceeding limits or replacing live tasks.
+- Verification: background tool tests, compileall, and manual process-manager
+  inspection passed.
+
 ## v0.8.30 — 2026-08-30
 
 - Bound `EmbeddedSession` reader threads to their process generation so a
