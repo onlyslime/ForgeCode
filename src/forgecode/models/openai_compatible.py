@@ -490,7 +490,7 @@ def assemble_chat_stream(events: Iterable[dict[str, Any]], *, max_content_chars:
         if not isinstance(raw_calls, list):
             raise ProviderError("stream tool_calls delta must be a list", category="stream_protocol_error")
         for raw in raw_calls:
-            if not isinstance(raw, dict) or not isinstance(raw.get("index"), int) or isinstance(raw.get("index"), bool):
+            if not isinstance(raw, dict) or not isinstance(raw.get("index"), int) or isinstance(raw.get("index"), bool) or raw.get("index") < 0:
                 raise ProviderError("stream tool call fragment has no integer index", category="stream_protocol_error")
             call_index = raw["index"]
             try:

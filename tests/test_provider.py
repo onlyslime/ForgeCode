@@ -108,6 +108,11 @@ def test_stream_assembly_rejects_non_object_event():
         assemble_chat_stream([None])
 
 
+def test_stream_assembly_rejects_negative_tool_index():
+    with pytest.raises(ProviderError, match="integer index"):
+        assemble_chat_stream([{"choices": [{"index": 0, "delta": {"tool_calls": [{"index": -1}]}}]}])
+
+
 def test_provider_rejects_control_character_tool_call_id():
     with pytest.raises(ProviderError, match="no id"):
         parse_chat_completion({"choices": [{"finish_reason": "tool_calls", "message": {"tool_calls": [{"id": "bad\nid", "function": {"name": "read_file", "arguments": "{}"}}]}}]})

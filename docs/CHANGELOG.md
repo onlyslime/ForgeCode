@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.122 — 2026-08-31
+
+- **Streaming index validation:** reject negative tool-call fragment indexes before assembly, preventing malformed call ordering state.
+- **Verification:** provider regression tests, compile checks, and manual malformed-stream inspection passed.
+
 ## v0.8.121 — 2026-08-31
 
 - **Neutral protocol validation:** custom providers now receive the same control-character and length checks for tool IDs, tool names, and tool-result correlation IDs as concrete adapters.
