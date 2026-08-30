@@ -233,7 +233,11 @@ def _human_result(value: object) -> str | None:
             summary += "\n" + " · ".join(metrics)
         changed = value.get("changed_files")
         if isinstance(changed, list) and changed:
-            summary += "\nFiles changed: " + ", ".join(str(path) for path in changed[:20])
+            stats = value.get("file_change_stats") if isinstance(value.get("file_change_stats"), dict) else {}
+            summary += "\n\nFiles changed\n─────────────"
+            for path in changed[:20]:
+                item = stats.get(path, {}) if isinstance(stats, dict) else {}
+                summary += f"\nM {path}  +{item.get('added', 0)} -{item.get('removed', 0)}"
         return summary + "\n\n" + _pretty_text(value["message"])
     if value.get("error"):
         error = _pretty_text(value.get('error'))

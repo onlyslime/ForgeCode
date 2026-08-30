@@ -337,6 +337,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--workspace", type=Path, default=Path.cwd(), help="workspace root")
     parser.add_argument("--json", action="store_true", help="emit machine-readable JSON where supported")
     parser.add_argument("--jsonl", action="store_true", help="emit one machine-readable JSON envelope line")
+    parser.add_argument("--print", dest="print_prompt", metavar="PROMPT", help="run one prompt non-interactively and print the result")
     subparsers = parser.add_subparsers(dest="command")
     doctor_parser = subparsers.add_parser("doctor", help="check the local framework setup")
     doctor_parser.add_argument("--json", action="store_true", default=argparse.SUPPRESS, dest="json")
@@ -468,6 +469,7 @@ def _parser() -> argparse.ArgumentParser:
     _add_tool_policy_arguments(chat_parser)
     chat_parser.add_argument("--json", action="store_true", default=argparse.SUPPRESS, dest="json")
     chat_parser.add_argument("--jsonl", action="store_true", default=argparse.SUPPRESS, dest="jsonl")
+    chat_parser.add_argument("--print", dest="print_prompt", metavar="PROMPT", help="run one prompt and exit")
     inspect_parser = subparsers.add_parser("inspect", aliases=["map"], help="inspect a bounded read-only repository map")
     inspect_parser.add_argument("--task", default="repository inspection", help="task used to rank relevant files")
     inspect_parser.add_argument("--budget-chars", type=int, default=20_000)
@@ -711,7 +713,14 @@ def main(argv: list[str] | None = None) -> int:
     raw_has_mode = "--mode" in raw_argv or any(item.startswith("--mode=") for item in raw_argv)
     setattr(args, "_legacy_json_run", bool(args.command == "run" and raw_has_json and not raw_has_jsonl and not raw_has_mode))
     setattr(args, "_legacy_json_chat_existing", bool(args.command in {"chat", "start"} and raw_has_json and not raw_has_jsonl and "--session" in raw_argv))
-    command = args.command or "doctor"
+    command = args.command or ("chat" if getattr(args, "print_prompt", None) else "doctor")
+    if command == "chat" and getattr(args, "command", None) is None:
+        # ``fcc --print`` is a shorthand for a one-shot chat invocation; the
+        # root parser does not create the chat subparser namespace, so supply
+        # its safe defaults explicitly.
+        for name, value in {"prompt": [], "session": None, "mode": AgentMode.ACT.value, "bypass": False, "auto_approve": False, "demo": False, "demo_task": "calculator"}.items():
+            if not hasattr(args, name):
+                setattr(args, name, value)
     if command in {"chat", "start"} and getattr(args, "bypass", False):
         args.mode = AgentMode.BYPASS.value
     # ``--json`` and ``--jsonl`` are two spellings of the same canonical
@@ -1722,7 +1731,7 @@ def main(argv: list[str] | None = None) -> int:
         # The REPL is scriptable by design: callers may pipe lines through
         # stdin, while tests can inject a stream through ``InteractiveSession``.
         machine_json = bool(getattr(args, "json", False) or getattr(args, "jsonl", False))
-        initial_prompt = " ".join(args.prompt).strip()
+        initial_prompt = str(getattr(args, "print_prompt", "") or "").strip() or " ".join(getattr(args, "prompt", ()) or ()).strip()
         api_key = os.getenv(settings.api_key_env or "FORGECODE_API_KEY", "")
         new_run_id = uuid.uuid4().hex
         try:
@@ -1913,12 +1922,16 @@ def main(argv: list[str] | None = None) -> int:
                     started_at = time.monotonic()
                     tool_steps = 0
                     active_tool = ""
+                    current_turn = 0
+                    provider_attempts = 0
+                    provider_retries = 0
                     current_phase = ""
                     streamed_content = False
                     changed_files: set[str] = set()
+                    file_change_stats: dict[str, dict[str, int]] = {}
                     file_snapshots: dict[str, str] = {}
                     def progress_event(kind: str, payload: dict[str, Any]) -> None:
-                        nonlocal tool_steps, current_phase, streamed_content, active_tool
+                        nonlocal tool_steps, current_phase, streamed_content, active_tool, current_turn, provider_attempts, provider_retries
                         if machine_json:
                             return
                         labels = {"tool_call": "▸", "tool_result": "✓" if payload.get("ok") else "✗", "verification_result": "✓" if payload.get("ok") else "✗", "command_result": "✓" if payload.get("ok") else "✗", "command_timeout": "✗", "mode": "•", "model_message": "◆", "model_progress": "…", "model_delta": "", "provider_retry": "↻", "provider_attempt": "·"}
@@ -1948,6 +1961,7 @@ def main(argv: list[str] | None = None) -> int:
                             if kind == "model_progress":
                                 streamed_content = False
                                 turn = int(payload.get("step", 0)) + 1
+                                current_turn = turn
                                 print(f"\x1b[2K\r\x1b[35m… assistant turn {turn}  ({elapsed:.1f}s)\x1b[0m {payload.get('message', '')}  \x1b[90m[{tool_steps} tool steps]\x1b[0m")
                                 redraw_input_bar()
                                 return
@@ -1958,6 +1972,7 @@ def main(argv: list[str] | None = None) -> int:
                                     print(f"\x1b[35m{content}\x1b[0m", end="", flush=True)
                                 return
                             if kind == "provider_retry":
+                                provider_retries += 1
                                 print(f"\x1b[33m↻ provider retry {payload.get('next_attempt', '?')} · {payload.get('category', 'transient error')}\x1b[0m")
                                 redraw_input_bar()
                                 return
@@ -1965,6 +1980,8 @@ def main(argv: list[str] | None = None) -> int:
                                 print(f"\x1b[31m✗ provider attempt {payload.get('attempt', '?')} · {payload.get('error_category', payload.get('outcome', 'failed'))}\x1b[0m")
                                 redraw_input_bar()
                                 return
+                            if kind == "provider_attempt":
+                                provider_attempts += 1
                             if kind == "model_message":
                                 content = str(payload.get("content") or "").strip()
                                 if content:
@@ -1992,12 +2009,18 @@ def main(argv: list[str] | None = None) -> int:
                                     print(f"  \x1b[100;37m{line_number:>3} │ {line[:240]}\x1b[0m")
                                 if len(output.splitlines()) > 24:
                                     print(f"  \x1b[100;90m… {len(output.splitlines()) - 24} more lines\x1b[0m")
+                                print(f"  \x1b[90m✓ Read summary · {len(output.splitlines())} lines\x1b[0m")
                             if kind == "tool_result" and tool in {"run_command", "search"} and payload.get("ok"):
                                 output = str(payload.get("output") or "").strip()
                                 if output:
                                     print("  \x1b[100;97m output \x1b[0m")
                                     for line in output.splitlines()[:12]:
                                         print(f"  \x1b[100;37m{line[:240]}\x1b[0m")
+                                metadata = payload.get("metadata") if isinstance(payload.get("metadata"), dict) else {}
+                                if tool == "run_command":
+                                    print(f"  \x1b[90m✓ Run summary · exit {metadata.get('exit_code', 0)}\x1b[0m")
+                                elif tool == "search":
+                                    print(f"  \x1b[90m✓ Search summary · {len(output.splitlines())} matches\x1b[0m")
                             if kind == "tool_call" and tool in {"write_file", "apply_patch"}:
                                 preview = arguments.get("content") or arguments.get("patch")
                                 if isinstance(preview, str):
@@ -2014,6 +2037,10 @@ def main(argv: list[str] | None = None) -> int:
                                 changed_path = metadata.get("path") or arguments.get("path")
                                 if tool in {"write_file", "apply_patch"} and changed_path:
                                     changed_files.add(str(changed_path))
+                                    diff_text = str(metadata.get("diff") or "")
+                                    stats = file_change_stats.setdefault(str(changed_path), {"added": 0, "removed": 0})
+                                    stats["added"] += sum(1 for line in diff_text.splitlines() if line.startswith("+") and not line.startswith("+++"))
+                                    stats["removed"] += sum(1 for line in diff_text.splitlines() if line.startswith("-") and not line.startswith("---"))
                                     before_exists = str(changed_path) in file_snapshots
                                     status_code = "M" if before_exists else "A"
                                     print(f"  \x1b[1;33m{status_code} {changed_path}\x1b[0m")
@@ -2030,8 +2057,8 @@ def main(argv: list[str] | None = None) -> int:
                             while not heartbeat_stop.wait(5.0):
                                 with output_lock:
                                     elapsed = time.monotonic() - started_at
-                                    current = f" · running {active_tool}" if active_tool else " · waiting for model"
-                                    print(f"\x1b[2K\r\x1b[90m… working ({elapsed:.1f}s) · {tool_steps} tool steps{current}\x1b[0m")
+                                    current = f" · running {active_tool}" if active_tool else f" · waiting for model · turn {current_turn}"
+                                    print(f"\x1b[2K\r\x1b[90m… working ({elapsed:.1f}s) · {tool_steps} tool steps{current} · attempts {provider_attempts} · retries {provider_retries}\x1b[0m")
                                     redraw_input_bar()
                         heartbeat_thread = threading.Thread(target=heartbeat, name="forgecode-heartbeat", daemon=True)
                         heartbeat_thread.start()
@@ -2059,7 +2086,7 @@ def main(argv: list[str] | None = None) -> int:
                         session.append("plan_updated", {"plan": current.to_dict()}, mode=state["mode"])
                     except ValueError:
                         pass
-                payload = {"stopped_reason": result.stopped_reason, "state": result.state, "succeeded": result.succeeded, "verification_ok": result.verification_ok, "run_id": result.run_id, "duration_seconds": round(time.monotonic() - started_at, 3), "tool_steps": tool_steps, "changed_files": sorted(changed_files)}
+                payload = {"stopped_reason": result.stopped_reason, "state": result.state, "succeeded": result.succeeded, "verification_ok": result.verification_ok, "run_id": result.run_id, "duration_seconds": round(time.monotonic() - started_at, 3), "tool_steps": tool_steps, "changed_files": sorted(changed_files), "file_change_stats": file_change_stats}
                 if result.error:
                     payload["error"] = _redact_display(result.error, [api_key])
                 # Interactive callers need to see the assistant's actual
@@ -2765,8 +2792,9 @@ def main(argv: list[str] | None = None) -> int:
                 except TrustError:
                     trust_status = {"trusted": False}
             trust_label = "trusted" if trust_status.get("trusted") else "untrusted"
-            print(f"\x1b[90mstatus  ready   mode: {state['mode']}   model: {effective_model or 'not configured'}\x1b[0m")
-            print(f"\x1b[90mtools   {len(registry.names())} enabled   workspace: {trust_label}\x1b[0m\n")
+            print(f"\x1b[90mForgeCode v{__version__}\x1b[0m")
+            print(f"\x1b[90mmode: {state['mode']}   model: {effective_model or 'not configured'}\x1b[0m")
+            print(f"\x1b[90mtools: {len(registry.names())}   workspace: {trust_label}\x1b[0m\n")
             if state["mode"] in {"act", "bypass"} and bool(getattr(sys.stdin, "isatty", lambda: False)()):
                 if not trust_status.get("trusted"):
                     print("This workspace is not trusted for file changes or commands.")
@@ -2800,6 +2828,9 @@ def main(argv: list[str] | None = None) -> int:
                     _emit_machine(record)
                 else:
                     print(initial_result)
+            if getattr(args, "print_prompt", None):
+                controller.join(600.0)
+                return 0 if not controller.active else 3
         shutdown_unresolved = False
         try:
             stream = sys.stdin
