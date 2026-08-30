@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.8.35 — 2026-08-30
+
+- Hardened oversized-integer validation to use `bit_length()` instead of
+  decimal conversion, ensuring extreme provider values are rejected without
+  triggering Python's integer string-conversion exception.
+- Verification: provider contract tests, compileall, diff checks, and manual
+  5,000-digit integer validation passed.
+
 ## v0.8.34 — 2026-08-30
 
 - Added a bounded integer magnitude to provider tool arguments, preventing

@@ -177,7 +177,10 @@ def _valid_json_value(value: Any, *, depth: int = 0, budget: list[int] | None = 
     if budget[0] < 0:
         return False
     if value is None or isinstance(value, (str, int, bool)):
-        if isinstance(value, int) and not isinstance(value, bool) and len(str(abs(value))) > 1_000:
+        # Use bit_length instead of decimal conversion: Python deliberately
+        # limits int-to-str for very large values, and validation must never
+        # raise that implementation detail for untrusted provider output.
+        if isinstance(value, int) and not isinstance(value, bool) and value.bit_length() >= 3_322:
             return False
         return not isinstance(value, str) or len(value) <= 200_000
     if isinstance(value, float):
