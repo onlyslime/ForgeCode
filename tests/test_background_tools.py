@@ -70,6 +70,11 @@ def test_background_manager_bounds_command(tmp_path):
             raise AssertionError("expected command validation")
 
 
+def test_background_manager_blocks_destructive_commands(tmp_path):
+    with pytest.raises(ValueError, match="blocked by safety policy"):
+        ProcessManager().start("git clean -xfd", tmp_path, "unsafe")
+
+
 def test_background_tools_reject_non_object_arguments(tmp_path):
     guard = WorkspaceGuard(tmp_path)
     context = ToolContext(guard, AllowAllApproval())

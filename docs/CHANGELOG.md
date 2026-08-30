@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.80 — 2026-08-31
+
+- Enforced destructive-command blocking inside `ProcessManager.start()`, so
+  direct manager callers cannot bypass the background tool safety boundary.
+- Verification: direct `git clean -xfd` rejection, background tests,
+  compileall, and diff checks passed.
+
 ## v0.8.79 — 2026-08-31
 
 - Added consistent object-argument validation across all background process
