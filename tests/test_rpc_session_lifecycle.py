@@ -551,3 +551,15 @@ def test_rpc_record_with_workspace_external_session_path_is_not_recovered(tmp_pa
     record = record_dir / f"{handle}.json"
     record.write_text(json.dumps({"workspace": str(tmp_path), "mode": "act", "session_path": "../../outside.jsonl", "state": "idle", "sequence": 0, "events": []}), encoding="utf-8")
     assert rpc._load_session(handle, str(tmp_path)) is None
+
+
+def test_rpc_unknown_persisted_state_requires_recovery(tmp_path):
+    from forgecode import rpc
+    handle = "c" * 32
+    record_dir = tmp_path / ".forgecode" / "rpc-sessions"
+    record_dir.mkdir(parents=True)
+    (tmp_path / ".forgecode" / "sessions").mkdir(parents=True)
+    record = record_dir / f"{handle}.json"
+    record.write_text(json.dumps({"workspace": str(tmp_path), "mode": "act", "session_path": f".forgecode/sessions/{handle}.jsonl", "state": "future_state", "sequence": 0, "events": []}), encoding="utf-8")
+    restored = rpc._load_session(handle, str(tmp_path))
+    assert restored is not None and restored["state"] == "recovery_required"

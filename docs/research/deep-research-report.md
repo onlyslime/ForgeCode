@@ -675,7 +675,7 @@ CLI/TUI
 - [x] 每个 P0/P1 能力都有可执行验收标准或演示场景。
 - [x] 已明确竞品参考与本题自研实现的边界，避免误用现成 agent 框架。
 
-## ForgeCode 当前差距复核（2026-08-30，v0.7.39）
+## ForgeCode 当前差距复核（2026-08-30，v0.7.40）
 
 本节以当前仓库源码、定向测试和正常 `fcc` 工作流为准；竞品能力只作为产品
 形态基线，不把未能直接访问的页面当作已验证事实。OpenAI 官方 Codex 页面在
@@ -692,7 +692,7 @@ CLI/TUI
 | 验证 | 测试 profile、有限修复、review/export、轨迹评估 | 缺少语言服务和调试器集成 | P1 |
 | 扩展发布 | Skills、hooks、SDK、JSONL RPC、工具收窄、uv/独立二进制布局 | 缺少 MCP、插件市场、跨平台一键安装 | P2 |
 
-截至当前 v0.7.39，正常交互工作流还提供 `/context`（有界索引健康度）和
+截至当前 v0.7.40，正常交互工作流还提供 `/context`（有界索引健康度）和
 `/events [limit] [kind]`（可筛选、带相对耗时和错误码的持久化事件尾部）。
 这些能力不改变工具权限，只把已有审计证据暴露给用户；对应交互、机器契约和
 provider 回归测试均已通过。
@@ -987,6 +987,16 @@ worktree 并行能力仍属于 ForgeCode 的已知 P2/P1 差距，本轮未改�
   `git diff --check` 均通过。
 - RPC/embedding/工具策略/后台任务/语义工具/只读并行的定向测试均在完整回归中覆盖；未发现
   JSONL、审批或 WorkspaceGuard 回归。
+
+### v0.7.40 实施审计：RPC session state compatibility（2026-08-30）
+
+- **范围**：RPC 恢复只接受 `idle/running/paused/completed/failed/cancelled/recovery_required`
+  七种状态；未知或非字符串状态统一降级 `recovery_required`，避免未来 schema 值被误当成
+  可运行 session。
+- **非目标**：不猜测未知状态含义、不自动执行恢复、不改变合法状态的 TTL/replay/取消语义。
+- **完成条件**：前向不兼容记录不会获得 active 权限；合法旧记录继续恢复。
+- **验证**：RPC session lifecycle 定向测试 `52 passed`，compileall 与 diff 检查通过；
+  发布门禁将补充完整回归。
 
 ### v0.7.39 实施审计：pause/resume synchronization（2026-08-30）
 

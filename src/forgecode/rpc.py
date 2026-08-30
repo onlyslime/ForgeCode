@@ -36,6 +36,7 @@ _MAX_SESSION_EVENTS = 512
 _MAX_REQUEST_LINE_BYTES = 1_048_576
 _MAX_SESSION_RESULT_BYTES = 262_144
 _MAX_RPC_RECORD_BYTES = 512_000
+_RPC_SESSION_STATES = frozenset({"idle", "running", "paused", "completed", "failed", "cancelled", "recovery_required"})
 
 # Stable capability metadata for clients that cannot invoke the workspace-bound
 # ``tools`` command yet.  Keep this list declarative and bounded; it is not an
@@ -244,6 +245,8 @@ def _load_session(handle: str, workspace_hint: str | None = None) -> dict[str, A
             events = raw.get("events", [])
             if not isinstance(events, list): events = []
             persisted_state = raw.get("state", "idle")
+            if not isinstance(persisted_state, str) or persisted_state not in _RPC_SESSION_STATES:
+                persisted_state = "recovery_required"
             # A daemon restart cannot retain an in-process worker. Never
             # claim that a recovered running handle is still executing.
             state = "recovery_required" if persisted_state == "running" else persisted_state

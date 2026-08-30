@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.7.40 — 2026-08-30
+
+- RPC session recovery now validates persisted lifecycle states; unknown future
+  values are restored as `recovery_required` instead of ambiguous active states.
+- Added regression coverage for forward-incompatible state records.
+
 ## v0.7.39 — 2026-08-30
 
 - Serialized AgentLoop pause/resume flag access across the worker thread and
