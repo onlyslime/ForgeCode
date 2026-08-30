@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.182 — 2026-08-31
+
+- **Metadata size safety:** `file_metadata` now rejects files larger than the shared 2 MiB workspace limit before reading or hashing them.
+- **Verification:** command-boundary tests, compile checks, and manual oversized-file inspection passed.
+
 ## v0.8.181 — 2026-08-31
 
 - **Approval failure isolation:** exceptions from custom approval policies now fail closed as a denial and still notify the approval observer for complete audit evidence.

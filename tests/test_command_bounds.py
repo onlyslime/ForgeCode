@@ -123,6 +123,15 @@ def test_understanding_tools_report_expired_deadline(tmp_path: Path):
         assert result.metadata["error"] == "deadline_exceeded"
 
 
+def test_file_metadata_rejects_oversized_file(tmp_path: Path):
+    path = tmp_path / "large.bin"
+    path.write_bytes(b"x" * 2_000_001)
+    registry = build_default_registry(WorkspaceGuard(tmp_path))
+    result = registry.execute("file_metadata", {"path": "large.bin"}, ToolContext(WorkspaceGuard(tmp_path), AllowAllApproval()))
+    assert result.ok is False
+    assert result.metadata["error"] == "file_too_large"
+
+
 def test_symbol_navigation_reports_expired_deadline(tmp_path: Path):
     registry = build_default_registry(WorkspaceGuard(tmp_path))
     context = ToolContext(WorkspaceGuard(tmp_path), AllowAllApproval(), deadline_monotonic=time.monotonic() - 1)
