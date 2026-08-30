@@ -38,3 +38,9 @@ def test_git_worktree_tools_reject_non_object_arguments(tmp_path):
     for tool in (GitWorktreeCreateTool(guard), GitWorktreeRemoveTool(guard), GitWorktreeReconcileTool(guard)):
         with pytest.raises(ValueError, match="arguments must be an object"):
             tool.execute(None, context)
+
+
+def test_git_worktree_remove_rejects_non_boolean_force(tmp_path):
+    guard = WorkspaceGuard(tmp_path); context = ToolContext(guard, AllowAllApproval())
+    with pytest.raises(ValueError, match="force"):
+        GitWorktreeRemoveTool(guard).execute({"name": "demo", "force": "false"}, context)

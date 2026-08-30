@@ -312,6 +312,9 @@ class GitWorktreeRemoveTool:
         name = arguments.get("name")
         if not isinstance(name, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}", name):
             raise ValueError("name must be 1-64 safe filename characters")
+        force = arguments.get("force", False)
+        if not isinstance(force, bool):
+            raise ValueError("force must be a boolean")
         target = self.guard.resolve(str(Path(".forgecode") / "worktrees" / name))
         if not target.exists():
             return ToolResult(False, "managed worktree does not exist", {"error": "worktree_missing"})
@@ -324,9 +327,9 @@ class GitWorktreeRemoveTool:
         owner = records.get(name, {}).get("run_id")
         if owner and context.run_id and owner != context.run_id:
             return ToolResult(False, "worktree belongs to another session", {"error": "worktree_owner_mismatch"})
-        if not context.request_approval(self.definition.name, {"name": name, "force": bool(arguments.get("force", False))}):
+        if not context.request_approval(self.definition.name, {"name": name, "force": force}):
             return ToolResult(False, "git_worktree_remove denied by approval policy", {"error": "approval_denied"})
-        command = ["git", "worktree", "remove"] + (["--force"] if arguments.get("force", False) else []) + [str(target)]
+        command = ["git", "worktree", "remove"] + (["--force"] if force else []) + [str(target)]
         try:
             result = subprocess.run(command, cwd=context.guard.root, capture_output=True, text=True, timeout=min(45.0, context.remaining_seconds(45.0)), check=False)
         except (OSError, subprocess.TimeoutExpired) as exc:

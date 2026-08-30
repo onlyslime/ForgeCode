@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.96 — 2026-08-31
+
+- Enforced strict boolean validation for `git_worktree_remove.force`,
+  preventing values such as `"false"` from enabling destructive `--force`.
+- Verification: non-boolean force regression, manual API check, compileall,
+  and diff checks passed.
+
 ## v0.8.95 — 2026-08-31
 
 - Added object-argument validation to Git worktree create, remove, and
