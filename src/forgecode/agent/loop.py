@@ -242,7 +242,13 @@ class AgentLoop:
         deadline = self.context.deadline_monotonic
         remaining = None if deadline is None else max(0.0, deadline - now)
         return {
-            "active": not self.lifecycle.terminal and self._started_monotonic is not None,
+            "active": self.lifecycle.state not in {
+                RunState.CREATED,
+                RunState.RECOVERY_REQUIRED,
+                RunState.COMPLETED,
+                RunState.FAILED,
+                RunState.CANCELLED,
+            } and self._started_monotonic is not None,
             "state": self.lifecycle.state.value,
             "run_id": self.run_id,
             "event_sequence": self._last_event_sequence,

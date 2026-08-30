@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.12 — 2026-08-30
+
+- Corrected live status semantics so recovery-required runs are reported as
+  stopped rather than active.
+- Verification: recovery-state regression passed; manual review checked all
+  lifecycle states and confirmed only executing phases report active.
+
 ## v0.8.11 — 2026-08-30
 
 - Added hard step and tool-call limits to live run diagnostics so operators can

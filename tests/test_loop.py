@@ -44,6 +44,14 @@ def test_agent_loop_status_snapshot_is_bounded_and_tracks_run(tmp_path: Path):
     assert after["event_sequence"] == 0
     assert set(after) == {"active", "state", "run_id", "event_sequence", "step", "provider_requests", "tool_calls", "limits", "elapsed_seconds", "remaining_seconds", "steering_items", "steering_chars", "cancelled", "audit_complete"}
 
+
+def test_agent_loop_status_snapshot_does_not_call_recovery_required_active(tmp_path: Path):
+    guard = WorkspaceGuard(tmp_path)
+    loop = AgentLoop(FakeProvider(), build_default_registry(guard), ToolContext(guard, AllowAllApproval()))
+    loop._started_monotonic = 1.0
+    loop.lifecycle.state = loop.lifecycle.state.__class__.RECOVERY_REQUIRED
+    assert loop.status_snapshot()["active"] is False
+
 def test_agent_loop_labels_first_progress_as_initial_analysis(tmp_path: Path):
     events = []
     guard = WorkspaceGuard(tmp_path)
