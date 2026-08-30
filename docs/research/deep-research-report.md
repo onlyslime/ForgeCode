@@ -800,6 +800,17 @@ Codex 官方页面或未实现的竞品特性当作本项目已完成能力。
 - 定向测试覆盖命令参数不出现在 human/machine 结果中；具体命令仍只在启动调用的
   受控审计链路中按既有 secrets 脱敏策略处理。
 
+### 外部资料复核（2026-08-30）
+
+- OpenCode 官方 Tools 页面当前可访问（HTTP 200），明确列出 `read`、`write`、
+  `edit`、`bash`、`grep`、`glob` 以及 experimental `lsp`；这验证了 ForgeCode
+  已有基础读写/搜索工具，但仍缺少真正语言服务器协议和更多编辑语义。
+- OpenCode 官方 Permissions 页面当前可访问（HTTP 200），明确区分 `allow`、
+  `ask`、`deny`，并说明 auto 模式不能绕过显式 deny；ForgeCode 的 Plan/Act/Bypass
+  与审批策略覆盖相同安全意图，但配置表达式和外部工具粒度仍较少。
+- OpenAI Codex CLI 官方页面在本环境仍返回 HTTP 403；本报告不声称读取其源码，
+  Codex 差距判断仅依据此前可访问的官方文档索引和已记录的能力描述。
+
 ### 0.7.3 实施审计：静态语义导航（2026-08-30）
 
 - **范围**：新增 `find_definition` 与 `find_references`，覆盖常见源码后缀，
