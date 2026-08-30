@@ -141,8 +141,13 @@ class _ProtocolTransport:
             data = {"choices": [{"message": {"role": "assistant", "content": text, "tool_calls": calls}, "finish_reason": "tool_calls" if calls else "stop"}], "usage": data.get("usageMetadata", {})}
         elif self.provider == "ollama":
             msg = data.get("message", {})
+            if not isinstance(msg, dict):
+                raise ValueError("ollama response message must be an object")
             calls = []
-            for index, call in enumerate(msg.get("tool_calls", []) if isinstance(msg, dict) else []):
+            raw_calls = msg.get("tool_calls", [])
+            if not isinstance(raw_calls, list) or any(not isinstance(call, dict) for call in raw_calls):
+                raise ValueError("ollama response tool_calls must be objects")
+            for index, call in enumerate(raw_calls):
                 function = call.get("function", {}) if isinstance(call, dict) else {}
                 if isinstance(function, dict) and function.get("name"):
                     calls.append({"id": str(call.get("id") or f"call-{index}"), "type": "function", "function": {"name": function["name"], "arguments": json.dumps(function.get("arguments", function.get("parameters", {})), ensure_ascii=False)}})

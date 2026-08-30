@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.134 — 2026-08-31
+
+- **Ollama response validation:** reject non-object messages and malformed tool-call arrays before provider translation.
+- **Verification:** provider tests, compile checks, and manual malformed-message inspection passed.
+
 ## v0.8.133 — 2026-08-31
 
 - **Google response validation:** validate candidates, candidate content, and parts before translation, preventing leaked index/attribute errors on malformed responses.

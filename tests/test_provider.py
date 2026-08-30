@@ -172,6 +172,12 @@ def test_google_transport_rejects_invalid_candidates():
         transport._response(json.dumps({"candidates": []}).encode())
 
 
+def test_ollama_transport_rejects_invalid_message():
+    transport = _ProtocolTransport(object(), "ollama", "secret")
+    with pytest.raises(ValueError, match="message must be an object"):
+        transport._response(json.dumps({"message": []}).encode())
+
+
 def test_provider_neutral_response_validation_rejects_nonfinite_usage_and_bad_finish_reason():
     assert not is_valid_response(ModelResponse(Message("assistant", "ok"), finish_reason="made_up"))
     assert not is_valid_response(ModelResponse(Message("assistant", "ok"), usage={"total_tokens": float("nan")}))
