@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import math
 from dataclasses import fields, is_dataclass
 from pathlib import Path
 from typing import Any, Iterable
@@ -49,8 +50,10 @@ def redact_value(value: Any, secrets: Iterable[str] = ()) -> Any:
     def walk(item: Any, depth: int = 0) -> Any:
         if depth > 20:
             return "[maximum nesting depth exceeded]"
-        if item is None or isinstance(item, (bool, int, float)):
+        if item is None or isinstance(item, (bool, int)):
             return item
+        if isinstance(item, float):
+            return item if math.isfinite(item) else "[non-finite number omitted]"
         if isinstance(item, str):
             return redact_text(item, secret_values)
         if isinstance(item, (bytes, bytearray, memoryview)):

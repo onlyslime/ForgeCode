@@ -61,3 +61,10 @@ def test_redaction_walker_handles_dataclass_bytes_exception_and_cycles():
     assert redacted["error"]["type"] == "RuntimeError"
     assert "hidden" not in str(redacted["error"])
     assert "circular" in redacted["cycle"][0]
+
+
+def test_redaction_walker_normalizes_nonfinite_numbers():
+    redacted = redact_value({"nan": float("nan"), "inf": float("inf"), "ok": 1.5})
+    assert redacted["nan"] == "[non-finite number omitted]"
+    assert redacted["inf"] == "[non-finite number omitted]"
+    assert redacted["ok"] == 1.5

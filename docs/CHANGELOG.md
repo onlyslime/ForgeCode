@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.47 — 2026-08-31
+
+- Normalized non-finite floats in recursive redaction to a safe placeholder,
+  fulfilling the JSON-compatible metadata contract for persisted events.
+- Verification: session/redaction tests, manual JSON serialization check,
+  compileall, and diff checks passed.
+
 ## v0.8.46 — 2026-08-31
 
 - Added bounded secret material validation to `ToolContext`, limiting entries
