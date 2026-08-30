@@ -868,6 +868,12 @@ Codex 官方页面或未实现的竞品特性当作本项目已完成能力。
   request permissions、MCP elicitations）。这是真实源码证据，说明 Codex 的审批
   边界比 ForgeCode 当前全局 interactive/auto/deny 更细；本项目后续可按风险域拆分，
   但不能宣称已实现 Codex 的 granular profile。
+- 同一仓库的 recursive tree API 当前返回 7,629 个条目，包含独立的
+  `app-server-client`、`app-server-daemon`、`app-server-protocol/schema/json`，以及
+  多组 approval、permission、session、dynamic tool 的 JSON schema。这是源码树级
+  证据，说明 Codex 的 RPC/客户端/后台守护进程是独立产品边界；ForgeCode 当前虽有
+  JSONL RPC/Node embed，但尚无等价的长期 daemon 和生成式 schema 目录。针对这些
+  README/具体 Rust 实现的单文件请求本轮超时或 404，未据此扩展结论。
 
 ### 0.7.3 实施审计：静态语义导航（2026-08-30）
 
