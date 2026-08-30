@@ -4,6 +4,9 @@ from __future__ import annotations
 import subprocess
 import re
 import json
+import os
+import tempfile
+import threading
 from pathlib import Path
 from typing import Any
 
@@ -12,6 +15,7 @@ from .base import ToolContext, ToolDefinition, ToolResult
 
 _WORKTREE_STATE = Path(".forgecode") / "worktrees.json"
 _MAX_WORKTREE_RECORDS = 64
+_WORKTREE_STATE_LOCK = threading.RLock()
 
 
 def _worktree_records(guard) -> dict[str, dict[str, str]]:
@@ -33,7 +37,23 @@ def _save_worktree_records(guard, records: dict[str, dict[str, str]]) -> None:
     path = guard.resolve(_WORKTREE_STATE)
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = {"schema_version": 1, "worktrees": dict(list(records.items())[:_MAX_WORKTREE_RECORDS])}
-    path.write_text(json.dumps(payload, ensure_ascii=False, sort_keys=True) + "\n", encoding="utf-8")
+    encoded = (json.dumps(payload, ensure_ascii=False, sort_keys=True) + "\n").encode("utf-8")
+    temporary = None
+    with _WORKTREE_STATE_LOCK:
+        try:
+            with tempfile.NamedTemporaryFile(mode="wb", prefix="worktrees.", suffix=".tmp", dir=path.parent, delete=False) as handle:
+                temporary = Path(handle.name)
+                handle.write(encoded)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(temporary, path)
+            temporary = None
+        finally:
+            if temporary is not None:
+                try:
+                    temporary.unlink()
+                except OSError:
+                    pass
 
 
 class GitStatusTool:
@@ -189,9 +209,10 @@ class GitWorktreeCreateTool:
         relative = self.guard.relative(target)
         metadata = {"run_id": context.run_id[:128] if isinstance(context.run_id, str) else "", "branch": branch, "path": relative}
         try:
-            records = _worktree_records(self.guard)
-            records[name] = metadata
-            _save_worktree_records(self.guard, records)
+            with _WORKTREE_STATE_LOCK:
+                records = _worktree_records(self.guard)
+                records[name] = metadata
+                _save_worktree_records(self.guard, records)
         except (OSError, ValueError, TypeError) as exc:
             return ToolResult(False, "worktree created but ownership metadata could not be saved", {"error": "worktree_metadata_failed", "path": relative, "detail": type(exc).__name__})
         return ToolResult(True, f"created worktree {relative} on {branch}", {"path": relative, "branch": branch, "run_id": metadata["run_id"], "exit_code": 0})
@@ -236,7 +257,10 @@ class GitWorktreeRemoveTool:
         if result.returncode == 0 and name in records:
             records.pop(name, None)
             try:
-                _save_worktree_records(self.guard, records)
+                with _WORKTREE_STATE_LOCK:
+                    records = _worktree_records(self.guard)
+                    records.pop(name, None)
+                    _save_worktree_records(self.guard, records)
             except (OSError, ValueError, TypeError):
                 return ToolResult(False, "worktree removed but ownership metadata could not be updated", {"error": "worktree_metadata_failed", "name": name, "exit_code": 0})
         return ToolResult(result.returncode == 0, output, {"name": name, "exit_code": result.returncode})

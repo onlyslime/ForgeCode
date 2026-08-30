@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.7.31 — 2026-08-30
+
+- Worktree ownership metadata is now updated with a bounded, same-directory
+  temporary file, `fsync`, and atomic replace under an in-process lock.
+- Interrupted or concurrent updates cannot expose a partially written JSON
+  state file; temporary artifacts are cleaned up on failure.
+
 ## v0.7.30 — 2026-08-30
 
 - Worktree creation now records bounded, non-sensitive session ownership
