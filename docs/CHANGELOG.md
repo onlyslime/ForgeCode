@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.8.89 — 2026-08-31
+
+- Converted background process startup failures into structured tool results,
+  preventing `run_background` from leaking spawn exceptions into the agent
+  loop.
+- Verification: injected startup failure regression, manual tool invocation,
+  compileall, and diff checks passed.
+
 ## v0.8.88 — 2026-08-31
 
 - Hardened `kill_process` against a process-exit race, returning structured

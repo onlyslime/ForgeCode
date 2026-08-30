@@ -95,6 +95,17 @@ def test_background_manager_filters_sensitive_environment(tmp_path, monkeypatch)
     assert "absent" in result["output"]
 
 
+def test_run_background_converts_start_failure_to_tool_result(tmp_path):
+    guard = WorkspaceGuard(tmp_path); context = ToolContext(guard, AllowAllApproval())
+    class BrokenManager:
+        def start(self, *_args):
+            raise OSError("spawn failed")
+    result = RunBackgroundTool(guard, BrokenManager()).execute({"command": "python -c \"print(1)\""}, context)
+    assert result.ok is False
+    assert result.metadata["error"] == "start_failed"
+    assert result.metadata["task_id"]
+
+
 def test_background_tools_reject_non_object_arguments(tmp_path):
     guard = WorkspaceGuard(tmp_path)
     context = ToolContext(guard, AllowAllApproval())

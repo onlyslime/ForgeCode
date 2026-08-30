@@ -196,7 +196,10 @@ class RunBackgroundTool:
         if not context.request_approval(self.definition.name, {"command":command, "_risk":risk, "_risk_reasons":list(reasons)}): return ToolResult(False, "run_background denied by approval policy", {"error":"approval_denied"})
         if context.cancelled: return ToolResult(False, "run_background cancelled before start", {"error":"cancelled"})
         task_id = uuid.uuid4().hex[:16]
-        self.manager.start(command, context.guard.root, task_id)
+        try:
+            self.manager.start(command, context.guard.root, task_id)
+        except (OSError, RuntimeError, ValueError) as exc:
+            return ToolResult(False, f"background task failed to start: {type(exc).__name__}", {"error": "start_failed", "task_id": task_id})
         return ToolResult(True, f"background task started: {task_id}", {"task_id":task_id, "status":"running"})
 
 class ProcessStatusTool:
