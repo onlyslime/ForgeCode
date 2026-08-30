@@ -837,6 +837,11 @@ class AgentLoop:
         if not prompt.strip():
             raise ValueError("prompt must not be empty")
         self._started_monotonic = time.monotonic()
+        # A loop instance is reusable by embedders; counters describe this
+        # run only and must not leak history from an earlier invocation.
+        self._current_step = 0
+        self._provider_requests = 0
+        self._tool_calls = 0
         prompt = redact_text(prompt, self.context.secrets)
         messages: list[Message] = [
             self.context_builder.system_message(

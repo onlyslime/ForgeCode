@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.9 — 2026-08-30
+
+- Reset live status counters at run entry so reusable embedded loop instances
+  cannot report stale provider/tool activity from a prior invocation.
+- Verification: status regression passed; manual review confirmed the reset
+  occurs only after prompt validation and before repository/provider work.
+
 ## v0.8.8 — 2026-08-30
 
 - Added live provider-request and tool-call counters to the bounded run status
