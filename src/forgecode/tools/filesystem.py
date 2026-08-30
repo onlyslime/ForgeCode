@@ -23,6 +23,10 @@ _MAX_SEARCH_LINE_CHARS = 4_000
 _MAX_WRITE_CHARS = 1_000_000
 
 
+class _WriteDeadlineExceeded(RuntimeError):
+    """Internal signal used to abort an atomic write before replacement."""
+
+
 def _is_ignored(path, guard) -> bool:
     return is_ignored_context_path(guard, path)
 
@@ -341,6 +345,8 @@ class WriteFileTool:
                     os.chmod(temporary, before_mode)
                 if context.pause_wait is not None:
                     context.pause_wait()
+                if context.remaining_seconds(1.0) <= 0:
+                    raise _WriteDeadlineExceeded("deadline expired before atomic replace")
                 os.replace(temporary, path)
             finally:
                 try:
@@ -349,6 +355,13 @@ class WriteFileTool:
                     pass
                 if temporary.exists():
                     temporary.unlink()
+        except _WriteDeadlineExceeded:
+            if transaction_manifest is not None:
+                try:
+                    context.transaction_store.fail(transaction_id, "deadline exceeded before atomic replace", recovery_required=False)
+                except Exception:
+                    pass
+            return ToolResult(False, "write_file deadline expired before atomic replace", {"error": "deadline_exceeded", "transaction_id": transaction_id, "path": path_value})
         except PauseRequested:
             if transaction_manifest is not None:
                 try:

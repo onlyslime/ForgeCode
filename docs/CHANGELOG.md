@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.177 — 2026-08-31
+
+- **Atomic write deadline gate:** `write_file` now rechecks the run budget immediately before `os.replace`, preventing a prepared temporary file from becoming a committed workspace mutation after deadline expiry.
+- **Verification:** command/recovery tests, compile checks, and manual deadline-write inspection passed.
+
 ## v0.8.176 — 2026-08-31
 
 - **Quality output draining:** cancellable test/diagnostic processes now drain stdout and stderr during polling, preventing pipe-buffer deadlocks on verbose commands; cleanup timeouts fail safely.
