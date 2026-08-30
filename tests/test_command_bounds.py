@@ -4,7 +4,7 @@ from pathlib import Path
 from forgecode.security import WorkspaceGuard
 from forgecode.tools import AllowAllApproval, ToolContext, build_default_registry
 from forgecode.tools.shell import classify_command
-from forgecode.tools.quality import DiagnosticsTool, TestTool
+from forgecode.tools.quality import DiagnosticsTool, TestTool as QualityCheckTool
 import pytest
 
 
@@ -49,6 +49,6 @@ def test_command_cancellation_terminates_process(tmp_path: Path):
 
 def test_quality_tools_reject_empty_explicit_commands(tmp_path: Path):
     context = ToolContext(WorkspaceGuard(tmp_path), AllowAllApproval())
-    for tool in (TestTool(tmp_path), DiagnosticsTool(tmp_path)):
+    for tool in (QualityCheckTool(tmp_path), DiagnosticsTool(tmp_path)):
         with pytest.raises(ValueError, match="non-empty"):
             tool.execute({"command": "   "}, context)
