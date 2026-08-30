@@ -933,7 +933,7 @@ scope allow/deny 与 fallback 全局策略。该字段只描述策略路径，�
 - **非目标**：不改变 capability 内容、协议版本或会话执行行为。
 - **验证**：CLI machine contract 定向测试 27 passed，compileall 与 diff 检查通过。
 
-### 当前差距复核（v0.7.28）
+### 当前差距复核（v0.7.36）
 
 基于已核实的 Codex `AskForApproval.ts`、Codex app-server 源码树、OpenCode
 Tools/Permissions 文档和 Cline 工具/Plan 文档，ForgeCode 的优势是边界全部在本仓库
@@ -979,9 +979,9 @@ Cline 将工具结果回传到模型，并把 Plan 限制为探索/规划、Act 
 ForgeCode 当前 ToolRegistry、Plan/Act 边界一致。Cline 的浏览器、MCP 和 Kanban
 worktree 并行能力仍属于 ForgeCode 的已知 P2/P1 差距，本轮未改变优先级。
 
-### 最新门禁证据（v0.7.28）
+### 最新门禁证据（v0.7.36）
 
-- 完整回归：`515 passed, 8 skipped, 2 warnings`（3 分 13 秒）。skip 均为当前
+- 完整回归：`521 passed, 9 skipped, 2 warnings`（3 分 13 秒）。skip 均为当前
   Windows 账户无法创建 symlink；warnings 为既有 pytest collection warning。
 - `forgecode doctor` 显示 `lsp_status` 已注册，`python -m compileall -q src`、
   `git diff --check` 均通过。
