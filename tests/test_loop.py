@@ -1,5 +1,6 @@
 import asyncio
 from pathlib import Path
+import threading
 
 from forgecode.agent import AgentLoop
 from forgecode.models import Message, ModelCapabilities, ModelResponse, ToolCall
@@ -70,3 +71,46 @@ def test_agent_loop_fails_fast_on_required_stream_capability_mismatch(tmp_path: 
     result = asyncio.run(loop.run("hello"))
     assert result.stopped_reason == "capability_mismatch"
     assert result.error == "configured provider requires streaming but does not support it"
+
+
+def test_agent_loop_steering_is_injected_at_next_model_boundary(tmp_path: Path):
+    started = threading.Event()
+    release = threading.Event()
+    observed = []
+
+    class Provider:
+        def __init__(self):
+            self.calls = 0
+
+        async def complete(self, messages, _tools):
+            self.calls += 1
+            observed.append([message.content for message in messages if message.role == "user"])
+            if self.calls == 1:
+                started.set()
+                while not release.is_set():
+                    await asyncio.sleep(0.005)
+                return ModelResponse(Message("assistant", tool_calls=(ToolCall("inspect", "list_files", {"pattern": "*"}),)), finish_reason="tool_calls")
+            return ModelResponse(Message("assistant", "done"), finish_reason="stop")
+
+    provider = Provider()
+    loop = AgentLoop(provider, build_default_registry(WorkspaceGuard(tmp_path)), ToolContext(WorkspaceGuard(tmp_path), AllowAllApproval()))
+
+    async def scenario():
+        task = asyncio.create_task(loop.run("initial task"))
+        while not started.is_set():
+            await asyncio.sleep(0.005)
+        assert loop.steer("focus on the failing edge case")["accepted"] is True
+        release.set()
+        return await task
+
+    result = asyncio.run(scenario())
+    assert result.succeeded
+    assert any("focus on the failing edge case" in item for item in observed[-1])
+
+
+def test_agent_loop_cancel_clears_pending_steering(tmp_path: Path):
+    guard = WorkspaceGuard(tmp_path)
+    loop = AgentLoop(object(), build_default_registry(guard), ToolContext(guard, AllowAllApproval()))
+    assert loop.steer("do not run after cancellation")["accepted"] is True
+    assert loop.cancel("user cancelled") is True
+    assert not loop._steering_queue

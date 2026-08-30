@@ -102,6 +102,16 @@ class RunService:
         released = loop.resume()
         return {"resumed": released, "state": loop.lifecycle.state.value, "message": "resume requested" if released else "worker was not paused"}
 
+    def steer(self, message: str) -> dict[str, Any]:
+        """Deliver a bounded instruction at the active loop's next model boundary."""
+        loop = self._current_loop()
+        if loop is None:
+            with self._active_lock:
+                if self._starting:
+                    return {"accepted": False, "error": "worker is still initializing", "code": "worker_starting"}
+            return {"accepted": False, "error": "no active worker", "code": "no_active_worker"}
+        return loop.steer(message)
+
     def _resume_validation_error(self, loop: AgentLoop) -> str | None:
         """Revalidate durable session/checkpoint and planning fingerprints."""
         try:

@@ -358,6 +358,7 @@ class InteractiveRunController:
     pause_active: Callable[[], object] = lambda: {"paused": False, "error": "no active worker"}
     resume_active: Callable[[], object] = lambda: {"resumed": False, "error": "no active worker"}
     cancel_active: Callable[[], object] = lambda: {"cancelled": False, "error": "no active worker"}
+    steer_active: Callable[[str], object] = lambda _message: {"accepted": False, "error": "no active worker"}
     max_queue_items: int = 32
     max_queue_chars: int = 32_000
     _queue: list[str] = field(default_factory=list, init=False, repr=False)
@@ -396,6 +397,21 @@ class InteractiveRunController:
                 "last_elapsed_seconds": self._last_elapsed_seconds,
                 "last_tool_steps": self._last_tool_steps,
             }
+
+    def steer(self, message: str) -> object:
+        """Request an instruction injection at the next safe model boundary."""
+        text = str(message).rstrip("\r\n")
+        if not text.strip():
+            return {"accepted": False, "error": "steering message must not be empty"}
+        with self._condition:
+            if not self._active:
+                return {"accepted": False, "error": "no active worker", "code": "no_active_worker"}
+            if self._cancel_requested:
+                return {"accepted": False, "error": "run cancellation is already requested", "code": "cancellation_requested"}
+        result = self.steer_active(text)
+        if isinstance(result, dict) and result.get("accepted") is True:
+            self.event_sink("steering_enqueued", {"chars": len(text), "position": result.get("position", 1)})
+        return result
 
     def submit(self, message: str) -> dict[str, object]:
         # Preserve leading whitespace: `` !cmd`` is ordinary prose, whereas
@@ -600,6 +616,7 @@ class InteractiveSession:
     context_info: Callable[[], object] = lambda: {}
     events_info: Callable[[int, str | None], object] = lambda _limit=40, _kind=None: {}
     cancel: Callable[[], object] = lambda: {"cancelled": True}
+    steer: Callable[[str], object] = lambda _message: {"accepted": False, "error": "no active worker"}
     pause: Callable[[], object] = lambda: {"paused": True}
     resume: Callable[[], object] = lambda: {"resumed": True}
     quit: Callable[[], object] = lambda: {"stopped": True}
@@ -621,7 +638,7 @@ class InteractiveSession:
     stopped: bool = False
     controller: InteractiveRunController | None = None
 
-    COMMANDS = ("help", "introduce", "introdece", "status", "queue", "tools", "plan", "mode", "model", "connect", "login", "rules", "files", "skills", "skill", "tree", "diff", "context", "events", "review", "test", "compact", "undo", "cancel", "pause", "resume", "clear", "quit", "exit")
+    COMMANDS = ("help", "introduce", "introdece", "status", "queue", "steer", "tools", "plan", "mode", "model", "connect", "login", "rules", "files", "skills", "skill", "tree", "diff", "context", "events", "review", "test", "compact", "undo", "cancel", "pause", "resume", "clear", "quit", "exit")
 
     def header(self, *, run_id: str = "", mode: str = "plan", profile: str = "default", rules_count: int = 0, budget: int = 60_000) -> str:
         return f"ForgeCode session run={run_id or '<new>'} workspace=. mode={mode} profile={profile} rules={rules_count} budget={budget}"
@@ -634,6 +651,7 @@ class InteractiveSession:
             "/introduce            介绍 ForgeCode 的定位、能力与项目地址\n"
             "/status               show live worker, phase, and timing\n"
             "/queue                show pending follow-up queue capacity\n"
+            "/steer <message>      guide an active run at its next model boundary\n"
             "/tools                list available tools and safety categories\n"
             "/model [show|list]    inspect the active model configuration\n"
             "/mode plan|act|bypass switch planning, approved edits, or trusted mode\n"
@@ -694,6 +712,10 @@ class InteractiveSession:
                 worker = value.get("worker") if isinstance(value.get("worker"), dict) else {}
                 return {"queue_status": True, "active": bool(worker.get("active")), "items": worker.get("queue_items", 0), "chars": worker.get("queue_chars", 0), "max_items": self.max_queue_items, "max_chars": self.max_queue_chars}
             return {"queue_status": True, "active": False, "items": 0, "chars": 0, "max_items": self.max_queue_items, "max_chars": self.max_queue_chars}
+        if command == "steer":
+            if not args:
+                raise SlashCommandError("usage: /steer <message>")
+            return self.steer(" ".join(args))
         if command == "tools":
             if args: raise SlashCommandError("usage: /tools")
             return self.tools()

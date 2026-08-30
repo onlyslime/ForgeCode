@@ -81,7 +81,7 @@ uv run forgecode
 | 理解 | 列出和读取文件、文本/正则搜索、仓库概览、符号、定义、引用、元数据 |
 | 修改 | 创建文件、原子写入、统一补丁、红绿预览、事务记录 |
 | 验证 | 测试、诊断、有界 shell 命令、标准输出/错误、退出码、修复尝试 |
-| 控制 | Plan、Act、Bypass、暂停、恢复、取消/Esc、后续任务队列 |
+| 控制 | Plan、Act、Bypass、暂停、恢复、取消/Esc、安全边界 steering、后续任务队列 |
 | 上下文 | `AGENTS.md` 规则、显式引用、增量索引、上下文搜索、压缩、健康诊断 |
 | Git | status、diff、log、worktree、review、撤销和恢复检查 |
 | 进程 | 后台命令、状态轮询、输出限制、安全终止 |
@@ -109,7 +109,7 @@ WorkspaceGuard + 模式 + 风险 + 审批
 
 ## 常用命令
 
-在 `fcc` 中可以从 `/help`、`/tools`、`/status`、`/files`、`/rules`、`/tree`、`/review`、`/context`、`/compact`、`/events`、`/cancel` 和 `/exit` 开始。使用 `!command` 将有界命令结果发送给模型，使用 `!!command` 则只在本地执行。脚本和 CI 可使用：
+在 `fcc` 中可以从 `/help`、`/tools`、`/status`、`/files`、`/rules`、`/tree`、`/review`、`/context`、`/compact`、`/events`、`/steer`、`/cancel` 和 `/exit` 开始。`/steer <消息>` 会在下一次模型请求前引导正在运行的任务，不会打断工具副作用。使用 `!command` 将有界命令结果发送给模型，使用 `!!command` 则只在本地执行。脚本和 CI 可使用：
 
 ```powershell
 fcc --print "review this project" --jsonl

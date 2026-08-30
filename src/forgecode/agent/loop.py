@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
+from collections import deque
 from dataclasses import dataclass
 from datetime import datetime, timezone
 import hashlib
@@ -115,6 +116,9 @@ class AgentLoop:
         self._interactive_pause = False
         self._pause_event_recorded = False
         self._pause_lock = threading.RLock()
+        self._steering_lock = threading.RLock()
+        self._steering_queue: deque[str] = deque()
+        self._steering_chars = 0
         # Attempt/retry ids are only unique within a provider request.  Some
         # adapters (and a number of test/fake adapters) restart their counter
         # for every turn, so using the id by itself can silently drop evidence
@@ -200,6 +204,39 @@ class AgentLoop:
             # observes this boundary error, records it as a tool result, and
             # returns its terminal ``paused`` result at the next loop edge.
             raise PauseRequested("operation paused before side effect")
+
+    def steer(self, message: str, *, max_items: int = 8, max_chars: int = 16_000) -> dict[str, Any]:
+        """Queue a bounded instruction for the next safe model boundary.
+
+        Steering is deliberately consumed before a subsequent provider
+        request, never in the middle of a synchronous tool operation.  It is
+        therefore useful for correcting an active run without weakening the
+        approval or workspace boundary.
+        """
+        text = str(message).rstrip("\r\n")
+        if not text.strip():
+            return {"accepted": False, "error": "steering message must not be empty"}
+        if len(text) > max_chars:
+            return {"accepted": False, "error": f"steering message exceeds the {max_chars}-character limit"}
+        with self._steering_lock:
+            if self.context.cancelled or self.lifecycle.terminal:
+                return {"accepted": False, "error": "active run is no longer steerable"}
+            if len(self._steering_queue) >= max_items or self._steering_chars + len(text) > max_chars:
+                return {"accepted": False, "error": "steering queue is full"}
+            self._steering_queue.append(text)
+            self._steering_chars += len(text)
+            position = len(self._steering_queue)
+        return {"accepted": True, "steering": True, "position": position}
+
+    def _consume_steering(self, messages: list[Message]) -> int:
+        with self._steering_lock:
+            pending = list(self._steering_queue)
+            self._steering_queue.clear()
+            self._steering_chars = 0
+        for text in pending:
+            messages.append(Message(role="user", content=redact_text(text, self.context.secrets)))
+            self._record("steering_message", {"chars": len(text), "message": text[:2_000]})
+        return len(pending)
 
     def _record(self, kind: str, payload: dict[str, Any]) -> None:
         safe_payload = self._sanitize_session_payload(payload)
@@ -351,6 +388,9 @@ class AgentLoop:
         observes it at provider/tool boundaries; an in-flight provider is
         given a bounded context so it can stop assembling transport data.
         """
+        with self._steering_lock:
+            self._steering_queue.clear()
+            self._steering_chars = 0
         return self.cancellation_token.cancel(reason)
 
     def _provider_context(self, step: int) -> ProviderContext:
@@ -818,6 +858,9 @@ class AgentLoop:
             paused_result = await self._pause_at_boundary(messages, verification_ok, explored)
             if paused_result is not None:
                 return paused_result
+            # Steering is injected only at this model boundary.  It cannot
+            # interrupt a synchronous tool or bypass its approval gate.
+            self._consume_steering(messages)
             request_messages = self._maybe_auto_compact(messages, step=step)
             request_messages = self.context_builder.fit(request_messages)
             self._last_context_summary = "\n".join(message.content for message in request_messages[-8:])[:8_000]

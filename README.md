@@ -87,7 +87,7 @@ Completed · Verification passed · Worked for 18.4s · 4 tool steps
 | Understand | list and read files, search text/regex, repository map, symbols, definitions, references, metadata |
 | Modify | create files, atomic writes, unified patches, red/green previews, transaction records |
 | Verify | tests, diagnostics, bounded shell commands, stdout/stderr, exit codes, repair attempts |
-| Control | Plan, Act, Bypass, pause, resume, cancel/Esc, follow-up queue |
+| Control | Plan, Act, Bypass, pause, resume, cancel/Esc, safe-boundary steering, follow-up queue |
 | Context | `AGENTS.md` rules, explicit references, incremental index, context search, compaction, health diagnostics |
 | Git | status, diff, log, worktrees, review, undo and recovery inspection |
 | Processes | background commands, status polling, output limits, safe termination |
@@ -120,7 +120,9 @@ WorkspaceGuard is an application boundary, not an operating-system sandbox.
 ## Commands worth knowing
 
 Inside `fcc`, start with `/help`, `/tools`, `/status`, `/files`, `/rules`,
-`/tree`, `/review`, `/context`, `/compact`, `/events`, `/cancel`, and `/exit`.
+`/tree`, `/review`, `/context`, `/compact`, `/events`, `/steer`, `/cancel`, and
+`/exit`. `/steer <message>` guides an active run before its next model request;
+it never interrupts a tool side effect.
 Use `!command` to send a bounded command result to the model, or `!!command` to
 keep it local. For scripts and CI:
 

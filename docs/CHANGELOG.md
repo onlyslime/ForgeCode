@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.8.2 — 2026-08-30
+
+- Added bounded `/steer <message>` control for guiding an active run at its
+  next safe model boundary without interrupting tool side effects.
+- Steering messages are redacted, auditable, capped, and cleared on
+  cancellation; existing follow-up queue behavior remains unchanged.
+- Manually verified a two-turn steering run and reran the focused regression
+  suite.
+
 ## v0.8.1 — 2026-08-30
 
 - Version synchronization release for the assessment submission build.

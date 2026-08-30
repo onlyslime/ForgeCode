@@ -2739,6 +2739,7 @@ def main(argv: list[str] | None = None) -> int:
             pause_active=pause_active,
             resume_active=resume_active,
             cancel_active=cancel_active,
+            steer_active=lambda message: active_service.steer(message) if active_service is not None else {"accepted": False, "error": "no active worker", "code": "no_active_worker"},
         )
         controller_holder["value"] = controller
         interactive = InteractiveSession(
@@ -2762,6 +2763,7 @@ def main(argv: list[str] | None = None) -> int:
             context_info=context_info_command,
             events_info=events_info_command,
             cancel=controller.cancel,
+            steer=controller.steer,
             pause=controller.pause,
             resume=controller.resume,
             quit=quit_session,

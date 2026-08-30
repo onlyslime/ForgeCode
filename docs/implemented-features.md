@@ -35,6 +35,8 @@ locations are mapped in [`capability-trace.md`](capability-trace.md).
   workspace) modes.
 - Interactive, automatic, or deny approval policies, including per-scope
   `changes`, `execution`, and `evidence` decisions.
+- Bounded `/steer` instructions injected at the next model boundary; steering
+  never interrupts synchronous tool side effects and is cleared on cancel.
 - Scoped `AGENTS.md` rules, explicit references, incremental context indexing,
   context search/show/complete, compaction, and health diagnostics.
 - Validated skills and lifecycle hooks with bounded prompt text, quotas, and
