@@ -969,12 +969,12 @@ SHA `1d605501b2a3164d9effca75a6940d67ae833abb`）。当前 schema 仍明确包�
 permissions/MCP 五个布尔域；ForgeCode 的 `[approval_scopes]` 仍是风险域近似，
 并不覆盖这些 Codex 专用维度。
 
-### 最新门禁证据（v0.7.26）
+### 最新门禁证据（v0.7.27）
 
-- 完整回归：`512 passed, 8 skipped, 2 warnings`（3 分 21 秒）。skip 均为当前
+- 完整回归：`514 passed, 8 skipped, 2 warnings`（4 分 09 秒）。skip 均为当前
   Windows 账户无法创建 symlink；warnings 为既有 pytest collection warning。
 - `forgecode doctor`、`python -m compileall -q src`、`git diff --check` 均通过。
-- RPC/embedding/工具策略/后台任务/语义工具的定向测试均在完整回归中覆盖；未发现
+- RPC/embedding/工具策略/后台任务/语义工具/只读并行的定向测试均在完整回归中覆盖；未发现
   JSONL、审批或 WorkspaceGuard 回归。
 
 ### 0.7.27 实施审计：只读批次覆盖补齐（2026-08-30）
