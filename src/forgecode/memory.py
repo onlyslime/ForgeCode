@@ -57,7 +57,21 @@ class MemoryStore:
                 resolved = self.guard.resolve(self.path, must_exist=True)
                 if resolved != self.path.absolute() or self.path.is_symlink() or not resolved.is_file():
                     raise MemoryError("memory path must be a regular workspace-local file")
+                before_stat = resolved.stat()
                 raw = resolved.read_text(encoding="utf-8")
+                after_stat = resolved.stat()
+                if (
+                    before_stat.st_size,
+                    before_stat.st_mtime_ns,
+                    getattr(before_stat, "st_dev", 0),
+                    getattr(before_stat, "st_ino", 0),
+                ) != (
+                    after_stat.st_size,
+                    after_stat.st_mtime_ns,
+                    getattr(after_stat, "st_dev", 0),
+                    getattr(after_stat, "st_ino", 0),
+                ):
+                    raise MemoryError("workspace memory changed while it was read")
                 if len(raw) > MAX_MEMORY_CHARS * 8:
                     raise MemoryError("workspace memory file exceeds the size limit")
                 data = bounded_json_loads(raw)

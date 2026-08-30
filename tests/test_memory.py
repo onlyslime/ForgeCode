@@ -1,4 +1,5 @@
 from pathlib import Path
+import os
 from concurrent.futures import ThreadPoolExecutor
 
 import pytest
@@ -44,6 +45,28 @@ def test_memory_store_rejects_tampered_schema(tmp_path: Path):
     (folder / "memory.json").write_text('{"schema_version": 9, "entries": []}', encoding="utf-8")
     with pytest.raises(MemoryError, match="unsupported schema"):
         MemoryStore(WorkspaceGuard(tmp_path)).read()
+
+
+def test_memory_read_detects_regular_file_replacement(monkeypatch, tmp_path: Path):
+    store = MemoryStore(WorkspaceGuard(tmp_path))
+    store.add("stable fact")
+    path = tmp_path / ".forgecode" / "memory.json"
+    original_stat = Path.stat
+    calls = {"target": 0}
+
+    def replacement_stat(self, *args, **kwargs):
+        result = original_stat(self, *args, **kwargs)
+        if self == path:
+            calls["target"] += 1
+            if calls["target"] == 2:
+                values = list(result)
+                values[1] += 1
+                return os.stat_result(values)
+        return result
+
+    monkeypatch.setattr(Path, "stat", replacement_stat)
+    with pytest.raises(MemoryError, match="changed while it was read"):
+        store.read()
 
 
 def test_memory_is_injected_as_untrusted_context_and_redacted(tmp_path: Path):

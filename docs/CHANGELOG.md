@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.8.210 — 2026-08-31
+
+- **Memory identity hardening:** workspace memory reads now detect regular
+  file replacement by comparing device/inode identity as well as size and
+  timestamps.
+- **Verification:** memory regression tests, compile, and diff checks passed;
+  a manual identity-replacement simulation raised the expected error.
+
 ## v0.8.209 — 2026-08-31
 
 - **Session identity hardening:** durable session reads now compare device and
