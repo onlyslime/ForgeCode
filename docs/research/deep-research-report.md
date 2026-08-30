@@ -1232,3 +1232,8 @@ v0.7.42 在此基础上为 `session.events` 增加有界 `type` 过滤；客户�
 `after + limit + type` 稳定轮询单类事件，并继续获得 `next_sequence`、
 `oldest_sequence` 与 `truncated` 游标信息。这是向 Codex thread/turn 通知模型
 迈出的兼容性步骤，但仍不是无限流式订阅或长期 daemon。
+本轮复核 OpenCode 官方权限文档（`https://opencode.ai/docs/permissions/`，HTTP 200）
+与 Codex `AskForApproval.ts` 源码（GitHub raw，HTTP 200）：两者都把“请求模型”和
+“执行授权”分开，且权限结果可被客户端/会话继续消费。ForgeCode 的事件轮询现在也
+遵循这一边界：事件元数据可用于恢复和去重，但不会改变审批决定；后续应把审批决定
+作为独立的 session event payload，而不是隐含在工具结果文本中。
