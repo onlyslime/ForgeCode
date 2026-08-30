@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.15 — 2026-08-30
+
+- Strengthened `/status` cache invalidation with filesystem ctime/inode
+  identity in addition to sequence, size, and mtime.
+- Verification: cache-key replacement scenarios were manually reviewed;
+  status CLI tests and compile checks passed.
+
 ## v0.8.14 — 2026-08-30
 
 - Extended `/status` metric cache invalidation with session file size and

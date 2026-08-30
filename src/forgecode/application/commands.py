@@ -1857,7 +1857,7 @@ def main(argv: list[str] | None = None) -> int:
         state = {"mode": args.mode, "last": None, "plan": None, "plan_targets": (), "reference_specs": (), "rules_fingerprint": "", "reference_fingerprint": "", "index_fingerprint": "", "last_message": "", "last_verification": None}
         active_service: RunService | None = None
         active_service_lock = threading.RLock()
-        status_metrics_cache: tuple[tuple[int, int, int], dict[str, Any]] | None = None
+        status_metrics_cache: tuple[tuple[int, int, int, int], dict[str, Any]] | None = None
         status_metrics_lock = threading.RLock()
         controller_holder: dict[str, InteractiveRunController | None] = {"value": None}
         shortcut_control: dict[str, Any] = {"token": None, "pause": None, "fingerprint": None}
@@ -2510,9 +2510,9 @@ def main(argv: list[str] | None = None) -> int:
             sequence = session.last_sequence
             try:
                 stat = session.path.stat()
-                cache_key = (sequence, int(stat.st_size), int(stat.st_mtime_ns))
+                cache_key = (sequence, int(stat.st_size), int(stat.st_mtime_ns), int(getattr(stat, "st_ctime_ns", 0) or getattr(stat, "st_ino", 0)))
             except OSError:
-                cache_key = (sequence, -1, -1)
+                cache_key = (sequence, -1, -1, -1)
             with status_metrics_lock:
                 cached = status_metrics_cache if status_metrics_cache and status_metrics_cache[0] == cache_key else None
             if cached is not None:
