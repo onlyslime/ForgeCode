@@ -90,7 +90,7 @@ def test_background_tools_reject_non_object_arguments(tmp_path):
     guard = WorkspaceGuard(tmp_path)
     context = ToolContext(guard, AllowAllApproval())
     manager = ProcessManager()
-    tools = [RunBackgroundTool(guard, manager), ProcessStatusTool(guard, manager), PollProcessTool(guard, manager), KillProcessTool(guard, manager)]
+    tools = [RunBackgroundTool(guard, manager), ProcessStatusTool(guard, manager), PollProcessTool(guard, manager), ListProcessesTool(guard, manager), KillProcessTool(guard, manager)]
     for tool in tools:
         try:
             tool.execute(None, context)

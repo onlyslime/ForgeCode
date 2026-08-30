@@ -198,6 +198,8 @@ class ListProcessesTool:
     definition = ToolDefinition("list_processes", "List bounded ForgeCode background task summaries.", {"type":"object"})
     def __init__(self, guard, manager): self.manager = manager
     def execute(self, arguments, context):
+        if not isinstance(arguments, dict):
+            raise ValueError("arguments must be an object")
         rows = self.manager.list()
         return ToolResult(True, "\n".join(f"{r['task_id']} {r['status']} pid={r['pid']} duration={r['duration_seconds']}s" for r in rows) or "no background tasks", {"tasks": rows, "count": len(rows)})
 

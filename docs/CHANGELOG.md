@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.82 — 2026-08-31
+
+- Added object-argument validation to `list_processes`, completing consistent
+  malformed-input handling across all background process tools.
+- Verification: five-tool invalid-input regression, compileall, and diff
+  checks passed.
+
 ## v0.8.81 — 2026-08-31
 
 - Filtered sensitive environment variables in direct `ProcessManager` child
