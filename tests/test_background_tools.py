@@ -31,6 +31,17 @@ def test_background_manager_rejects_duplicate_task_id(tmp_path):
         item.process.wait(timeout=3)
 
 
+def test_background_snapshot_rejects_invalid_cursor(tmp_path):
+    manager = ProcessManager()
+    for cursor in (-1, True, "1"):
+        try:
+            manager.snapshot("missing", cursor)
+        except ValueError as exc:
+            assert "non-negative integer" in str(exc)
+        else:
+            raise AssertionError("expected cursor validation")
+
+
 def test_background_manager_bounds_task_id(tmp_path):
     manager = ProcessManager()
     for task_id in ("", "x\n", "x" * 129):

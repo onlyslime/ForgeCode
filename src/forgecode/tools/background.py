@@ -136,6 +136,8 @@ class ProcessManager:
         with self._lock: return self._items.get(task_id)
 
     def snapshot(self, task_id: str, cursor: int = 0) -> dict[str, Any]:
+        if isinstance(cursor, bool) or not isinstance(cursor, int) or cursor < 0:
+            raise ValueError("cursor must be a non-negative integer")
         item = self.get(task_id)
         if item is None:
             stale = self._stale.get(task_id)

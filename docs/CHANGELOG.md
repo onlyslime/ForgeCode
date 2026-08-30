@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.71 — 2026-08-31
+
+- Validated direct background `snapshot()` cursors as non-negative integers,
+  preventing negative slicing and leaking internal type errors.
+- Verification: cursor boundary regression, background tests, compileall, and
+  manual API checks passed.
+
 ## v0.8.70 — 2026-08-31
 
 - Hardened background state persistence by rejecting symlink/junction aliases
