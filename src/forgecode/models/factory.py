@@ -91,6 +91,9 @@ class _ProtocolTransport:
         def events():
             anthropic_tools: dict[int, int] = {}
             next_tool_index = 0
+            google_tools: dict[str, int] = {}
+            google_tool_ids: dict[str, str] = {}
+            google_next_tool_index = 0
             emitted_finish = False
 
             def frame(delta: dict[str, Any], finish_reason: str | None = None) -> bytes:
@@ -134,7 +137,16 @@ class _ProtocolTransport:
                         done = event_type == "message_stop"
                     elif self.provider == "google":
                         parts = item.get("candidates", [{}])[0].get("content", {}).get("parts", [])
-                        text = "".join(str(part.get("text", "")) for part in parts)
+                        text = "".join(str(part.get("text", "")) for part in parts if isinstance(part, dict))
+                        for part in parts:
+                            function = part.get("functionCall") if isinstance(part, dict) else None
+                            if isinstance(function, dict) and function.get("name"):
+                                name = str(function["name"])
+                                if name not in google_tools:
+                                    google_tools[name] = google_next_tool_index
+                                    google_tool_ids[name] = str(function.get("id") or f"call-{google_next_tool_index}")
+                                    google_next_tool_index += 1
+                                yield frame({"tool_calls": [{"index": google_tools[name], "id": google_tool_ids[name], "function": {"name": name, "arguments": json.dumps(function.get("args", {}), ensure_ascii=False)}}]})
                         done = bool(item.get("candidates", [{}])[0].get("finishReason"))
                     else:
                         message = item.get("message", {})
@@ -147,7 +159,7 @@ class _ProtocolTransport:
                         emitted_finish = True
                     if done:
                         if not emitted_finish:
-                            yield frame({}, "tool_calls" if anthropic_tools else "stop")
+                            yield frame({}, "tool_calls" if (anthropic_tools or google_tools) else "stop")
                         yield b"data: [DONE]\n\n"
         return status, events(), response_headers
 

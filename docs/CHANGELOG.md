@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.7.56 — 2026-08-30
+
+- Google streaming responses now normalize Gemini `functionCall` parts into
+  ForgeCode tool-call fragments and select `tool_calls` when a function call
+  accompanies the provider's `STOP` finish reason.
+
 ## v0.7.55 — 2026-08-30
 
 - Google provider requests now translate OpenAI-style tool schemas into

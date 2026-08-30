@@ -50,6 +50,20 @@ def test_google_tool_schema_and_function_call_translation():
     assert result.message.tool_calls[0].arguments == {"path": "README.md"}
 
 
+def test_google_stream_function_call_is_normalized():
+    class StreamTransport(Transport):
+        def post_stream(self, url, headers, body, timeout):
+            frames = [
+                b'data: {"candidates":[{"content":{"parts":[{"functionCall":{"name":"read_file","args":{"path":"README.md"}}}]},"finishReason":"STOP"}]}\n\n',
+            ]
+            return 200, frames, {}
+    provider = GoogleProvider(api_key="k", base_url="https://g.test/v1", model="m", transport=StreamTransport({}), streaming=True)
+    result = asyncio.run(provider.complete([Message("user", "read")], []))
+    assert result.finish_reason == "tool_calls"
+    assert result.message.tool_calls[0].name == "read_file"
+    assert result.message.tool_calls[0].arguments == {"path": "README.md"}
+
+
 def test_anthropic_stream_is_normalized_to_openai_sse():
     class StreamTransport(Transport):
         def post_stream(self, url, headers, body, timeout):
