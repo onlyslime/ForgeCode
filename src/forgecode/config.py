@@ -331,7 +331,12 @@ def _env_overlay() -> dict[str, Any]:
         if os.getenv(env_name):
             values[key] = os.environ[env_name]
     if os.getenv("FORGECODE_OFFLINE"):
-        values["offline"] = os.environ["FORGECODE_OFFLINE"].lower() in {"1", "true", "yes", "on"}
+        raw_offline = os.environ["FORGECODE_OFFLINE"].strip().lower()
+        if raw_offline not in {"0", "1", "false", "true", "no", "yes", "off", "on"}:
+            # A typo must not silently turn offline mode off and enable a
+            # provider/network request unexpectedly.
+            raise ConfigError("FORGECODE_OFFLINE must be a boolean")
+        values["offline"] = raw_offline in {"1", "true", "yes", "on"}
     numeric = (
         ("FORGECODE_MAX_STEPS", "max_steps", int),
         ("FORGECODE_MAX_TOOL_CALLS", "max_tool_calls", int),

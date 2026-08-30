@@ -30,6 +30,12 @@ def test_config_accepts_every_registered_tool_in_policy(tmp_path: Path):
     assert config.tool_policy.allow == ("process_status", "test", "file_metadata")
 
 
+def test_config_rejects_malformed_offline_environment(monkeypatch, tmp_path: Path):
+    monkeypatch.setenv("FORGECODE_OFFLINE", "truue")
+    with pytest.raises(ConfigError, match="FORGECODE_OFFLINE"):
+        ConfigLoader(tmp_path).load()
+
+
 def test_config_loads_scoped_approval_decisions(tmp_path: Path):
     directory = tmp_path / ".forgecode"
     directory.mkdir()

@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.8.203 — 2026-08-31
+
+- **Configuration fail-closed parsing:** malformed `FORGECODE_OFFLINE`
+  values now raise a configuration error instead of silently disabling
+  offline mode and potentially enabling network access.
+- **Verification:** environment/config regression tests, compile, and diff
+  checks passed; malformed-value behavior was manually reproduced.
+
 ## v0.8.202 — 2026-08-31
 
 - **Tool-policy completeness:** configuration validation now accepts every
