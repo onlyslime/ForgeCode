@@ -111,7 +111,12 @@ class ProcessManager:
             # Keep the admission check and process registration under one
             # lock. Otherwise concurrent callers can both pass the limit and
             # temporarily exceed the configured task budget.
-            process = subprocess.Popen(command, cwd=root, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
+            environment = {
+                name: value
+                for name, value in os.environ.items()
+                if not any(marker in name.upper() for marker in ("API_KEY", "APIKEY", "TOKEN", "SECRET", "PASSWORD", "COOKIE"))
+            }
+            process = subprocess.Popen(command, cwd=root, shell=True, env=environment, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
             item = _Process(process, command, time.monotonic())
             self._items[task_id] = item
             self._stale.pop(task_id, None)

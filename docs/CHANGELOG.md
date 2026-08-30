@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.81 — 2026-08-31
+
+- Filtered sensitive environment variables in direct `ProcessManager` child
+  processes, closing a credential-leakage bypass outside the tool wrapper.
+- Verification: injected-secret manual check, background tests, compileall,
+  and diff checks passed.
+
 ## v0.8.80 — 2026-08-31
 
 - Enforced destructive-command blocking inside `ProcessManager.start()`, so

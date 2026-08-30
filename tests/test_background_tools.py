@@ -75,6 +75,17 @@ def test_background_manager_blocks_destructive_commands(tmp_path):
         ProcessManager().start("git clean -xfd", tmp_path, "unsafe")
 
 
+def test_background_manager_filters_sensitive_environment(tmp_path, monkeypatch):
+    monkeypatch.setenv("FORGECODE_BG_SECRET", "hidden-value")
+    manager = ProcessManager()
+    item = manager.start("python -c \"import os; print(os.getenv('FORGECODE_BG_SECRET', 'absent'))\"", tmp_path, "env-check")
+    item.process.wait(timeout=5)
+    time.sleep(0.05)
+    result = manager.snapshot("env-check")
+    assert "hidden-value" not in result["output"]
+    assert "absent" in result["output"]
+
+
 def test_background_tools_reject_non_object_arguments(tmp_path):
     guard = WorkspaceGuard(tmp_path)
     context = ToolContext(guard, AllowAllApproval())
