@@ -9,6 +9,9 @@ import pytest
 
 from forgecode.cli import main
 from forgecode.rpc import serve_lines
+from forgecode.rpc import _RPC_TOOL_CAPABILITIES
+from forgecode.security.workspace import WorkspaceGuard
+from forgecode.tools import build_default_registry
 
 
 def test_rpc_describe_exposes_versioned_session_capabilities() -> None:
@@ -21,6 +24,12 @@ def test_rpc_describe_exposes_versioned_session_capabilities() -> None:
     assert len(tools) == 31
     assert any(item["name"] == "git_worktree_create" and item["side_effecting"] for item in tools)
     assert payload["data"]["tool_capabilities_scope"].startswith("built_in_catalog")
+
+
+def test_rpc_tool_catalog_matches_default_registry(tmp_path: Path) -> None:
+    catalog = {item["name"] for item in _RPC_TOOL_CAPABILITIES}
+    registry = set(build_default_registry(WorkspaceGuard(tmp_path)).names())
+    assert catalog == registry
 
 
 def test_rpc_describe_honors_request_id_replay_contract() -> None:

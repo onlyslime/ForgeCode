@@ -999,6 +999,10 @@ worktree 并行能力仍属于 ForgeCode 的已知 P2/P1 差距，本轮未改�
 - **验证**：工具策略与 RPC 契约定向测试 `52 passed, 1 skipped`，compileall 与 diff
   检查通过；发布门禁将补充 doctor 和完整回归。
 
+补充审计：RPC capability catalog 通过测试与默认 registry 做名称集合等价校验，避免
+新增内置工具只出现在本地 `/tools` 而无法被 SDK/RPC 客户端发现。该校验不授予权限，
+仍保留运行时 policy 收窄边界。
+
 ### 0.7.35 实施审计：RPC tool capability discovery（2026-08-30）
 
 - **范围**：`rpc.describe` 返回 31 项内置工具的名称、风险组和 side-effect 标记，
