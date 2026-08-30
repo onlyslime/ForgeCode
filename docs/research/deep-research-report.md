@@ -988,6 +988,14 @@ worktree 并行能力仍属于 ForgeCode 的已知 P2/P1 差距，本轮未改�
 - RPC/embedding/工具策略/后台任务/语义工具/只读并行的定向测试均在完整回归中覆盖；未发现
   JSONL、审批或 WorkspaceGuard 回归。
 
+### v0.7.38 门禁补充（2026-08-30）
+
+- RPC session lifecycle 与 machine contract 定向测试通过；独立交互暂停测试通过。
+- 两次完整回归均在既有 `test_pause_racing_approval_blocks_side_effect_until_resume`
+  用例出现时序失败（测试的 2 秒 wait_for 触发 cancellation），其余测试通过；排除该
+  单个已知竞态后完整集合通过。该结果按事实记录，不能视为 v0.7.38 的全绿门禁，后续
+  需要单独收敛暂停/审批竞态后再重新执行发布级回归。
+
 ### 0.7.38 实施审计：workspace-local RPC session paths（2026-08-30）
 
 - **范围**：恢复前要求 `session_path` 为无遍历组件的相对路径，解析后必须位于当前
