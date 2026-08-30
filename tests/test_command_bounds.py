@@ -132,6 +132,16 @@ def test_file_metadata_rejects_oversized_file(tmp_path: Path):
     assert result.metadata["error"] == "file_too_large"
 
 
+def test_understanding_reads_reject_oversized_file(tmp_path: Path):
+    (tmp_path / "large.py").write_bytes(b"x" * 2_000_001)
+    registry = build_default_registry(WorkspaceGuard(tmp_path))
+    context = ToolContext(WorkspaceGuard(tmp_path), AllowAllApproval())
+    for name, arguments in (("read_range", {"path": "large.py", "start_line": 1, "end_line": 1}), ("list_symbols", {"path": "large.py"})):
+        result = registry.execute(name, arguments, context)
+        assert result.ok is False
+        assert result.metadata["error"] == "file_too_large"
+
+
 def test_symbol_navigation_reports_expired_deadline(tmp_path: Path):
     registry = build_default_registry(WorkspaceGuard(tmp_path))
     context = ToolContext(WorkspaceGuard(tmp_path), AllowAllApproval(), deadline_monotonic=time.monotonic() - 1)

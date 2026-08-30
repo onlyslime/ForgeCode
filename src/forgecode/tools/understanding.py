@@ -20,6 +20,8 @@ class ReadRangeTool:
             raise ValueError("line range must be valid and at most 500 lines")
         path = context.guard.resolve(path_value, must_exist=True)
         if _is_ignored(path, context.guard) or not path.is_file(): raise ValueError("path is not a readable file")
+        if path.stat().st_size > _MAX_FILE_BYTES:
+            return ToolResult(False, f"file exceeds the {_MAX_FILE_BYTES}-byte safety limit", {"error": "file_too_large", "path": path_value})
         lines = path.read_text(encoding="utf-8").splitlines()
         shown = lines[start - 1:end]
         return ToolResult(True, "\n".join(f"{i} | {line}" for i, line in enumerate(shown, start)), {"path": context.guard.relative(path), "start_line": start, "end_line": min(end, len(lines)), "total_lines": len(lines)})
@@ -34,6 +36,8 @@ class ListSymbolsTool:
             return ToolResult(False, "symbol listing skipped because the run deadline has expired", {"error": "deadline_exceeded"})
         path_value = _required(arguments, "path"); path = context.guard.resolve(path_value, must_exist=True)
         if _is_ignored(path, context.guard) or not path.is_file(): raise ValueError("path is not a readable file")
+        if path.stat().st_size > _MAX_FILE_BYTES:
+            return ToolResult(False, f"file exceeds the {_MAX_FILE_BYTES}-byte safety limit", {"error": "file_too_large", "path": path_value})
         text = path.read_text(encoding="utf-8")
         patterns = [r"^\s*(?:async\s+)?def\s+(\w+)", r"^\s*class\s+(\w+)", r"^\s*(?:export\s+)?(?:async\s+)?function\s+(\w+)", r"^\s*(?:export\s+)?class\s+(\w+)", r"^\s*export\s+(?:const|let|var)\s+(\w+)"]
         rows = []

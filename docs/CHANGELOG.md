@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.184 — 2026-08-31
+
+- **Understanding read limits:** `read_range` and `list_symbols` now reject files over the shared 2 MiB safety limit before loading full contents.
+- **Verification:** command-boundary tests, compile checks, and manual oversized-source inspection passed.
+
 ## v0.8.183 — 2026-08-31
 
 - **Metadata TOCTOU guard:** `file_metadata` now validates the bytes actually read, closing the race where a file grows after the initial size check.
