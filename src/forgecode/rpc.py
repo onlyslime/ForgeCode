@@ -598,8 +598,11 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                             raise ValueError("session.wait.timeout must be between 0 and 60 seconds")
                         deadline = time.monotonic() + float(timeout)
                         while info.get("state") in {"running", "paused"} and time.monotonic() < deadline:
-                            _SESSION_CONDITION.wait(timeout=max(0.0, deadline - time.monotonic()))
-                            info = _RPC_SESSIONS.get(handle, info)
+                            with _SESSION_LOCK:
+                                _SESSION_CONDITION.wait(timeout=min(0.1, max(0.0, deadline - time.monotonic())))
+                                info = _RPC_SESSIONS.get(handle, info)
+                                if info is not None:
+                                    info = _refresh_session_from_disk(handle, info)
                         data["timed_out"] = info.get("state") in {"running", "paused"}
                         data["state"] = info.get("state")
                         data["sequence"] = info.get("sequence", 0)
@@ -626,8 +629,11 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                             events = [item for item in info.get("events", []) if int(item.get("sequence", 0)) > after and (event_type is None or item.get("type") == event_type)]
                             if events or wait_seconds == 0 or time.monotonic() >= deadline:
                                 break
-                            _SESSION_CONDITION.wait(timeout=max(0.0, deadline - time.monotonic()))
-                            info = _RPC_SESSIONS.get(handle, info)
+                            with _SESSION_LOCK:
+                                _SESSION_CONDITION.wait(timeout=min(0.1, max(0.0, deadline - time.monotonic())))
+                                info = _RPC_SESSIONS.get(handle, info)
+                                if info is not None:
+                                    info = _refresh_session_from_disk(handle, info)
                         data["type"] = event_type
                         selected = events[: min(limit, 100)]
                         data["events"] = [

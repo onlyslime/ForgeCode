@@ -214,6 +214,7 @@ def test_rpc_background_run_persists_structured_result(tmp_path, monkeypatch):
     assert recovered["data"]["recovered"] is True
     waited = _call({"method": "session.wait", "params": {"session": handle, "timeout": 0}})
     assert waited["data"]["timed_out"] is False
+    assert "data" in waited, waited
     assert waited["data"]["state"] == "completed"
 
 
@@ -427,7 +428,7 @@ def test_rpc_recovery_restores_execution_and_filters_malformed_events(tmp_path):
     assert [event["sequence"] for event in events] == [2, 4]
 
 
-def test_rpc_session_wait_refreshes_active_flags_after_completion(tmp_path, monkeypatch):
+def test_rpc_session_wait_refreshes_active_flags_after_completion(tmp_path):
     handle = _call({"method": "session.open", "params": {"workspace": str(tmp_path)}})["data"]["session"]
     from forgecode import rpc
     info = rpc._RPC_SESSIONS[handle]
@@ -458,6 +459,29 @@ def test_rpc_read_views_refresh_newer_durable_events(tmp_path):
     assert status["sequence"] == 2 and status["state"] == "idle"
     events = _call({"method": "session.events", "params": {"session": handle, "after": 1}})["data"]["events"]
     assert [event["sequence"] for event in events] == [2]
+
+
+def test_rpc_wait_polling_observes_external_terminal_state(tmp_path):
+    handle = _call({"method": "session.open", "params": {"workspace": str(tmp_path)}})["data"]["session"]
+    from forgecode import rpc
+    with rpc._SESSION_LOCK:
+        info = rpc._RPC_SESSIONS[handle]
+        info["state"] = "running"
+
+    def finish_elsewhere():
+        import time
+        time.sleep(0.05)
+        external = dict(rpc._RPC_SESSIONS[handle])
+        external["state"] = "completed"
+        external["sequence"] = 1
+        external["events"] = [{"sequence": 1, "type": "run_finished", "state": "completed"}]
+        rpc._persist_session(handle, external)
+
+    import threading
+    threading.Thread(target=finish_elsewhere, daemon=True).start()
+    waited = _call({"method": "session.wait", "params": {"session": handle, "timeout": 1}})
+    assert waited["data"]["state"] == "completed"
+    assert waited["data"]["timed_out"] is False
 
 
 def test_rpc_cancel_exposes_auditable_cancel_request(tmp_path):

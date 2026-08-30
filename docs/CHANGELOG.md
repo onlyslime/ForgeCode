@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.8.20 — 2026-08-30
+
+- Made long-polling RPC `session.wait` and `session.events` observe durable
+  cross-process updates with bounded polling while retaining condition-based
+  in-process wakeups.
+- Verification: targeted lifecycle regressions, manual second-writer timing
+  simulation, compileall, and diff checks passed.
+
 ## v0.8.19 — 2026-08-30
 
 - Added safe cross-process refresh for read-only RPC session views, allowing
