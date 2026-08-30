@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.103 — 2026-08-31
+
+- Synchronized the `repository_map` JSON schema with its runtime budget
+  bounds (`minimum: 256`, `maximum: 100000`).
+- Verification: schema-contract regression, targeted tests, compileall, and
+  diff checks passed.
+
 ## v0.8.102 — 2026-08-31
 
 - Added a 100,000-character upper bound to `repository_map.budget_chars`,

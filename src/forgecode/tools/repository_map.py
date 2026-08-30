@@ -12,7 +12,7 @@ class RepositoryMapTool:
     definition = ToolDefinition(
         "repository_map",
         "Build a bounded deterministic repository map with language, build, tests, symbols and omissions.",
-        {"type": "object", "properties": {"task": {"type": "string"}, "budget_chars": {"type": "integer"}}, "required": []},
+        {"type": "object", "properties": {"task": {"type": "string"}, "budget_chars": {"type": "integer", "minimum": 256, "maximum": _MAX_BUDGET_CHARS}}, "required": []},
     )
 
     def __init__(self, guard):
