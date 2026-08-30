@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.180 — 2026-08-31
+
+- **Policy extension isolation:** exceptions from custom tool-policy `permits()` callbacks now fail closed, marking the affected tool unavailable instead of aborting the agent or widening access.
+- **Verification:** tool/security tests, compile checks, and manual broken-policy inspection passed.
+
 ## v0.8.179 — 2026-08-31
 
 - **Background snapshot race:** task snapshots now honor the drain worker's `finished` marker when OS polling briefly lags, preventing completed processes from being reported as running.

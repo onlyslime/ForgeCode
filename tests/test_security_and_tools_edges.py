@@ -12,6 +12,21 @@ def test_workspace_guard_rejects_non_path_root():
         WorkspaceGuard(".")
 
 
+def test_tool_policy_exception_fails_closed():
+    registry = ToolRegistry()
+    class Tool:
+        definition = type("Definition", (), {"name": "safe", "description": "", "parameters": {}, "side_effecting": False})()
+        def execute(self, arguments, context):
+            return ToolResult(True, "ok")
+    registry.register(Tool())
+    class BrokenPolicy:
+        def permits(self, name, *, available):
+            raise RuntimeError("policy crashed")
+    filtered = registry.filter(BrokenPolicy())
+    assert filtered.names() == ()
+    assert filtered.unavailable_names() == ("safe",)
+
+
 def test_absolute_outside_and_symlink_escape_are_rejected(tmp_path):
     guard = WorkspaceGuard(tmp_path)
     outside = tmp_path.parent / "outside.txt"

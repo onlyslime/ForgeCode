@@ -187,7 +187,15 @@ class ToolRegistry:
         available = set(self._tools)
         for name, tool in self._tools.items():
             permits = getattr(policy, "permits", None)
-            if permits is None or permits(name, available=available):
+            try:
+                allowed = permits is None or bool(permits(name, available=available))
+            except Exception:
+                # Extension-owned policy code is untrusted.  A policy
+                # failure must not crash the agent or accidentally widen
+                # the tool set; fail closed and expose the tool as
+                # unavailable instead.
+                allowed = False
+            if allowed:
                 # Reuse the already-validated source entry without invoking
                 # register(), which would trust a potentially mutated
                 # extension-owned definition again.
