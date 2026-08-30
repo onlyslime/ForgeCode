@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.160 — 2026-08-31
+
+- **Background cleanup reliability:** killing a ForgeCode-owned process now uses its independent bounded cleanup window even after the parent run deadline, so successful termination is not misreported as unresolved.
+- **Verification:** background-tool tests, compile checks, and manual expired-deadline kill inspection passed.
+
 ## v0.8.159 — 2026-08-31
 
 - **Background deadline boundary:** approved background commands now fail fast when the run budget is exhausted, preventing an expired run from spawning a detached process.

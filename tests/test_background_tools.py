@@ -28,6 +28,18 @@ def test_background_task_respects_expired_deadline(tmp_path):
     assert not (tmp_path / "should-not-exist").exists()
 
 
+def test_kill_confirms_cleanup_even_after_deadline(tmp_path):
+    guard = WorkspaceGuard(tmp_path)
+    manager = ProcessManager()
+    active = ToolContext(guard, AllowAllApproval())
+    started = RunBackgroundTool(guard, manager).execute({"command": "python -c \"import time; time.sleep(10)\""}, active)
+    assert started.ok
+    expired = ToolContext(guard, AllowAllApproval(), deadline_monotonic=time.monotonic() - 1)
+    result = KillProcessTool(guard, manager).execute({"task_id": started.metadata["task_id"]}, expired)
+    assert result.ok is True
+    assert result.metadata["termination_result"] == "confirmed"
+
+
 def test_background_manager_rejects_duplicate_task_id(tmp_path):
     manager = ProcessManager()
     item = manager.start("python -c \"print('ok')\"", tmp_path, "same")

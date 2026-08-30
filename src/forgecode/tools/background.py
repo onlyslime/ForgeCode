@@ -265,7 +265,10 @@ class KillProcessTool(ProcessStatusTool):
         except OSError as exc:
             return ToolResult(False, f"background task termination failed: {type(exc).__name__}", {"task_id": task_id, "error": "termination_failed", "termination_result": "failed"})
         try:
-            item.process.wait(timeout=min(0.5, context.remaining_seconds(0.5)))
+            # Cleanup must remain bounded but cannot depend on the run
+            # deadline: an expired run still needs a chance to confirm that
+            # its already-running child was terminated.
+            item.process.wait(timeout=0.5)
         except subprocess.TimeoutExpired:
             return ToolResult(False, f"background task termination unresolved: {task_id}", {"task_id": task_id, "status": "running", "termination_result": "unresolved", "error": "termination_unresolved", "pid": item.process.pid})
         return ToolResult(True, f"background task stopped: {task_id}", {"task_id": task_id, "status": "cancelled", "exit_code": item.process.returncode, "termination_result": "confirmed"})
