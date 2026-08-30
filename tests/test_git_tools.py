@@ -49,6 +49,12 @@ def test_git_worktree_remove_rejects_non_boolean_force(tmp_path):
         GitWorktreeRemoveTool(guard).execute({"name": "demo", "force": "false"}, context)
 
 
+def test_git_worktree_create_rejects_newline_start_point(tmp_path):
+    guard = WorkspaceGuard(tmp_path); context = ToolContext(guard, AllowAllApproval())
+    with pytest.raises(ValueError, match="start_point"):
+        GitWorktreeCreateTool(guard).execute({"name": "demo", "branch": "feature", "start_point": "HEAD\nforged"}, context)
+
+
 def test_worktree_metadata_rejects_newline_fields(tmp_path):
     guard = WorkspaceGuard(tmp_path)
     folder = tmp_path / ".forgecode"; folder.mkdir()

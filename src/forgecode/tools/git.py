@@ -261,7 +261,7 @@ class GitWorktreeCreateTool:
         if not isinstance(branch, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._/-]{0,127}", branch) or branch.startswith(("-", ".")):
             raise ValueError("branch must be a valid bounded branch name")
         start = arguments.get("start_point")
-        if start is not None and (not isinstance(start, str) or not start.strip() or len(start) > 160 or start.startswith("-")):
+        if start is not None and (not isinstance(start, str) or not start.strip() or len(start) > 160 or start.startswith("-") or any(ch in start for ch in "\r\n")):
             raise ValueError("start_point must be a bounded Git ref")
         target = self.guard.resolve(str(Path(".forgecode") / "worktrees" / name))
         if target.exists():

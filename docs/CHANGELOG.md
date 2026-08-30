@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.101 — 2026-08-31
+
+- Rejected newline-bearing Git worktree `start_point` refs to prevent
+  approval and command-output injection through malformed metadata.
+- Verification: malformed-ref regression, manual API check, compileall, and
+  diff checks passed.
+
 ## v0.8.100 — 2026-08-31
 
 - Restricted worktree ownership paths to safe workspace-relative paths,
