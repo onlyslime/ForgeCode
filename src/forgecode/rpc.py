@@ -613,6 +613,7 @@ def serve_lines(lines: Iterable[str]) -> Iterable[str]:
                         data["timed_out"] = info.get("state") in {"running", "paused"}
                         data["state"] = info.get("state")
                         data["sequence"] = info.get("sequence", 0)
+                        data["execution"] = info.get("execution")
                         state_value = data["state"]
                         data["active_flags"] = (["turn_in_progress"] if state_value == "running" else (["paused"] if state_value == "paused" else (["recovery_required"] if state_value == "recovery_required" else [])))
                         worker = info.get("process") or info.get("worker")

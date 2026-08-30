@@ -473,6 +473,22 @@ def test_rpc_read_view_refreshes_same_sequence_state_transition(tmp_path):
     assert status["state"] == "recovery_required" and status["sequence"] == 0
 
 
+def test_rpc_wait_refreshes_execution_after_durable_update(tmp_path):
+    handle = _call({"method": "session.open", "params": {"workspace": str(tmp_path)}})["data"]["session"]
+    from forgecode import rpc
+    info = rpc._RPC_SESSIONS[handle]
+    info["state"] = "running"
+    info["execution"] = "thread"
+    rpc._persist_session(handle, info)
+    external = dict(info)
+    external["state"] = "completed"
+    external["execution"] = "process"
+    external["sequence"] = 1
+    rpc._persist_session(handle, external)
+    waited = _call({"method": "session.wait", "params": {"session": handle, "timeout": 0}})["data"]
+    assert waited["state"] == "completed" and waited["execution"] == "process"
+
+
 def test_rpc_cancel_exposes_auditable_cancel_request(tmp_path):
     handle = _call({"method": "session.open", "params": {"workspace": str(tmp_path)}})["data"]["session"]
     cancelled = _call({"method": "session.cancel", "params": {"session": handle}})

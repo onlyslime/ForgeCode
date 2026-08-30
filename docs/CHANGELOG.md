@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.22 — 2026-08-30
+
+- Refreshed `execution` metadata in `session.wait` responses after durable
+  cross-process updates, keeping lifecycle fields internally consistent.
+- Verification: targeted RPC regression, manual durable update simulation,
+  compileall, and diff checks passed.
+
 ## v0.8.21 — 2026-08-30
 
 - Hardened durable RPC refresh when a process changes state without advancing
