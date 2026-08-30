@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.21 — 2026-08-30
+
+- Hardened durable RPC refresh when a process changes state without advancing
+  its event sequence, while preserving active in-process worker ownership.
+- Verification: targeted lifecycle regressions, manual durable-state injection,
+  compileall, and diff checks passed.
+
 ## v0.8.20 — 2026-08-30
 
 - Made long-polling RPC `session.wait` and `session.events` observe durable

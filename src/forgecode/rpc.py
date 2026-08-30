@@ -336,7 +336,14 @@ def _refresh_session_from_disk(handle: str, info: dict[str, Any]) -> dict[str, A
     if info.get("worker") is not None or info.get("process") is not None:
         return info
     restored = _load_session(handle, info.get("workspace"))
-    if restored is None or int(restored.get("sequence", 0)) <= int(info.get("sequence", 0)):
+    if restored is None:
+        return info
+    newer_sequence = int(restored.get("sequence", 0)) > int(info.get("sequence", 0))
+    changed_same_sequence = any(
+        restored.get(key) != info.get(key)
+        for key in ("state", "cancel_requested", "execution", "result")
+    ) or restored.get("events", []) != info.get("events", [])
+    if not newer_sequence and not changed_same_sequence:
         return info
     restored["created_monotonic"] = info.get("created_monotonic", time.monotonic())
     _RPC_SESSIONS[handle] = restored
