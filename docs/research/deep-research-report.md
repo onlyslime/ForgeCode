@@ -1001,7 +1001,7 @@ worktree 并行能力仍属于 ForgeCode 的已知 P2/P1 差距，本轮未改�
 
 ### 0.7.35 实施审计：RPC tool capability discovery（2026-08-30）
 
-- **范围**：`rpc.describe` 返回 29 项内置工具的名称、风险组和 side-effect 标记，
+- **范围**：`rpc.describe` 返回 31 项内置工具的名称、风险组和 side-effect 标记，
   与当前 registry 的核心工具集合保持稳定声明；增加 scope 说明，提醒客户端活动
   policy 仍可收窄工具，能力发现不等于授权。
 - **非目标**：不从 RPC 授予工具、不绕过 WorkspaceGuard/审批、不声称反映工作区自定义
