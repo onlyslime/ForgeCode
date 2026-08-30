@@ -341,7 +341,7 @@ def parse_chat_completion(payload: dict[str, Any]) -> ModelResponse:
     return ModelResponse(Message(role="assistant", content=content, tool_calls=calls), finish_reason, safe_usage)
 
 
-def _sse_json_events(chunks: Iterable[bytes], *, max_bytes: int = 4_000_000, max_events: int = 2_000, cancellation: CancellationToken | Callable[[], bool] | None = None, allow_duplicate_frames: bool = False) -> tuple[list[dict[str, Any]], bool]:
+def _sse_json_events(chunks: Iterable[bytes], *, max_bytes: int = 4_000_000, max_events: int = 2_000, cancellation: CancellationToken | Callable[[], bool] | None = None, allow_duplicate_frames: bool = False, on_text_delta: Callable[[str], None] | None = None) -> tuple[list[dict[str, Any]], bool]:
     """Parse a bounded OpenAI-compatible SSE byte stream.
 
     We decode only complete UTF-8 lines and complete JSON data frames.  A
@@ -407,6 +407,19 @@ def _sse_json_events(chunks: Iterable[bytes], *, max_bytes: int = 4_000_000, max
                 raise ProviderError("SSE stream repeated a data frame", category="stream_protocol_error")
             seen_data_frames.add(canonical)
             events.append(payload)
+            # Forward visible assistant text as soon as its SSE frame arrives.
+            # Full assembly still happens below, so protocol validation and
+            # tool execution remain completion-boundary operations.
+            if on_text_delta is not None:
+                choices = payload.get("choices")
+                if isinstance(choices, list) and choices and isinstance(choices[0], dict):
+                    delta = choices[0].get("delta")
+                    text = delta.get("content") if isinstance(delta, dict) else None
+                    if isinstance(text, str) and text:
+                        try:
+                            on_text_delta(text)
+                        except Exception:
+                            pass
             if len(events) > max_events:
                 raise ProviderError("stream contains too many events", category="response_limit")
     if buffer.strip():
@@ -749,10 +762,11 @@ class OpenAICompatibleProvider:
                                 _sse_json_events, chunks,
                                 max_bytes=self.max_response_bytes,
                                 allow_duplicate_frames="deepseek.com" in self.base_url.lower(),
+                                on_text_delta=request_context.on_text_delta,
                                 timeout=timeout,
                                 cancellation=request_context.cancellation_token or request_context.cancellation_requested,
                             )
-                            response = assemble_chat_stream(events, cancellation=request_context.cancellation_token or request_context.cancellation_requested, on_text_delta=request_context.on_text_delta)
+                            response = assemble_chat_stream(events, cancellation=request_context.cancellation_token or request_context.cancellation_requested)
                             attempt_finished(attempt_info, outcome="success")
                             return response
                         except asyncio.CancelledError:

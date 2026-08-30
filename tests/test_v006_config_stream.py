@@ -380,3 +380,17 @@ def test_provider_honors_bounded_retry_after_header_from_transport():
     assert response.message.content == "ok" and transport.calls == 2
     assert provider.retry_events[0]["retry_after"] == "0"
     assert provider.retry_events[0]["delay_seconds"] < 0.1
+
+
+def test_sse_text_delta_callback_is_emitted_while_frames_are_read():
+    from forgecode.models.openai_compatible import _sse_json_events
+
+    seen = []
+    chunks = [
+        b'data: {"choices":[{"index":0,"delta":{"content":"hello"}}]}\n',
+        b'data: {"choices":[{"index":0,"delta":{"content":" world"},"finish_reason":"stop"}]}\n',
+        b"data: [DONE]\n",
+    ]
+    events, done = _sse_json_events(chunks, on_text_delta=seen.append)
+    assert done is True
+    assert events and seen == ["hello", " world"]
