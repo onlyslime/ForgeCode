@@ -47,6 +47,10 @@ def _insert_chat_after_global_options(argv: list[str]) -> list[str]:
     index = 0
     while index < len(argv):
         item = argv[index]
+        if item.startswith("--workspace=") and len(item) > len("--workspace="):
+            prefix.append(item)
+            index += 1
+            continue
         if item in root_flags:
             prefix.append(item)
             index += 1

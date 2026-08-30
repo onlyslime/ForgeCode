@@ -77,6 +77,19 @@ def test_google_stream_function_call_is_normalized():
     assert result.message.tool_calls[0].arguments == {"path": "README.md"}
 
 
+def test_google_stream_rejects_split_function_call_arguments():
+    class SplitTransport(Transport):
+        def post_stream(self, url, headers, body, timeout):
+            frames = [
+                b'data: {"candidates":[{"content":{"parts":[{"functionCall":{"name":"read_file","args":{"path":"README.md"}}}]}}]}\n\n',
+                b'data: {"candidates":[{"content":{"parts":[{"functionCall":{"name":"read_file","args":{"extra":true}}}]},"finishReason":"STOP"}]}\n\n',
+            ]
+            return 200, frames, {}
+    provider = GoogleProvider(api_key="k", base_url="https://g.test/v1", model="m", transport=SplitTransport({}), streaming=True, max_retries=0)
+    with pytest.raises(ProviderError, match="multiple argument frames"):
+        asyncio.run(provider.complete([Message("user", "read")], []))
+
+
 def test_ollama_tool_call_translation():
     transport = Transport({"message": {"role": "assistant", "content": "", "tool_calls": [{"id": "call-1", "function": {"name": "read_file", "arguments": {"path": "README.md"}}}]}})
     provider = OllamaProvider(api_key="", base_url="http://localhost:11434/v1", model="m", transport=transport)

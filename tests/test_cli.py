@@ -8,6 +8,9 @@ def test_fcc_launcher_keeps_global_options_before_chat():
     assert _insert_chat_after_global_options(["--jsonl", "--bypass"]) == [
         "--jsonl", "chat", "--bypass"
     ]
+    assert _insert_chat_after_global_options(["--workspace=work", "--bypass"]) == [
+        "--workspace=work", "chat", "--bypass"
+    ]
 
 
 def test_fcc_version_passthrough(monkeypatch, capsys):

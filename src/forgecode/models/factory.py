@@ -187,11 +187,22 @@ class _ProtocolTransport:
                             function = part.get("functionCall") if isinstance(part, dict) else None
                             if isinstance(function, dict) and function.get("name"):
                                 name = str(function["name"])
+                                raw_args = function.get("args", {})
+                                if not isinstance(raw_args, dict):
+                                    raise ValueError("Google functionCall args must be an object")
                                 if name not in google_tools:
                                     google_tools[name] = google_next_tool_index
                                     google_tool_ids[name] = str(function.get("id") or f"call-{google_next_tool_index}")
                                     google_next_tool_index += 1
-                                yield frame({"tool_calls": [{"index": google_tools[name], "id": google_tool_ids[name], "function": {"name": name, "arguments": json.dumps(function.get("args", {}), ensure_ascii=False)}}]})
+                                    yield frame({"tool_calls": [{"index": google_tools[name], "id": google_tool_ids[name], "function": {"name": name, "arguments": json.dumps(raw_args, ensure_ascii=False)}}]})
+                                elif raw_args:
+                                    # Gemini normally emits one complete
+                                    # functionCall object. A second frame for
+                                    # the same call cannot be represented as a
+                                    # safe JSON delta; reject it instead of
+                                    # concatenating two objects into invalid
+                                    # arguments that might reach a tool.
+                                    raise ValueError("Google functionCall was emitted in multiple argument frames")
                         done = bool(item.get("candidates", [{}])[0].get("finishReason"))
                     else:
                         message = item.get("message", {})
