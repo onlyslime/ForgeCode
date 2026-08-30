@@ -253,6 +253,7 @@ def _load_session(handle: str, workspace_hint: str | None = None) -> dict[str, A
         if not candidate.is_file():
             continue
         try:
+            assert_no_path_alias(candidate_dir, message="RPC session record directory is a symlink or junction alias")
             assert_no_path_alias(candidate, message="RPC session record is a symlink or junction alias")
             if candidate.stat().st_size > _MAX_RPC_RECORD_BYTES:
                 continue

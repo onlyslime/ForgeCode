@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.199 — 2026-08-31
+
+- **RPC session directory integrity:** persisted session loading now rejects records when the `rpc-sessions` parent directory is a symlink or junction alias, closing a workspace-boundary replacement gap.
+- **Verification:** RPC session lifecycle tests, compile, and diff checks passed.
+
 ## v0.8.198 — 2026-08-31
 
 - **Background status boundaries:** process status, polling, and listing now honor cancellation and active deadlines while preserving the legacy context-free status API.
