@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.7.61 — 2026-08-30
+
+- Google `generateContent` requests now preserve the selected model field when
+  translating from the provider-neutral request shape.
+
 ## v0.7.60 — 2026-08-30
 
 - Trajectory evaluation now distinguishes newly opened sessions (`not_started`)

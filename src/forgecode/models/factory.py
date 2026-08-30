@@ -54,6 +54,7 @@ class _ProtocolTransport:
             url = url.rsplit("/chat/completions", 1)[0] + "/messages"
         elif self.provider == "google":
             messages = payload.pop("messages", [])
+            model = payload.get("model")
             raw_tools = payload.pop("tools", [])
             declarations = []
             for tool in raw_tools if isinstance(raw_tools, list) else []:
@@ -83,6 +84,10 @@ class _ProtocolTransport:
                         parts.append({"functionCall": {"name": function["name"], "args": arguments}})
                 google_contents.append({"role": "user" if role == "user" else "model", "parts": parts or [{"text": ""}]})
             payload = {"contents": google_contents}
+            if isinstance(model, str) and model:
+                # Preserve the selected model for native gateways and
+                # transparent proxies that route from the JSON body.
+                payload["model"] = model
             if declarations:
                 payload["tools"] = [{"functionDeclarations": declarations}]
             url = url.rsplit("/chat/completions", 1)[0] + ":generateContent"
