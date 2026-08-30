@@ -123,6 +123,15 @@ def test_understanding_tools_report_expired_deadline(tmp_path: Path):
         assert result.metadata["error"] == "deadline_exceeded"
 
 
+def test_symbol_navigation_reports_expired_deadline(tmp_path: Path):
+    registry = build_default_registry(WorkspaceGuard(tmp_path))
+    context = ToolContext(WorkspaceGuard(tmp_path), AllowAllApproval(), deadline_monotonic=time.monotonic() - 1)
+    for name in ("find_definition", "find_references", "symbol_hover"):
+        result = registry.execute(name, {"symbol": "sample"}, context)
+        assert result.ok is False
+        assert result.metadata["error"] == "deadline_exceeded"
+
+
 def test_command_cancellation_terminates_process(tmp_path: Path):
     registry = build_default_registry(WorkspaceGuard(tmp_path))
     cancelled = False

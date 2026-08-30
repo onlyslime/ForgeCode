@@ -78,6 +78,10 @@ def _source_files(context: ToolContext, path_value: str | None = None):
 class FindDefinitionTool:
     definition = ToolDefinition("find_definition", "Find bounded source definitions for a symbol without executing project code.", {"type":"object","properties":{"symbol":{"type":"string"},"path":{"type":"string"}},"required":["symbol"]})
     def execute(self, arguments, context):
+        if context.cancelled:
+            return ToolResult(False, "definition search cancelled before scan", {"error": "cancelled"})
+        if context.remaining_seconds(20.0) <= 0:
+            return ToolResult(False, "definition search skipped because the run deadline has expired", {"error": "deadline_exceeded"})
         symbol = _required(arguments, "symbol")
         if not isinstance(symbol, str) or not re.fullmatch(r"[A-Za-z_]\w{0,127}", symbol):
             raise ValueError("symbol must be a simple identifier")
@@ -96,6 +100,10 @@ class FindDefinitionTool:
 class FindReferencesTool:
     definition = ToolDefinition("find_references", "Find bounded textual references to a symbol in source files.", {"type":"object","properties":{"symbol":{"type":"string"},"path":{"type":"string"}},"required":["symbol"]})
     def execute(self, arguments, context):
+        if context.cancelled:
+            return ToolResult(False, "reference search cancelled before scan", {"error": "cancelled"})
+        if context.remaining_seconds(20.0) <= 0:
+            return ToolResult(False, "reference search skipped because the run deadline has expired", {"error": "deadline_exceeded"})
         symbol = _required(arguments, "symbol")
         if not isinstance(symbol, str) or not re.fullmatch(r"[A-Za-z_]\w{0,127}", symbol):
             raise ValueError("symbol must be a simple identifier")
@@ -114,6 +122,10 @@ class FindReferencesTool:
 class SymbolHoverTool:
     definition = ToolDefinition("symbol_hover", "Show a bounded static definition and nearby source context for a symbol.", {"type":"object","properties":{"symbol":{"type":"string"},"path":{"type":"string"},"context_lines":{"type":"integer"}},"required":["symbol"]})
     def execute(self, arguments, context):
+        if context.cancelled:
+            return ToolResult(False, "symbol hover cancelled before scan", {"error": "cancelled"})
+        if context.remaining_seconds(20.0) <= 0:
+            return ToolResult(False, "symbol hover skipped because the run deadline has expired", {"error": "deadline_exceeded"})
         symbol = _required(arguments, "symbol")
         if not isinstance(symbol, str) or not re.fullmatch(r"[A-Za-z_]\w{0,127}", symbol): raise ValueError("symbol must be a simple identifier")
         radius = arguments.get("context_lines", 2)

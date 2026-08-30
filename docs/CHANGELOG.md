@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.169 — 2026-08-31
+
+- **Symbol navigation deadlines:** definition, reference, and hover tools now fail fast on cancellation or expired runs before scanning source files.
+- **Verification:** command-boundary tests, compile checks, and manual expired-navigation inspection passed.
+
 ## v0.8.168 — 2026-08-31
 
 - **Understanding-tool deadlines:** bounded range reads and symbol listing now fail fast on cancellation or expired runs before touching workspace files.

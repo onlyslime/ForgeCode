@@ -13,7 +13,7 @@ wheels = [
 
 [[package]]
 name = "forgecode"
-version = "0.8.168"
+version = "0.8.169"
 source = { editable = "." }
 dependencies = [
     { name = "prompt-toolkit" },
