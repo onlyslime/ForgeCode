@@ -148,6 +148,8 @@ class GitWorktreeListTool:
         self.guard = guard
 
     def execute(self, arguments, context):
+        if not isinstance(arguments, dict):
+            raise ValueError("arguments must be an object")
         try:
             records = _worktree_records(context.guard)
         except (OSError, ValueError):

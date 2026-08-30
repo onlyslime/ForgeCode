@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.99 — 2026-08-31
+
+- Added object-argument validation to `git_worktrees`, completing consistent
+  malformed-input handling across Git worktree tools.
+- Verification: four-tool boundary regression, manual API check, compileall,
+  and diff checks passed.
+
 ## v0.8.98 — 2026-08-31
 
 - Rejected newline-bearing worktree ownership metadata fields to prevent
