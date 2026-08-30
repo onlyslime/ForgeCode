@@ -134,6 +134,11 @@ def test_provider_rejects_invalid_wrapped_tool_name():
         _tool_schema_to_payload({"type": "function", "function": {"name": "bad\tname"}})
 
 
+def test_provider_rejects_invalid_wrapped_tool_fields():
+    with pytest.raises(ProviderError, match="function fields are invalid"):
+        _tool_schema_to_payload({"type": "function", "function": {"name": "ok", "parameters": []}})
+
+
 def test_provider_neutral_response_validation_rejects_nonfinite_usage_and_bad_finish_reason():
     assert not is_valid_response(ModelResponse(Message("assistant", "ok"), finish_reason="made_up"))
     assert not is_valid_response(ModelResponse(Message("assistant", "ok"), usage={"total_tokens": float("nan")}))

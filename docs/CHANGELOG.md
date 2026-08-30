@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.127 — 2026-08-31
+
+- **Outbound schema field validation:** reject malformed wrapped function descriptions and parameter objects before request serialization.
+- **Verification:** provider tests, compile checks, and manual malformed-schema inspection passed.
+
 ## v0.8.126 — 2026-08-31
 
 - **Wrapped schema validation:** validate function names inside already-wrapped OpenAI tool schemas, preventing malformed names from bypassing outbound protocol checks.
