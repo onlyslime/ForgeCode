@@ -4,6 +4,7 @@ import json
 import pytest
 
 from forgecode.models import Message, ModelResponse, OpenAICompatibleProvider, ProviderError, ToolCall, is_valid_response, parse_chat_completion, assemble_chat_stream
+from forgecode.models.openai_compatible import _tool_schema_to_payload
 
 
 class RecordingTransport:
@@ -121,6 +122,11 @@ def test_provider_rejects_control_character_tool_call_id():
 def test_provider_rejects_control_character_usage_key():
     with pytest.raises(ProviderError, match="invalid field name"):
         parse_chat_completion({"choices": [{"finish_reason": "stop", "message": {"content": "ok"}}], "usage": {"bad\nkey": 1}})
+
+
+def test_provider_rejects_non_object_tool_schema():
+    with pytest.raises(ProviderError, match="tool schema must be"):
+        _tool_schema_to_payload(None)
 
 
 def test_provider_neutral_response_validation_rejects_nonfinite_usage_and_bad_finish_reason():

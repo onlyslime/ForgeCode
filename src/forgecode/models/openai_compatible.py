@@ -258,6 +258,8 @@ def _message_to_payload(message: Message) -> dict[str, Any]:
 
 def _tool_schema_to_payload(schema: dict[str, Any]) -> dict[str, Any]:
     """Accept provider-neutral or already wrapped schemas and emit OpenAI shape."""
+    if not isinstance(schema, dict):
+        raise ProviderError("tool schema must be a JSON object", category="protocol_error")
     if schema.get("type") == "function" and isinstance(schema.get("function"), dict):
         return schema
     if isinstance(schema.get("name"), str):

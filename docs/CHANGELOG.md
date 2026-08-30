@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.125 — 2026-08-31
+
+- **Outbound schema validation:** provider request construction now rejects non-object tool schemas with a typed protocol error instead of leaking attribute errors.
+- **Verification:** provider regression tests, compile checks, and manual malformed-schema inspection passed.
+
 ## v0.8.124 — 2026-08-31
 
 - **Extension definition safety:** reject all ASCII control characters in tool names and descriptions, keeping registered extension metadata safe for logs and protocol payloads.
