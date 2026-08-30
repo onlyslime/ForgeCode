@@ -40,7 +40,7 @@ def _worktree_records(guard) -> dict[str, dict[str, str]]:
         if not isinstance(key, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}", key) or not isinstance(item, dict):
             raise ValueError("invalid worktree ownership record")
         fields = {str(field): value for field, value in item.items() if field in {"run_id", "branch", "path"}}
-        if any(not isinstance(value, str) or len(value) > 256 for value in fields.values()):
+        if any(not isinstance(value, str) or len(value) > 256 or any(ch in value for ch in "\r\n") for value in fields.values()):
             raise ValueError("invalid worktree ownership field")
         cleaned[key] = fields
     return cleaned

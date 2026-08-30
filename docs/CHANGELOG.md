@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.98 — 2026-08-31
+
+- Rejected newline-bearing worktree ownership metadata fields to prevent
+  forged records from injecting lines into worktree output and audit text.
+- Verification: malformed metadata regression, manual parser check,
+  compileall, and diff checks passed.
+
 ## v0.8.97 — 2026-08-31
 
 - Enforced string validation for the Git diff `path` argument, preventing

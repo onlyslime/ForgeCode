@@ -1,5 +1,6 @@
 from forgecode.security import WorkspaceGuard
 from forgecode.tools import AllowAllApproval, GitCommitTool, GitLogTool, GitStatusTool, GitDiffTool, GitWorktreeCreateTool, GitWorktreeRemoveTool, GitWorktreeReconcileTool, ToolContext
+from forgecode.tools.git import _worktree_records
 import pytest
 
 def test_git_log_and_commit_require_expected_boundaries(tmp_path):
@@ -46,3 +47,11 @@ def test_git_worktree_remove_rejects_non_boolean_force(tmp_path):
     guard = WorkspaceGuard(tmp_path); context = ToolContext(guard, AllowAllApproval())
     with pytest.raises(ValueError, match="force"):
         GitWorktreeRemoveTool(guard).execute({"name": "demo", "force": "false"}, context)
+
+
+def test_worktree_metadata_rejects_newline_fields(tmp_path):
+    guard = WorkspaceGuard(tmp_path)
+    folder = tmp_path / ".forgecode"; folder.mkdir()
+    (folder / "worktrees.json").write_text('{"worktrees":{"demo":{"path":"ok\\nforged"}}}', encoding="utf-8")
+    with pytest.raises(ValueError, match="ownership field"):
+        _worktree_records(guard)
