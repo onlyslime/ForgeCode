@@ -618,7 +618,7 @@ class InteractiveSession:
     stopped: bool = False
     controller: InteractiveRunController | None = None
 
-    COMMANDS = ("help", "status", "queue", "tools", "plan", "mode", "model", "connect", "login", "rules", "files", "skills", "skill", "tree", "diff", "context", "events", "review", "test", "compact", "undo", "cancel", "pause", "resume", "clear", "quit", "exit")
+    COMMANDS = ("help", "introdece", "status", "queue", "tools", "plan", "mode", "model", "connect", "login", "rules", "files", "skills", "skill", "tree", "diff", "context", "events", "review", "test", "compact", "undo", "cancel", "pause", "resume", "clear", "quit", "exit")
 
     def header(self, *, run_id: str = "", mode: str = "plan", profile: str = "default", rules_count: int = 0, budget: int = 60_000) -> str:
         return f"ForgeCode session run={run_id or '<new>'} workspace=. mode={mode} profile={profile} rules={rules_count} budget={budget}"
@@ -628,6 +628,7 @@ class InteractiveSession:
             "Commands\n"
             "────────\n"
             "/help                 show this command guide\n"
+            "/introdece            介绍 ForgeCode 的定位、能力与项目地址\n"
             "/status               show live worker, phase, and timing\n"
             "/queue                show pending follow-up queue capacity\n"
             "/tools                list available tools and safety categories\n"
@@ -677,6 +678,9 @@ class InteractiveSession:
         if command == "help":
             if args: raise SlashCommandError("usage: /help")
             return self.help_text()
+        if command == "introdece":
+            if args: raise SlashCommandError("usage: /introdece")
+            return self.introduction_text()
         if command == "status":
             if args: raise SlashCommandError("usage: /status")
             return self.status()
@@ -783,6 +787,23 @@ class InteractiveSession:
             self.stopped = True
             return result
         raise SlashCommandError("unreachable command")
+
+    @staticmethod
+    def introduction_text() -> str:
+        return (
+            "ForgeCode\n"
+            "─────────\n"
+            "ForgeCode 是一个本地运行、可审计的 coding agent。你可以用自然语言\n"
+            "描述编程任务，它会与大语言模型协作，理解项目、读取文件、搜索代码、\n"
+            "修改实现、运行命令和测试，并把每一步工具调用和结果清晰展示出来。\n\n"
+            "它支持多轮 AgentLoop、流式模型输出、OpenAI 兼容及多家 provider、\n"
+            "上下文索引与压缩、项目规则、会话持久化、暂停/恢复/取消、事务回滚、\n"
+            "运行审计、WorkspaceGuard、风险审批，以及 JSON/JSONL/RPC 自动化接口。\n\n"
+            "模型负责提出下一步行动；本地工具负责真正执行。文件写入和命令运行\n"
+            "都经过工作区校验、模式控制、风险策略和结构化记录。\n\n"
+            "详见 GitHub：\n"
+            "https://github.com/onlyslime/ForgeCode"
+        )
 
     def enqueue(self, message: str) -> None:
         if len(self._queue) >= self.max_queue_items or self._queue_chars + len(message) > self.max_queue_chars:
