@@ -797,7 +797,18 @@ class AgentLoop:
             request_messages = self.context_builder.fit(request_messages)
             self._last_context_summary = "\n".join(message.content for message in request_messages[-8:])[:8_000]
             self._record("model_progress", {"step": step, "message": "Analyzing the task and deciding the next safe action…" if step == 0 else "Reviewing the latest tool result and continuing…"})
-            self._record("model_request", {"step": step, "message_count": len(request_messages), "context_chars": sum(len(message.content) for message in request_messages), "tool_count": len(self.registry.schemas(self.context.mode))})
+            request_tools = self.registry.schemas(self.context.mode)
+            capabilities = getattr(self.provider, "capabilities", None)
+            if callable(capabilities):
+                capabilities = capabilities()
+            if request_tools and capabilities is not None and getattr(capabilities, "tool_calling", True) is False:
+                error_text = "configured provider does not support tool calling"
+                self._record("error", {"category": "capability_mismatch", "capability": "tool_calling", "tool_count": len(request_tools), "message": error_text})
+                self._fail_state("provider capability mismatch")
+                result = LoopResult(tuple(messages), "capability_mismatch", error_text, verification_ok, self.context.mode.value, explored=tuple(explored), state=self.lifecycle.state.value, run_id=self.run_id, audit_complete=self.audit_complete)
+                self._record("final", {"stopped_reason": result.stopped_reason, "error": error_text})
+                return result
+            self._record("model_request", {"step": step, "message_count": len(request_messages), "context_chars": sum(len(message.content) for message in request_messages), "tool_count": len(request_tools), "capabilities": capabilities.to_dict() if hasattr(capabilities, "to_dict") else None})
             provider_started = time.monotonic()
             try:
                 if self.context.hooks is not None:
@@ -809,7 +820,7 @@ class AgentLoop:
                     raise ProviderError("run deadline exceeded before provider request", category="deadline_exceeded")
                 response = await self._await_provider(
                     request_messages,
-                    self.registry.schemas(self.context.mode),
+                    request_tools,
                     # Steps are human-facing 1-based; request identities keep
                     # the historical zero-based suffix used by audit clients.
                     self._provider_context(step - 1),

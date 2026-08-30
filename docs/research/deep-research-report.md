@@ -691,7 +691,7 @@ CLI/TUI
 | 验证 | 测试 profile、有限修复、review/export、轨迹评估 | 缺少语言服务和调试器集成 | P1 |
 | 扩展发布 | Skills、hooks、SDK、JSONL RPC、工具收窄、uv/独立二进制布局 | 缺少 MCP、插件市场、跨平台一键安装 | P2 |
 
-截至当前 v0.7.2，正常交互工作流还提供 `/context`（有界索引健康度）和
+截至当前 v0.7.4，正常交互工作流还提供 `/context`（有界索引健康度）和
 `/events [limit] [kind]`（可筛选、带相对耗时和错误码的持久化事件尾部）。
 这些能力不改变工具权限，只把已有审计证据暴露给用户；对应交互、机器契约和
 provider 回归测试均已通过。
@@ -753,6 +753,17 @@ Codex 官方页面或未实现的竞品特性当作本项目已完成能力。
   side effect 的调用都回退为串行安全路径。
 - **验证**：至少覆盖顺序稳定性、取消传播、配额、错误聚合、混合只读/副作用调用、
   checkpoint 一致性和 JSON/JSONL tool-call 配对；在此之前不标记 P1 并行为完成。
+
+### 0.7.4 实施审计：provider capability negotiation（2026-08-30）
+
+- **范围**：AgentLoop 在发送带工具 schema 的请求前读取 provider 的显式
+  `capabilities` 声明；若声明 `tool_calling=false`，立即返回有界的
+  `capability_mismatch`，并在审计事件中记录能力快照。
+- **非目标**：不探测远端模型、不中途猜测模型能力、不改变未声明能力的
+  兼容 provider 行为，也不引入新的 provider SDK。
+- **完成条件**：不兼容请求不会到达 transport；错误可见、可恢复且不会产生
+  tool-call；正常 provider 请求继续使用原有协议。
+- **验证**：定向测试覆盖显式不支持工具调用的 provider；完整回归门禁在发布前执行。
 
 ### 0.7.3 实施审计：静态语义导航（2026-08-30）
 

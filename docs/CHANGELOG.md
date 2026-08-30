@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.7.4 — 2026-08-30
+
+- Provider capability declarations are now enforced before a tool-enabled
+  request: an explicit `tool_calling=false` provider fails fast with a bounded
+  capability-mismatch result instead of sending an incompatible request.
+- Model request audit events now include the provider capability snapshot.
+- Added regression coverage for fail-fast capability negotiation.
+
 ## v0.7.3 — 2026-08-30
 
 - Added guarded, bounded `find_definition` and `find_references` tools for
