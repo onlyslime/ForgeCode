@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.167 — 2026-08-31
+
+- **Navigation deadline boundaries:** repository maps and file metadata now fail fast on cancellation or expired runs, avoiding unnecessary snapshot and hashing work.
+- **Verification:** command-boundary tests, compile checks, and manual expired-navigation inspection passed.
+
 ## v0.8.166 — 2026-08-31
 
 - **Read deadline boundary:** `read_file` now checks cancellation and run deadlines before resolving or reading a workspace file.

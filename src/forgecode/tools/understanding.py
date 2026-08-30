@@ -126,6 +126,10 @@ class FileMetadataTool:
     definition = ToolDefinition("file_metadata", "Show bounded metadata including size, lines, encoding, modified time, and SHA-256.", {"type":"object","properties":{"path":{"type":"string"}},"required":["path"]})
     def __init__(self, guard): self.guard = guard
     def execute(self, arguments, context):
+        if context.cancelled:
+            return ToolResult(False, "file metadata cancelled before access", {"error": "cancelled"})
+        if context.remaining_seconds(10.0) <= 0:
+            return ToolResult(False, "file metadata skipped because the run deadline has expired", {"error": "deadline_exceeded"})
         path_value = _required(arguments, "path"); path = context.guard.resolve(path_value, must_exist=True)
         if _is_ignored(path, context.guard) or not path.is_file(): raise ValueError("path is not a readable file")
         raw = path.read_bytes()

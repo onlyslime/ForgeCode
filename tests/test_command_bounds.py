@@ -103,6 +103,16 @@ def test_read_file_reports_expired_deadline(tmp_path: Path):
     assert result.metadata["error"] == "deadline_exceeded"
 
 
+def test_map_and_metadata_report_expired_deadline(tmp_path: Path):
+    (tmp_path / "sample.py").write_text("x = 1", encoding="utf-8")
+    registry = build_default_registry(WorkspaceGuard(tmp_path))
+    context = ToolContext(WorkspaceGuard(tmp_path), AllowAllApproval(), deadline_monotonic=time.monotonic() - 1)
+    for name, arguments in (("repository_map", {}), ("file_metadata", {"path": "sample.py"})):
+        result = registry.execute(name, arguments, context)
+        assert result.ok is False
+        assert result.metadata["error"] == "deadline_exceeded"
+
+
 def test_command_cancellation_terminates_process(tmp_path: Path):
     registry = build_default_registry(WorkspaceGuard(tmp_path))
     cancelled = False

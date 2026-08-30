@@ -21,10 +21,18 @@ class RepositoryMapTool:
     def execute(self, arguments: dict[str, Any], context: ToolContext) -> ToolResult:
         if not isinstance(arguments, dict):
             raise ValueError("arguments must be an object")
+        if context.cancelled:
+            return ToolResult(False, "repository map cancelled before build", {"error": "cancelled"})
+        if context.remaining_seconds(30.0) <= 0:
+            return ToolResult(False, "repository map skipped because the run deadline has expired", {"error": "deadline_exceeded"})
         task = arguments.get("task", "repository inspection")
         budget = arguments.get("budget_chars", 20_000)
         if isinstance(budget, bool) or not isinstance(budget, int) or not 256 <= budget <= _MAX_BUDGET_CHARS:
             raise ValueError(f"budget_chars must be between 256 and {_MAX_BUDGET_CHARS}")
         repository = RepositoryMapBuilder(context.guard).build()
+        if context.cancelled:
+            return ToolResult(False, "repository map cancelled after build", {"error": "cancelled"})
+        if context.remaining_seconds(1.0) <= 0:
+            return ToolResult(False, "repository map expired before result delivery", {"error": "deadline_exceeded"})
         plan = repository.plan_context(task, budget_chars=budget)
         return ToolResult(True, plan.render(), {"snapshot": repository.to_dict(), "selected_paths": list(plan.selected_paths), "omitted": plan.omitted, "budget_chars": plan.budget_chars})
