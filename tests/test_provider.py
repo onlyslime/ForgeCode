@@ -21,6 +21,16 @@ def test_cancellation_reason_is_normalized_to_one_line():
     assert "\n" not in token.reason and "\t" not in token.reason
 
 
+def test_cancellation_survives_unstringifiable_reason():
+    from forgecode.models import CancellationToken
+    class BrokenReason:
+        def __str__(self):
+            raise RuntimeError("boom")
+    token = CancellationToken()
+    assert token.cancel(BrokenReason()) is True
+    assert token.is_cancelled() and token.reason == "cancelled"
+
+
 class RecordingTransport:
     def __init__(self, status=200, payload=None):
         self.status = status

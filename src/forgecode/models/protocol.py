@@ -27,7 +27,12 @@ class CancellationToken:
         with self._lock:
             first = not self._event.is_set()
             if first:
-                safe_reason = str(reason or "cancelled")[:256]
+                try:
+                    safe_reason = str(reason or "cancelled")[:256]
+                except Exception:
+                    # Cancellation must remain effective even when an
+                    # extension supplies an object with a broken __str__.
+                    safe_reason = "cancelled"
                 # Cancellation reasons are copied into session/audit metadata;
                 # keep them single-line so untrusted callers cannot forge log
                 # records or corrupt line-oriented displays.

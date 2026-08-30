@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.207 — 2026-08-31
+
+- **Cancellation resilience:** cancellation remains effective when an
+  extension supplies a reason object whose string conversion raises.
+- **Verification:** provider protocol tests, compile, diff checks, and manual
+  broken-reason cancellation validation passed.
+
 ## v0.8.206 — 2026-08-31
 
 - **Cancellation audit hardening:** cancellation reasons are normalized to a
