@@ -139,7 +139,9 @@ def is_valid_response(response: Any) -> bool:
         return False
     if len(response.usage) > 32:
         return False
-    for value in response.usage.values():
+    for key, value in response.usage.items():
+        if not isinstance(key, str) or not key or len(key) > 128:
+            return False
         if isinstance(value, bool) or not isinstance(value, (int, float)):
             return False
         if isinstance(value, float) and not math.isfinite(value):

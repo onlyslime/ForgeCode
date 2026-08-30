@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.8.50 — 2026-08-31
+
+- Aligned provider-neutral usage validation with concrete adapters by
+  requiring bounded non-empty string field names.
+- Verification: provider tests, manual malformed-key validation, compileall,
+  and diff checks passed.
+
 ## v0.8.49 — 2026-08-31
 
 - Added oversized-integer normalization to recursive metadata redaction,
