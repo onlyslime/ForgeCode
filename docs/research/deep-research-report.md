@@ -1276,6 +1276,12 @@ Codex app-server v2 的协作 schema（GitHub raw，HTTP 200）还公开了
 `CollaborationModeMask`。ForgeCode 当前没有多代理生命周期、协作模式协商或子代理
 权限隔离；这属于 P2，必须在 worktree ownership、审批和取消边界稳定后再实现。
 
+OpenCode 工具目录 API 当前返回 HTTP 200，除基础 `read/write/edit/shell/grep/glob`
+外还包含 `question`、`task`、`todo`、`webfetch`、`websearch`、`lsp` 和 `skill`。
+ForgeCode 已有对应的本地读写、搜索、后台任务、skills 与静态导航能力，但没有
+交互式 question、todo 状态工具或网络抓取工具。前两者需要先定义会话事件和审批
+边界，后者涉及网络权限与凭据脱敏，因此列为后续 P1/P2，不在当前切片中直接添加。
+
 Pi 的消息队列章节还区分 steering（当前工具调用完成后注入）与 follow-up（整轮结束后
 注入），并支持 one-at-a-time/all 投递策略、Escape 中止后恢复队列、Alt+Up 取回待发
 消息。ForgeCode 当前队列是单一 FIFO：在当前 AgentLoop 返回后依次执行，Escape 会
