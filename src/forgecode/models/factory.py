@@ -158,7 +158,10 @@ class _ProtocolTransport:
             blocks = data.get("content", [])
             if not isinstance(blocks, list) or any(not isinstance(block, dict) for block in blocks):
                 raise ValueError("anthropic response content must be a list of objects")
-            text = "".join(str(b.get("text", "")) for b in blocks if b.get("type") == "text")
+            text_parts = [b.get("text", "") for b in blocks if b.get("type") == "text"]
+            if any(not isinstance(part, str) for part in text_parts):
+                raise ValueError("anthropic response text blocks must be strings")
+            text = "".join(text_parts)
             calls = [{"id": b.get("id", "call"), "type": "function", "function": {"name": b.get("name", ""), "arguments": json.dumps(b.get("input", {}))}} for b in blocks if b.get("type") == "tool_use"]
             data = {"choices": [{"message": {"role": "assistant", "content": text, "tool_calls": calls}, "finish_reason": "tool_calls" if calls else "stop"}], "usage": data.get("usage", {})}
         elif self.provider == "google":
@@ -171,7 +174,10 @@ class _ProtocolTransport:
             parts = candidate_content.get("parts", [])
             if not isinstance(parts, list) or any(not isinstance(part, dict) for part in parts):
                 raise ValueError("google response parts must be objects")
-            text = "".join(str(p.get("text", "")) for p in parts)
+            text_parts = [p.get("text", "") for p in parts if "text" in p]
+            if any(not isinstance(part, str) for part in text_parts):
+                raise ValueError("google response text parts must be strings")
+            text = "".join(text_parts)
             calls = []
             for index, part in enumerate(parts):
                 function = part.get("functionCall") if isinstance(part, dict) else None
@@ -190,7 +196,10 @@ class _ProtocolTransport:
                 function = call.get("function", {}) if isinstance(call, dict) else {}
                 if isinstance(function, dict) and function.get("name"):
                     calls.append({"id": str(call.get("id") or f"call-{index}"), "type": "function", "function": {"name": function["name"], "arguments": json.dumps(function.get("arguments", function.get("parameters", {})), ensure_ascii=False)}})
-            data = {"choices": [{"message": {"role": "assistant", "content": msg.get("content", ""), "tool_calls": calls}, "finish_reason": "tool_calls" if calls else "stop"}], "usage": {}}
+            content = msg.get("content", "")
+            if not isinstance(content, str):
+                raise ValueError("ollama response message content must be a string")
+            data = {"choices": [{"message": {"role": "assistant", "content": content, "tool_calls": calls}, "finish_reason": "tool_calls" if calls else "stop"}], "usage": {}}
         return json.dumps(data, ensure_ascii=False).encode()
 
     def post_json(self, url: str, headers: dict[str, str], body: bytes, timeout: float):

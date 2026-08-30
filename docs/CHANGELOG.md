@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.149 — 2026-08-31
+
+- **Provider text strictness:** response translators now reject non-string text/content fields instead of coercing arbitrary JSON values into assistant text.
+- **Verification:** provider tests, compile checks, and manual malformed-content inspection passed.
+
 ## v0.8.148 — 2026-08-31
 
 - **Transport scheme safety:** restrict custom provider transport URLs to HTTP/HTTPS schemes before rewriting or dispatch.

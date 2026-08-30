@@ -233,6 +233,12 @@ def test_ollama_transport_rejects_invalid_message():
         transport._response(json.dumps({"message": []}).encode())
 
 
+def test_provider_transport_rejects_non_text_content():
+    transport = _ProtocolTransport(object(), "ollama", "secret")
+    with pytest.raises(ValueError, match="content must be a string"):
+        transport._response(json.dumps({"message": {"content": []}}).encode())
+
+
 def test_transport_result_rejects_invalid_status():
     with pytest.raises(ValueError, match="invalid HTTP status"):
         _json_result((True, b"{}"))
