@@ -2431,7 +2431,9 @@ def main(argv: list[str] | None = None) -> int:
             """Draw the persistent human input area at the current bottom."""
             if machine_json:
                 return
-            bar = f"╭─ forgecode │ {state['mode']}  ·  /help  /tools  /status\n╰─❯ "
+            # Keep one replaceable status line; appending the two-line header
+            # for every async event causes prompt ghosts during long waits.
+            bar = f"╭─ forgecode │ {state['mode']}  ·  /help  /tools  /status  ╰─❯ "
             if not os.environ.get("NO_COLOR") and os.environ.get("FORGECODE_THEME", "vivid").lower() not in {"none", "minimal"}:
                 bar = "\x1b[40;97m" + bar + "\x1b[0m"
             print(bar, end="", flush=True)

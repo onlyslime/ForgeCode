@@ -11,6 +11,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 import ast
+import warnings
 import fnmatch
 import hashlib
 import json
@@ -74,7 +75,9 @@ def _extract_symbols(text: str, suffix: str) -> tuple[str, ...]:
     """
     if suffix == ".py":
         try:
-            tree = ast.parse(text)
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", SyntaxWarning)
+                tree = ast.parse(text)
             found: list[tuple[int, str]] = []
             for node in ast.walk(tree):
                 if isinstance(node, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):

@@ -11,6 +11,7 @@ raw session/backup contents.
 from __future__ import annotations
 
 import ast
+import warnings
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 import difflib
@@ -774,7 +775,9 @@ def _run_syntax_check(guard: WorkspaceGuard, paths: Sequence[str], *, max_files:
             raw = _current_file_bytes(guard, relative)
             if raw is None:
                 continue
-            ast.parse(raw.decode("utf-8"), filename=relative)
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", SyntaxWarning)
+                ast.parse(raw.decode("utf-8"), filename=relative)
         except SyntaxError as exc:
             line = int(exc.lineno or 1)
             findings.append(_finding("syntax", "high", "python.ast", f"Python syntax error: {str(exc.msg)[:500]}", path=relative, line=line, evidence_refs=(f"file:{relative}#L{line}",)))
