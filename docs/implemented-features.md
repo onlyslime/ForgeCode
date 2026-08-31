@@ -1,4 +1,4 @@
-# Implemented capabilities (v0.8.27)
+# Implemented capabilities (v0.9.0)
 
 This is the maintained, user-visible capability inventory for the current
 release. Claims are backed by the deterministic regression suite and the

@@ -124,6 +124,10 @@ fcc --jsonl
 - [文档导航](docs/README.md)
 - [架构说明](docs/architecture.md)
 - [已实现能力](docs/implemented-features.md)
+- [CLI 参考](docs/cli-reference.md) · [配置与服务商](docs/configuration.md)
+- [安全模型](docs/security-model.md) · [会话生命周期](docs/session-lifecycle.md)
+- [RPC 协议](docs/rpc-schema.md) · [故障排查](docs/troubleshooting.md)
+- [扩展开发](docs/extension-guide.md) · [贡献指南](docs/contributing.md)
 
 ## 仓库结构
 
@@ -134,4 +138,4 @@ docs/             架构说明、示例、研究资料和历史记录
 sdk/node/         简洁的 JSONL 客户端
 ```
 
-MIT 许可证。当前版本：`v0.8.27`。
+MIT 许可证。当前版本：`v0.9.0`。

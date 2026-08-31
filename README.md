@@ -141,6 +141,10 @@ fcc --jsonl
 - [Documentation guide](docs/README.md)
 - [Architecture](docs/architecture.md)
 - [Implemented capabilities](docs/implemented-features.md)
+- [CLI reference](docs/cli-reference.md) · [Configuration](docs/configuration.md)
+- [Security model](docs/security-model.md) · [Session lifecycle](docs/session-lifecycle.md)
+- [RPC schema](docs/rpc-schema.md) · [Troubleshooting](docs/troubleshooting.md)
+- [Extension guide](docs/extension-guide.md) · [Contributing](docs/contributing.md)
 
 ## Repository layout
 
@@ -151,4 +155,4 @@ docs/             architecture notes, examples, research, and history
 sdk/node/         small JSONL client
 ```
 
-MIT licensed. Current release: `v0.8.27`.
+MIT licensed. Current release: `v0.9.0`.

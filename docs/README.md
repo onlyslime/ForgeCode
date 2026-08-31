@@ -12,6 +12,12 @@ documents when you need more detail:
   implementation and safety design (maintainer/technical review).
 - `implemented-features.md` and `capability-trace.md`: capability inventory
   and the evidence behind each claim (assessment/review).
+- `cli-reference.md`, `configuration.md`, `provider-matrix.md`, and
+  `troubleshooting.md`: practical user and operator reference.
+- `security-model.md`, `session-lifecycle.md`, and `extension-guide.md`:
+  security, recovery, and extension contracts.
+- `rpc-schema.md`, `testing-and-verification.md`, and `contributing.md`:
+  integration, verification, and maintainer guidance.
 - `research/`: the research plan and report (project background).
 - `VERSIONING.md` and `CHANGELOG.md`: release and history policy.
 
@@ -29,6 +35,8 @@ public reading path and must not be committed or packaged.
 - `CHANGELOG.md` and `VERSIONING.md` define release conventions and history.
 - `implemented-features.md` is the maintained list of claimed capabilities and
   its manual audit status.
+- Practical reference documents use the current `v0.9.0` baseline; files in
+  `releases/` are historical local working material.
 - `research/` contains the research plan and report.
 
 ## Local-only material

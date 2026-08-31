@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.9.0 — 2026-08-31
+
+- Expanded documentation with CLI, configuration/provider, security, session
+  recovery, extension, RPC schema, testing, troubleshooting, and contributing
+  guides.
+- Updated the public capability baseline and package version to `v0.9.0`.
+- Compatibility: runtime protocols and safety behavior are unchanged; this is
+  a documentation-focused release.
+- Verification: documentation link scan, version consistency, and compile/
+  import smoke checks passed.
+
 ## v0.8.211 — 2026-08-31
 
 - **Plan protocol hardening:** non-text Act approval reasons now fail with a
