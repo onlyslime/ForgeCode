@@ -1,4 +1,12 @@
 from forgecode.application.interactive_service import _human_result
+from forgecode.application.prompt_ui import _vivid
+
+
+def test_vivid_renderer_colors_human_semantics_and_honors_no_color(monkeypatch):
+    rendered = _vivid("Completed\n✓ Verification passed\n✗ failed", enabled=True)
+    assert "\x1b[" in rendered
+    monkeypatch.setenv("NO_COLOR", "1")
+    assert _vivid("Completed") == "Completed"
 
 
 def test_human_rules_result_renders_sources_and_diagnostics():

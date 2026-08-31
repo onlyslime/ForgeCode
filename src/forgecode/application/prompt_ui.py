@@ -2,7 +2,39 @@
 from __future__ import annotations
 
 from typing import Callable
+import os
 from .interactive_service import SlashCommandError, _human_result
+
+
+def _vivid(text: str, *, enabled: bool | None = None) -> str:
+    """Color human-only output; JSON/JSONL paths never call this renderer."""
+    if enabled is None:
+        enabled = not os.environ.get("NO_COLOR") and os.environ.get("FORGECODE_THEME", "vivid").lower() not in {"none", "minimal"}
+    if not enabled:
+        return text
+    colors = {"blue": "\x1b[94m", "cyan": "\x1b[36m", "green": "\x1b[32m", "yellow": "\x1b[33m", "red": "\x1b[31m", "magenta": "\x1b[35m", "dim": "\x1b[2m"}
+    reset = "\x1b[0m"
+    headings = {"Status", "Review", "Rules", "Skills", "Files", "Recent events", "Context index", "Session tree", "Git diff", "Queue", "Available tools", "Completed", "Context compacted"}
+    result = []
+    for line in text.splitlines():
+        s = line.strip()
+        color = ""
+        if s in headings or set(s) <= {"─", "━", "═"}:
+            color = colors["blue"]
+        elif s.startswith(("✓", "Verification passed", "Index is healthy")):
+            color = colors["green"]
+        elif s.startswith(("✗", "Error", "failed", "Failures")):
+            color = colors["red"]
+        elif s.startswith(("⚠", "Approval", "awaiting", "Issues:")):
+            color = colors["yellow"]
+        elif s.startswith(("•", "phase:", "Model:", "Provider:")):
+            color = colors["cyan"]
+        elif s.startswith(("transaction:", "rollback:", "audit:")):
+            color = colors["magenta"]
+        if color:
+            line = f"{color}{line}{reset}"
+        result.append(line)
+    return "\n".join(result)
 
 
 def run_prompt_ui(session, *, mode: Callable[[], str]) -> None:
@@ -68,7 +100,7 @@ def run_prompt_ui(session, *, mode: Callable[[], str]) -> None:
         result = session.cancel()
         rendered = _human_result(result)
         if rendered:
-            session.output(rendered)
+            session.output(_vivid(rendered))
         event.app.invalidate()
 
     style = Style.from_dict({

@@ -48,7 +48,7 @@ from ..storage import Checkpoint, CheckpointStore, RecoveryConflict, SessionForm
 from ..tools import AgentMode, AllowAllApproval, DenyAllApproval, InteractiveApproval, RiskScopedApproval, ToolContext, build_default_registry
 from ..hooks import Hook, HookRegistry
 from .review_service import ReviewService
-from .prompt_ui import run_prompt_ui
+from .prompt_ui import run_prompt_ui, _vivid
 
 
 def _load_saved_credential(workspace: Path) -> None:
@@ -2409,8 +2409,11 @@ def main(argv: list[str] | None = None) -> int:
                             # Remove the active input line before appending a
                             # response; the bar is redrawn immediately below.
                             print("\x1b[2K\r", end="")
-                            print("\n\x1b[1;36m─── Complete ───\x1b[0m")
-                        print("\n" + rendered + "\n")
+                            complete = "─── Complete ───"
+                            if not os.environ.get("NO_COLOR") and os.environ.get("FORGECODE_THEME", "vivid").lower() not in {"none", "minimal"}:
+                                complete = "\x1b[1;36m" + complete + "\x1b[0m"
+                            print("\n" + complete)
+                        print("\n" + _vivid(rendered) + "\n")
                         if not machine_json:
                             redraw_input_bar()
 
@@ -2428,7 +2431,10 @@ def main(argv: list[str] | None = None) -> int:
             """Draw the persistent human input area at the current bottom."""
             if machine_json:
                 return
-            print(f"\x1b[40;97m╭─ forgecode │ {state['mode']}  ·  /help  /tools  /status\n╰─❯ \x1b[0m", end="", flush=True)
+            bar = f"╭─ forgecode │ {state['mode']}  ·  /help  /tools  /status\n╰─❯ "
+            if not os.environ.get("NO_COLOR") and os.environ.get("FORGECODE_THEME", "vivid").lower() not in {"none", "minimal"}:
+                bar = "\x1b[40;97m" + bar + "\x1b[0m"
+            print(bar, end="", flush=True)
 
         def model_command(model_args: list[str]) -> Any:
             nonlocal settings

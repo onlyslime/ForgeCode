@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.9.1 — 2026-08-31
+
+- Added vivid semantic colors for human interactive output, including
+  success, warning, error, phase, evidence, and transaction cues.
+- Added `NO_COLOR=1` and `FORGECODE_THEME=minimal|none` plain-output modes;
+  JSON/JSONL output is unchanged.
+- Verification: interactive rendering tests and Python compile check passed.
+
 ## v0.9.0 — 2026-08-31
 
 - Expanded documentation with CLI, configuration/provider, security, session
