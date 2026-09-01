@@ -2605,9 +2605,14 @@ def main(argv: list[str] | None = None) -> int:
                     if checked.stale:
                         state["plan"] = checked
                         return {"error": "plan is stale because project rules or referenced context changed; revise it before Act"}
-                    if not approval.approve("plan_act", {"plan_id": state["plan"].plan_id, "revision": state["plan"].revision, "items": [item.id for item in state["plan"].items]}):
-                        session.append("plan_denied", {"plan_id": state["plan"].plan_id}, mode="plan")
-                        return {"error": "Plan -> Act approval denied"}
+                    # Bypass mode explicitly skips approval prompts.  The
+                    # previous implementation asked the interactive approval
+                    # object before replacing it with AllowAllApproval,
+                    # leaving `/mode bypass` blocked waiting for input.
+                    if mode != AgentMode.BYPASS.value:
+                        if not approval.approve("plan_act", {"plan_id": state["plan"].plan_id, "revision": state["plan"].revision, "items": [item.id for item in state["plan"].items]}):
+                            session.append("plan_denied", {"plan_id": state["plan"].plan_id}, mode="plan")
+                            return {"error": "Plan -> Act approval denied"}
                     state["plan"] = state["plan"].approve_for_act()
                     session.append("plan_approved", {"plan_id": state["plan"].plan_id, "revision": state["plan"].revision}, mode=mode)
             state["mode"] = mode
