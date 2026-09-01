@@ -1864,19 +1864,20 @@ def main(argv: list[str] | None = None) -> int:
         output_lock = threading.RLock()
         approval_lines: queue.Queue[str] = queue.Queue()
         approval_waiting = threading.Event()
+        approval_prompt_text = {"value": ""}
         def approval_input(prompt: str = "") -> str:
             # Approval is always serviced by the interactive input loop.  A
             # direct ``input()`` call here can race prompt_toolkit's repaint
             # and leave the approval prompt invisible while the tool waits.
             approval_waiting.set()
-            if prompt and not machine_json:
-                print(prompt, end="", flush=True)
+            approval_prompt_text["value"] = prompt
             try:
                 return approval_lines.get(timeout=300.0)
             except queue.Empty:
                 return ""
             finally:
                 approval_waiting.clear()
+                approval_prompt_text["value"] = ""
         bypass = state["mode"] == AgentMode.BYPASS.value
         approval = AllowAllApproval() if bypass else (DenyAllApproval() if configured_approval == "deny" and not (args.auto_approve or args.demo) else InteractiveApproval(auto_approve=args.auto_approve or args.demo or configured_approval == "auto", input_fn=approval_input, output_fn=_approval_output(machine_json), prompt_to_output=machine_json, secrets=[api_key]))
         if not bypass and settings.effective and settings.effective.approval_scopes:
@@ -2873,6 +2874,7 @@ def main(argv: list[str] | None = None) -> int:
             input_bar=redraw_input_bar,
             clear_screen=clear_screen_command,
             approval_pending=approval_waiting.is_set,
+            approval_prompt=lambda: approval_prompt_text["value"],
             submit_approval=lambda line: approval_lines.put(line),
             json_mode=bool(getattr(args, "json", False)),
             jsonl_mode=bool(getattr(args, "jsonl", False)),

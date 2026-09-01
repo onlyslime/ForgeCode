@@ -108,7 +108,13 @@ def run_prompt_ui(session, *, mode: Callable[[], str]) -> None:
         "continuation": "bg:#202123 #f5f5f5",
         "bottom-toolbar": "bg:#202123 #f5f5f5",
     })
-    prompt_session = PromptSession(multiline=True, key_bindings=bindings, style=style, completer=SlashCompleter(), complete_while_typing=True)
+    def approval_toolbar():
+        if not session.approval_pending():
+            return ""
+        prompt = session.approval_prompt() or "Approval required: enter y or n"
+        return [("class:bottom-toolbar", f"  ⚠ {prompt}")]
+
+    prompt_session = PromptSession(multiline=True, key_bindings=bindings, style=style, completer=SlashCompleter(), complete_while_typing=True, bottom_toolbar=approval_toolbar)
 
     def prompt() -> HTML:
         return HTML(f"<prompt>╭─ forgecode │ {mode()}\n╰─❯ </prompt>")

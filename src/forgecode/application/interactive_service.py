@@ -656,6 +656,7 @@ class InteractiveSession:
     input_bar: Callable[[], None] = lambda: None
     clear_screen: Callable[[], object] = lambda: {"cleared": True}
     approval_pending: Callable[[], bool] = lambda: False
+    approval_prompt: Callable[[], str] = lambda: ""
     submit_approval: Callable[[str], None] = lambda _line: None
     json_mode: bool = False
     # ``json_mode`` is retained for the v0.0.7 event shape.  ``jsonl_mode``
