@@ -117,6 +117,18 @@ policy, cancellable, and recorded with results. Plan is read-only, Act permits
 approved side effects, and Bypass is an explicit trusted-workspace choice.
 WorkspaceGuard is an application boundary, not an operating-system sandbox.
 
+Before using Act or Bypass for a real workspace, inspect and explicitly grant
+trust from the shell (not from an interactive `/trust` command):
+
+```powershell
+fcc trust status
+fcc trust grant       # persist trust for the current workspace
+fcc trust revoke      # remove that trust later
+```
+
+Untrusted workspaces remain available for inspection and Plan mode, while
+side-effecting tools are refused until trust is granted.
+
 ## Commands worth knowing
 
 Inside `fcc`, start with `/help`, `/tools`, `/status`, `/files`, `/rules`,

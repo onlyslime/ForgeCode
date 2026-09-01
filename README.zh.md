@@ -107,6 +107,16 @@ WorkspaceGuard + 模式 + 风险 + 审批
 
 模型只提出动作，真正执行由本地代码完成。每个路径都会经过工作区校验。写入和命令执行有边界、按策略审批、可取消，并记录结果。Plan 是只读模式，Act 允许经过批准的副作用，Bypass 需要明确选择信任工作区。WorkspaceGuard 是应用层边界，不是操作系统沙箱。
 
+在真实工作区使用 Act 或 Bypass 前，请先在终端检查并明确授予信任（这不是交互会话中的 `/trust` 命令）：
+
+```powershell
+fcc trust status
+fcc trust grant       # 为当前工作区持久化信任
+fcc trust revoke      # 之后撤销信任
+```
+
+未信任的工作区仍可用于检查和 Plan 模式；在授予信任前，可能产生副作用的工具会被拒绝。
+
 ## 常用命令
 
 在 `fcc` 中可以从 `/help`、`/tools`、`/status`、`/files`、`/rules`、`/tree`、`/review`、`/context`、`/compact`、`/events`、`/steer`、`/memory`、`/cancel` 和 `/exit` 开始。`/steer <消息>` 会在下一次模型请求前引导正在运行的任务，不会打断工具副作用。使用 `!command` 将有界命令结果发送给模型，使用 `!!command` 则只在本地执行。跨会话记忆由用户显式管理：`forgecode memory add/show/remove/clear` 或交互式 `/memory`，并作为不可信上下文注入。
