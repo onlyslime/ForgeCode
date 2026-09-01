@@ -1865,8 +1865,9 @@ def main(argv: list[str] | None = None) -> int:
         approval_lines: queue.Queue[str] = queue.Queue()
         approval_waiting = threading.Event()
         def approval_input(prompt: str = "") -> str:
-            if threading.current_thread() is threading.main_thread():
-                return input(prompt)
+            # Approval is always serviced by the interactive input loop.  A
+            # direct ``input()`` call here can race prompt_toolkit's repaint
+            # and leave the approval prompt invisible while the tool waits.
             approval_waiting.set()
             if prompt and not machine_json:
                 print(prompt, end="", flush=True)

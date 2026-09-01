@@ -149,12 +149,16 @@ def _human_result(value: object) -> str | None:
             lines.extend(f"  ⚠ {item}" for item in issues)
         return "\n".join(lines)
     if "summary" in value and ("before_chars" in value or "after_chars" in value):
+        before = value.get("before_chars", 0)
+        after = value.get("after_chars", 0)
+        try:
+            reduction = ((float(before) - float(after)) / float(before) * 100.0) if float(before) else 0.0
+        except (TypeError, ValueError):
+            reduction = 0.0
         return "Context compacted\n─────────────────\n" + "\n".join((
-            f"before: {value.get('before_chars', 0)} chars",
-            f"after: {value.get('after_chars', 0)} chars",
-            f"omitted messages: {value.get('omitted_messages', 0)}",
-            "",
-            str(value.get("summary") or "completed"),
+            f"before: {before} chars",
+            f"after: {after} chars",
+            f"reduced: {reduction:.1f}%",
         ))
     if "results" in value and "prefix" in value and value.get("advisory") is True:
         results = value.get("results") or []

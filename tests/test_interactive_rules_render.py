@@ -51,7 +51,11 @@ def test_human_tree_review_and_compact_results_render():
     review = _human_result({"transaction_id": "tx1", "state": "committed", "rollback_available": True})
     assert "Review" in review and "rollback: available" in review
     compact = _human_result({"before_chars": 100, "after_chars": 40, "omitted_messages": 2, "summary": "kept recent context"})
-    assert "Context compacted" in compact and "kept recent context" in compact
+    assert "Context compacted" in compact
+    assert "before: 100 chars" in compact
+    assert "after: 40 chars" in compact
+    assert "reduced: 60.0%" in compact
+    assert "kept recent context" not in compact
 
 
 def test_human_tools_result_groups_capabilities():
