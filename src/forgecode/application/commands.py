@@ -1871,7 +1871,9 @@ def main(argv: list[str] | None = None) -> int:
             # direct ``input()`` call here can race prompt_toolkit's repaint
             # and leave the approval prompt invisible while the tool waits.
             approval_waiting.set()
-            approval_prompt_text["value"] = prompt
+            match = re.match(r"Approve\s+([A-Za-z0-9_]+)", prompt or "")
+            tool_label = match.group(1) if match else "operation"
+            approval_prompt_text["value"] = f"Approve {tool_label}? [y/N]"
             try:
                 # The prompt UI owns repainting; the worker only requests it.
                 if interactive_holder["session"] is not None:
