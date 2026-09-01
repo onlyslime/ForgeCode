@@ -1,7 +1,5 @@
 ForgeCode（自研、可审计的本地 coding agent）
 仓库：https://github.com/onlyslime/ForgeCode
-版本：v1.0.0
-
 安装与运行（Windows PowerShell）：
 1. 安装 uv：执行 `irm https://astral.sh/uv/install.ps1 | iex`。
 2. 安装本项目，二选一：
