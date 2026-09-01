@@ -1,4 +1,4 @@
-# CLI reference (v0.9.0)
+# CLI reference (v1.0.0)
 
 `forgecode` and its short alias `fcc` share one parser. Human output is the
 default; add `--json` for one bounded JSON value or `--jsonl` for a stream.
@@ -47,4 +47,3 @@ uv run forgecode --workspace $pwd run --demo --auto-approve
 uv run forgecode --workspace $pwd session tree --jsonl
 uv run forgecode --workspace $pwd review --json
 ```
-

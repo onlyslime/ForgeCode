@@ -1,4 +1,4 @@
-# ForgeCode v0.9.0 offline walkthrough
+# ForgeCode v1.0.0 offline walkthrough
 
 This deterministic, offline demo exercises the production AgentLoop, tool
 registry, approval boundary, named test runner, durable session, transaction

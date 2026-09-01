@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.0.0 — 2026-09-01
+
+- Unified all package, runtime, CLI documentation, and distribution metadata
+  to version `v1.0.0`, including the Python and npm packages.
+- Compatibility: runtime protocols and persisted schema versions are unchanged.
+- Verification: version consistency checks, compile/import smoke checks, and
+  targeted CLI checks passed.
+
 ## v0.9.1 — 2026-08-31
 
 - Added vivid semantic colors for human interactive output, including

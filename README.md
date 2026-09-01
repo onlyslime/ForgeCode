@@ -155,4 +155,4 @@ docs/             architecture notes, examples, research, and history
 sdk/node/         small JSONL client
 ```
 
-MIT licensed. Current release: `v0.9.0`.
+MIT licensed. Current release: `v1.0.0`.

@@ -35,7 +35,7 @@ public reading path and must not be committed or packaged.
 - `CHANGELOG.md` and `VERSIONING.md` define release conventions and history.
 - `implemented-features.md` is the maintained list of claimed capabilities and
   its manual audit status.
-- Practical reference documents use the current `v0.9.0` baseline; files in
+- Practical reference documents use the current `v1.0.0` baseline; files in
   `releases/` are historical local working material.
 - `research/` contains the research plan and report.
 

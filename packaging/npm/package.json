@@ -1,6 +1,6 @@
 {
   "name": "@onlyslime/forgecode",
-  "version": "0.6.3",
+  "version": "1.0.0",
   "description": "ForgeCode local coding agent",
   "license": "MIT",
   "bin": { "fcc": "bin/fcc.js", "forgecode": "bin/fcc.js" },
