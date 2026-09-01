@@ -45,6 +45,8 @@ def run_prompt_ui(session, *, mode: Callable[[], str]) -> None:
     from prompt_toolkit.key_binding import KeyBindings
     from prompt_toolkit.styles import Style
     from prompt_toolkit.completion import Completer, Completion
+    from prompt_toolkit.application.current import get_app
+    from html import escape
 
     slash_commands = ("/help", "/introduce", "/status", "/queue", "/steer", "/tools", "/model", "/plan", "/mode", "/connect", "/login", "/rules", "/files", "/skills", "/tree", "/diff", "/context", "/events", "/memory", "/review", "/test", "/compact", "/undo", "/pause", "/resume", "/cancel", "/clear", "/quit", "/exit")
     argument_choices = {
@@ -108,16 +110,21 @@ def run_prompt_ui(session, *, mode: Callable[[], str]) -> None:
         "continuation": "bg:#202123 #f5f5f5",
         "bottom-toolbar": "bg:#202123 #f5f5f5",
     })
-    def approval_toolbar():
-        if not session.approval_pending():
-            return ""
-        prompt = session.approval_prompt() or "Approval required: enter y or n"
-        return [("class:bottom-toolbar", f"  ⚠ {prompt}")]
+    def notify_approval() -> None:
+        try:
+            get_app().invalidate()
+        except Exception:
+            pass
 
-    prompt_session = PromptSession(multiline=True, key_bindings=bindings, style=style, completer=SlashCompleter(), complete_while_typing=True, bottom_toolbar=approval_toolbar)
+    session.approval_notify = notify_approval
+    prompt_session = PromptSession(multiline=True, key_bindings=bindings, style=style, completer=SlashCompleter(), complete_while_typing=True)
 
     def prompt() -> HTML:
-        return HTML(f"<prompt>╭─ forgecode │ {mode()}\n╰─❯ </prompt>")
+        approval = ""
+        if session.approval_pending():
+            text = escape(session.approval_prompt() or "Approval required: enter y or n")
+            approval = f"<approval>⚠ {text}</approval>\n"
+        return HTML(f"{approval}<prompt>╭─ forgecode │ {mode()}\n╰─❯ </prompt>")
 
     with patch_stdout(raw=True):
         while not session.stopped:

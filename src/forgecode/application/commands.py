@@ -1865,12 +1865,19 @@ def main(argv: list[str] | None = None) -> int:
         approval_lines: queue.Queue[str] = queue.Queue()
         approval_waiting = threading.Event()
         approval_prompt_text = {"value": ""}
+        interactive_holder = {"session": None}
         def approval_input(prompt: str = "") -> str:
             # Approval is always serviced by the interactive input loop.  A
             # direct ``input()`` call here can race prompt_toolkit's repaint
             # and leave the approval prompt invisible while the tool waits.
             approval_waiting.set()
             approval_prompt_text["value"] = prompt
+            try:
+                # The prompt UI owns repainting; the worker only requests it.
+                if interactive_holder["session"] is not None:
+                    interactive_holder["session"].approval_notify()
+            except Exception:
+                pass
             try:
                 return approval_lines.get(timeout=300.0)
             except queue.Empty:
@@ -2875,11 +2882,13 @@ def main(argv: list[str] | None = None) -> int:
             clear_screen=clear_screen_command,
             approval_pending=approval_waiting.is_set,
             approval_prompt=lambda: approval_prompt_text["value"],
+            approval_notify=lambda: None,
             submit_approval=lambda line: approval_lines.put(line),
             json_mode=bool(getattr(args, "json", False)),
             jsonl_mode=bool(getattr(args, "jsonl", False)),
             controller=controller,
         )
+        interactive_holder["session"] = interactive
         if machine_json:
             header_data = {"run_id": session.run_id, "workspace": ".", "mode": state["mode"], "profile": settings.profile, "rules": rules_count, "budget": settings.effective.context_budget_chars if settings.effective else 60_000}
             _emit_machine(_machine_envelope("chat", "interactive_header", True, data=header_data, exit_code=0, type="interactive_header", **_compat_aliases(header_data)))
